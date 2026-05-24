@@ -663,6 +663,10 @@
             z-index: 7100;
         }
 
+        #api-key-settings-modal-overlay {
+            z-index: 7100;
+        }
+
         #auth-info-modal-overlay {
             z-index: 7100;
         }
@@ -687,6 +691,7 @@
         .settings-row.settings-admin-menu-row,
         .settings-row.settings-code-create-row,
         .settings-row.settings-notice-badge-row,
+        .settings-row.settings-api-key-row,
         .settings-row.settings-auth-info-row,
         .settings-row.settings-admin-users-row {
             display: none;
@@ -696,6 +701,7 @@
         .settings-row.settings-admin-menu-row.visible,
         .settings-row.settings-code-create-row.visible,
         .settings-row.settings-notice-badge-row.visible,
+        .settings-row.settings-api-key-row.visible,
         .settings-row.settings-auth-info-row.visible,
         .settings-row.settings-admin-users-row.visible {
             display: flex;
@@ -953,6 +959,10 @@
             position: relative;
         }
 
+        #btn-settings.has-api-key-warning {
+            position: relative;
+        }
+
         #btn-settings.has-update::after {
             content: '';
             position: absolute;
@@ -963,6 +973,35 @@
             border-radius: 50%;
             background: #2563eb;
             box-shadow: 0 0 0 2px #fff;
+        }
+
+        #btn-settings.has-api-key-warning::after {
+            content: '';
+            position: absolute;
+            top: 7px;
+            right: 7px;
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #dc2626;
+            box-shadow: 0 0 0 2px #fff;
+        }
+
+        .admin-api-key-warning {
+            display: none;
+            margin: 12px 18px;
+            padding: 11px 12px;
+            border: 1px solid #fecaca;
+            border-radius: 8px;
+            background: #fef2f2;
+            color: #991b1b;
+            font-size: 12px;
+            font-weight: 800;
+            line-height: 1.45;
+        }
+
+        .admin-api-key-warning.visible {
+            display: block;
         }
 
         .settings-section {
@@ -1544,4 +1583,3 @@
             top: 0;
             /* line-height가 1.4(약 15.4px)이므로, 글자와 높이를 맞춤 */
         }
-

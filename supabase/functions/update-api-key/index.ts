@@ -1,0 +1,142 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
+
+function jsonResponse(body: Record<string, unknown>, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      ...corsHeaders,
+      'Content-Type': 'application/json',
+    },
+  });
+}
+
+function normalizeExpiresAt(value: unknown) {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
+  if (req.method !== 'POST') {
+    return jsonResponse({ error: 'Method not allowed' }, 405);
+  }
+
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
+  let serviceRoleKey = '';
+  try {
+    const secretKeys = JSON.parse(Deno.env.get('SUPABASE_SECRET_KEYS') || '{}');
+    serviceRoleKey = secretKeys.default || '';
+  } catch (_error) {
+    serviceRoleKey = '';
+  }
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return jsonResponse({ error: 'API 키 설정 중 오류가 발생했습니다.' }, 500);
+  }
+
+  if (!serviceRoleKey) {
+    return jsonResponse({ error: 'SUPABASE_SECRET_KEYS.default가 설정되지 않았습니다.' }, 500);
+  }
+
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader) {
+    return jsonResponse({ error: '로그인이 필요합니다.' }, 401);
+  }
+
+  const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+    global: { headers: { Authorization: authHeader } },
+  });
+  const { data: userData, error: userError } = await authClient.auth.getUser();
+  if (userError || !userData.user) {
+    return jsonResponse({ error: '로그인이 필요합니다.' }, 401);
+  }
+
+  const serviceClient = createClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+
+  const userId = userData.user.id;
+  const { data: entitlement, error: entitlementError } = await serviceClient
+    .from('entitlements')
+    .select('tier')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (entitlementError) {
+    return jsonResponse({ error: '관리자 권한 확인에 실패했습니다.', detail: entitlementError.message }, 500);
+  }
+
+  if (entitlement?.tier !== 'admin') {
+    return jsonResponse({ error: '관리자 권한이 필요합니다.' }, 403);
+  }
+
+  let payload: { provider?: unknown; key?: unknown; expiresAt?: unknown };
+  try {
+    payload = await req.json();
+  } catch (_error) {
+    return jsonResponse({ error: '입력값이 올바르지 않습니다.' }, 400);
+  }
+
+  const provider = typeof payload.provider === 'string' ? payload.provider.trim().toLowerCase() : 'vworld';
+  if (provider !== 'vworld') {
+    return jsonResponse({ error: '지원하지 않는 API 키 종류입니다.' }, 400);
+  }
+
+  const key = typeof payload.key === 'string' ? payload.key.trim() : '';
+  if (!key) {
+    return jsonResponse({ error: 'API 키를 입력하세요.' }, 400);
+  }
+
+  const expiresAt = normalizeExpiresAt(payload.expiresAt);
+  const now = new Date().toISOString();
+  const value = {
+    [provider]: {
+      key,
+      expiresAt,
+      updatedAt: now,
+      updatedBy: userId,
+    },
+  };
+
+  const { error: upsertError } = await serviceClient
+    .from('app_settings')
+    .upsert({
+      key: 'api_keys',
+      value,
+      updated_by: userId,
+      updated_at: now,
+    }, { onConflict: 'key' });
+
+  if (upsertError) {
+    return jsonResponse({ error: 'API 키 설정 저장에 실패했습니다.', detail: upsertError.message }, 500);
+  }
+
+  return jsonResponse({
+    ok: true,
+    settings: {
+      apiKeys: {
+        [provider]: {
+          key,
+          expiresAt,
+          expired: Boolean(expiresAt && new Date(expiresAt).getTime() <= Date.now()),
+          updatedAt: now,
+        },
+      },
+    },
+    serverTime: now,
+  });
+});

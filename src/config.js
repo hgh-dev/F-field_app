@@ -12,9 +12,52 @@ export const SHARE_BASE_URL = "https://f-field.app/";
 /**
  * VWORLD_API_KEY
  * 국토교통부 VWorld 지도 서비스를 이용하기 위한 인증 키입니다.
- * 이 키가 있어야만 위성지도, 지적도 등의 타일 이미지를 받아올 수 있습니다.
+ * Supabase 앱 설정에서 받은 값을 우선 사용하고, 네트워크 오류 시 로컬 캐시 또는 기본값을 씁니다.
  */
-export const VWORLD_API_KEY = "9FA62223-726F-3193-8BF1-F6530711D503";
+export const DEFAULT_VWORLD_API_KEY = "9FA62223-726F-3193-8BF1-F6530711D503";
+export const VWORLD_API_KEY_CACHE_KEY = 'f-field-vworld-api-key-cache';
+export const APP_SETTINGS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+function getCachedVworldApiKey() {
+   try {
+      if (typeof localStorage === 'undefined') return '';
+      const raw = localStorage.getItem(VWORLD_API_KEY_CACHE_KEY);
+      if (!raw) return '';
+      const cached = JSON.parse(raw);
+      const key = typeof cached.key === 'string' ? cached.key.trim() : '';
+      const expiresAt = typeof cached.expiresAt === 'string' ? cached.expiresAt : '';
+      if (!key) return '';
+      if (expiresAt && new Date(expiresAt).getTime() <= Date.now()) return '';
+      return key;
+   } catch (_error) {
+      return '';
+   }
+}
+
+export let VWORLD_API_KEY = getCachedVworldApiKey() || DEFAULT_VWORLD_API_KEY;
+
+export function setVworldApiKey(key, options = {}) {
+   const nextKey = typeof key === 'string' ? key.trim() : '';
+   if (!nextKey) return VWORLD_API_KEY;
+
+   VWORLD_API_KEY = nextKey;
+   try {
+      if (typeof localStorage === 'undefined') return VWORLD_API_KEY;
+      localStorage.setItem(VWORLD_API_KEY_CACHE_KEY, JSON.stringify({
+         key: nextKey,
+         expiresAt: options.expiresAt || null,
+         updatedAt: options.updatedAt || new Date().toISOString(),
+         fetchedAt: new Date().toISOString()
+      }));
+   } catch (_error) {
+      // localStorage를 사용할 수 없는 환경에서는 현재 세션 값만 갱신합니다.
+   }
+
+   if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('f-field:vworld-api-key-change', { detail: { key: nextKey } }));
+   }
+   return VWORLD_API_KEY;
+}
 
 /**
  * LocalStorage Keys

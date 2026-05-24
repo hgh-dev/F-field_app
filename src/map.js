@@ -427,6 +427,63 @@ configureMapLayerOpacityLayers({
 });
 applyDefaultMapLayerOpacities();
 
+const vworldKeyLayers = [
+    vworldBase,
+    vworldSatellite,
+    vworldHybrid,
+    vworldLxLayer,
+    vworldContinuousLayer,
+    mergedAdminLayer,
+    vworldRestrictionLayer,
+    vworldSteepSlopeLayer,
+    vworldHeritageLayer,
+    vworldForestLayer,
+    vworldCityparkLayer,
+    vworldForestryLayer,
+    vworldEnvpreserveLayer,
+    vworldCityzoneLayer,
+    vworldManagezoneLayer,
+    vworldFarmzoneLayer,
+    vworldBaekduLayer,
+    vworldWetlandLayer,
+    vworldWildlifeLayer,
+    vworldWatersourceLayer,
+    vworldNatureparkLayer,
+    vworldCityroadLayer,
+    vworldCityTransportLayer,
+    vworldCitySpaceLayer,
+    vworldCityPublicCultureLayer,
+    vworldCityDisasterLayer,
+    vworldCityEnvironmentLayer,
+    vworldLanduseLayer,
+    vworldBizzoneLayer,
+    vworldIndustrialBoundaryLayer,
+    vworldIndustrialFacilityLayer,
+    vworldIndustrialUsezoneLayer,
+    vworldIndustrialBusinessLayer,
+    vworldFlightProhibitLayer,
+    vworldRoadClassLayer,
+    vworldFlightRestrictLayer,
+    vworldForestSoilLayer,
+    vworldHikingTrailLayer
+];
+
+export function applyVworldApiKeyToMapLayers(key = VWORLD_API_KEY) {
+    const nextKey = String(key || '').trim();
+    if (!nextKey) return;
+
+    vworldKeyLayers.forEach(layer => {
+        layer.options.key = nextKey;
+        if (typeof layer.redraw === 'function') layer.redraw();
+    });
+}
+
+if (typeof window !== 'undefined') {
+    window.addEventListener('f-field:vworld-api-key-change', (event) => {
+        applyVworldApiKeyToMapLayers(event.detail?.key);
+    });
+}
+
 
 // 앱 기본 시작 레이어 구성입니다.
 // 동작 원리: 위성 + 지적도 + 하이브리드 조합을 먼저 올려 현장 식별성을 높입니다.

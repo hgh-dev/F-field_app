@@ -61,6 +61,7 @@ function closeVisibleOverlayForBackButton(closeHandlers) {
     const closeTargets = [
         ['delete-account-modal-overlay', closeHandlers.closeDeleteAccountModal],
         ['verification-code-create-modal-overlay', closeHandlers.closeVerificationCodeCreateModal],
+        ['api-key-settings-modal-overlay', closeHandlers.closeApiKeySettingsModal],
         ['notice-badge-settings-modal-overlay', closeHandlers.closeNoticeBadgeSettingsModal],
         ['auth-info-modal-overlay', closeHandlers.closeAuthInfoModal],
         ['admin-users-modal-overlay', closeHandlers.closeAdminUsersModal],

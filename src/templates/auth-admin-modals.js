@@ -160,6 +160,30 @@ const AUTH_ADMIN_MODALS_HTML = `    <div id="auth-modal-overlay" class="nav-moda
         </div>
     </div>
 
+    <div id="api-key-settings-modal-overlay" class="nav-modal-overlay center-modal-overlay">
+        <div class="nav-modal-content center-modal-content compact auth-modal-content"
+            onclick="event.stopPropagation()">
+            <div class="auth-modal-header">
+                <div class="auth-modal-title">API키 관리</div>
+                <button id="api-key-settings-modal-close" class="auth-modal-close" type="button"
+                    aria-label="닫기">×</button>
+            </div>
+            <div class="verification-code-form">
+                <div class="verification-code-field">
+                    <label class="verification-code-label" for="api-key-vworld-key">VWorld API 키</label>
+                    <input id="api-key-vworld-key" class="verification-code-input" type="text"
+                        autocomplete="off" spellcheck="false" placeholder="VWorld API 키">
+                </div>
+                <div class="verification-code-field">
+                    <label class="verification-code-label" for="api-key-vworld-expires-at">만료일</label>
+                    <input id="api-key-vworld-expires-at" class="verification-code-input" type="datetime-local">
+                    <div id="api-key-current-status" class="verification-code-help"></div>
+                </div>
+                <button id="api-key-save-btn" class="auth-google-btn" type="button">저장</button>
+            </div>
+        </div>
+    </div>
+
     <div id="auth-info-modal-overlay" class="nav-modal-overlay center-modal-overlay">
         <div class="nav-modal-content center-modal-content compact auth-modal-content"
             onclick="event.stopPropagation()">
@@ -209,6 +233,7 @@ const AUTH_ADMIN_MODALS_HTML = `    <div id="auth-modal-overlay" class="nav-moda
                 <div class="settings-page-title">관리자 메뉴</div>
                 <div></div>
             </header>
+            <div id="admin-api-key-warning" class="admin-api-key-warning"></div>
             <section class="settings-section">
                 <div id="settings-admin-users-row" class="settings-row settings-link-row settings-admin-users-row">
                     <div>
@@ -229,6 +254,13 @@ const AUTH_ADMIN_MODALS_HTML = `    <div id="auth-modal-overlay" class="nav-moda
                     <div>
                         <div class="settings-label">공지 뱃지 설정</div>
                         <div class="settings-help">공지사항 버튼에 표시할 파란 뱃지 시간을 설정합니다.</div>
+                    </div>
+                    <span class="settings-chevron"></span>
+                </div>
+                <div id="settings-api-key-row" class="settings-row settings-link-row settings-api-key-row">
+                    <div>
+                        <div class="settings-label">API키 관리</div>
+                        <div class="settings-help">VWorld API 키와 만료일을 앱 안에서 관리합니다.</div>
                     </div>
                     <span class="settings-chevron"></span>
                 </div>

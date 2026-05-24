@@ -12,10 +12,12 @@ import { copyText } from '../utils.js';
 import {
     AUTH_FEATURES, canUseFeature, createVerificationCode, deleteAccount, fetchAdminUsers, fetchAppSettings, fetchAuthInfo, getAuthState, isAdminAccount,
     isAuthConfigured, loadCurrentEntitlement, redeemVerificationCode, signInWithGoogle, signOut,
-    updateNoticeBadgeSettings, updateUserEntitlement
+    updateApiKeySettings, updateNoticeBadgeSettings, updateUserEntitlement
 } from '../auth.js';
 
 const PREMIUM_ACTION_GRANT_MS = 10 * 60 * 1000;
+const API_KEY_EXPIRATION_WARNING_DAYS = 10;
+const DAY_MS = 24 * 60 * 60 * 1000;
 const featureActionGrants = new Map();
 let latestNoticeBadgeSettings = null;
 let latestAdminUsers = [];
@@ -116,6 +118,7 @@ export function updateAuthUI(state = getAuthState()) {
     const settingsVerificationCodeRow = document.getElementById('settings-verification-code-row');
     const settingsVerificationCodeCreateRow = document.getElementById('settings-verification-code-create-row');
     const settingsNoticeBadgeRow = document.getElementById('settings-notice-badge-row');
+    const settingsApiKeyRow = document.getElementById('settings-api-key-row');
     const settingsAdminUsersRow = document.getElementById('settings-admin-users-row');
     const googleButton = document.getElementById('auth-google-btn');
     const tier = state.tier || 'free';
@@ -192,6 +195,9 @@ export function updateAuthUI(state = getAuthState()) {
     if (settingsNoticeBadgeRow) {
         settingsNoticeBadgeRow.classList.toggle('visible', canUseFeature(AUTH_FEATURES.NOTICE_BADGE_MANAGE, state));
     }
+    if (settingsApiKeyRow) {
+        settingsApiKeyRow.classList.toggle('visible', canUseFeature(AUTH_FEATURES.API_KEY_MANAGE, state));
+    }
     if (settingsAdminUsersRow) {
         settingsAdminUsersRow.classList.toggle('visible', canUseFeature(AUTH_FEATURES.ADMIN_USERS, state));
     }
@@ -199,6 +205,7 @@ export function updateAuthUI(state = getAuthState()) {
         googleButton.style.display = isLoggedIn ? 'none' : 'flex';
         googleButton.disabled = !isAuthConfigured();
     }
+    updateApiKeyExpirationWarning(state);
     if (state.error) setAuthMessage(state.error, 'error');
 }
 
@@ -320,6 +327,32 @@ function setNoticeBadgeVisible(isVisible) {
     button.classList.toggle('has-notice-badge', Boolean(isVisible));
 }
 
+function getApiKeyExpirationWarning(settings = latestNoticeBadgeSettings) {
+    const expiresAt = settings?.apiKeys?.vworld?.expiresAt;
+    if (!expiresAt) return null;
+
+    const expiresTime = new Date(expiresAt).getTime();
+    if (Number.isNaN(expiresTime)) return null;
+
+    const daysRemaining = Math.max(0, Math.ceil((expiresTime - Date.now()) / DAY_MS));
+    if (daysRemaining > API_KEY_EXPIRATION_WARNING_DAYS) return null;
+
+    const paddedDays = String(daysRemaining).padStart(2, '0');
+    return `API키 만료 ${paddedDays}일 전입니다. 만료 2일 전까지 api키를 연장하거나 새로운 키로 교체하세요.`;
+}
+
+function updateApiKeyExpirationWarning(state = getAuthState()) {
+    const isAdmin = isAdminAccount(state);
+    const message = isAdmin ? getApiKeyExpirationWarning() : null;
+    const settingsButton = document.getElementById('btn-settings');
+    const warningEl = document.getElementById('admin-api-key-warning');
+
+    settingsButton?.classList.toggle('has-api-key-warning', Boolean(message));
+    if (!warningEl) return;
+    warningEl.textContent = message || '';
+    warningEl.classList.toggle('visible', Boolean(message));
+}
+
 function formatDateTimeLocal(dateValue) {
     if (!dateValue) return '';
     const date = new Date(dateValue);
@@ -363,7 +396,39 @@ export async function refreshNoticeBadgeSettings() {
 
     latestNoticeBadgeSettings = settings;
     setNoticeBadgeVisible(settings.noticeBadge.active);
+    updateApiKeyExpirationWarning();
     return settings;
+}
+
+function syncApiKeyModal(settings = latestNoticeBadgeSettings) {
+    const vworld = settings?.apiKeys?.vworld || {};
+    const keyInput = document.getElementById('api-key-vworld-key');
+    const expiresInput = document.getElementById('api-key-vworld-expires-at');
+    const statusEl = document.getElementById('api-key-current-status');
+
+    if (keyInput) keyInput.value = vworld.key || '';
+    if (expiresInput) expiresInput.value = formatDateTimeLocal(vworld.expiresAt);
+    if (statusEl) {
+        if (!vworld.key) {
+            statusEl.textContent = '현재 설정: 저장된 키 없음';
+        } else if (vworld.expired) {
+            statusEl.textContent = '현재 설정: 만료됨';
+        } else {
+            statusEl.textContent = vworld.expiresAt
+                ? `현재 설정: ${new Date(vworld.expiresAt).toLocaleString()}까지 사용`
+                : '현재 설정: 만료일 없음';
+        }
+    }
+}
+
+function getApiKeyModalPayload() {
+    const key = document.getElementById('api-key-vworld-key')?.value.trim() || '';
+    const expiresAtValue = document.getElementById('api-key-vworld-expires-at')?.value || '';
+    return {
+        provider: 'vworld',
+        key,
+        expiresAt: expiresAtValue ? new Date(expiresAtValue).toISOString() : null
+    };
 }
 
 function openNoticeBadgeSettingsModal() {
@@ -384,6 +449,40 @@ function openNoticeBadgeSettingsModal() {
 
 export function closeNoticeBadgeSettingsModal() {
     const overlay = document.getElementById('notice-badge-settings-modal-overlay');
+    if (!overlay) return;
+    overlay.classList.remove('visible');
+    setTimeout(() => { overlay.style.display = 'none'; }, 200);
+}
+
+async function openApiKeySettingsModal() {
+    if (!canUseFeature(AUTH_FEATURES.API_KEY_MANAGE, getAuthState())) {
+        alert('관리자 권한이 필요합니다.');
+        return;
+    }
+
+    const overlay = document.getElementById('api-key-settings-modal-overlay');
+    if (!overlay) return;
+    syncApiKeyModal();
+    overlay.style.display = 'flex';
+    setTimeout(() => {
+        overlay.classList.add('visible');
+        document.getElementById('api-key-vworld-key')?.focus();
+    }, 10);
+
+    try {
+        const settings = await fetchAppSettings({ force: true });
+        if (settings) {
+            latestNoticeBadgeSettings = settings;
+            syncApiKeyModal(settings);
+            updateApiKeyExpirationWarning();
+        }
+    } catch (_error) {
+        // 저장 화면은 캐시된 값만으로도 열 수 있습니다.
+    }
+}
+
+export function closeApiKeySettingsModal() {
+    const overlay = document.getElementById('api-key-settings-modal-overlay');
     if (!overlay) return;
     overlay.classList.remove('visible');
     setTimeout(() => { overlay.style.display = 'none'; }, 200);
@@ -467,6 +566,7 @@ async function openAdminMenuModal() {
 
     const overlay = document.getElementById('admin-menu-modal-overlay');
     if (!overlay) return;
+    updateApiKeyExpirationWarning();
     overlay.style.display = 'flex';
     setTimeout(() => overlay.classList.add('visible'), 10);
 }
@@ -628,12 +728,51 @@ async function handleSaveNoticeBadgeSettings() {
 
     try {
         const result = await updateNoticeBadgeSettings(payload);
-        latestNoticeBadgeSettings = result;
-        syncNoticeBadgeModal(result);
-        setNoticeBadgeVisible(result?.noticeBadge?.active);
+        const settings = await fetchAppSettings({ force: true }) || result;
+        latestNoticeBadgeSettings = settings;
+        syncNoticeBadgeModal(settings);
+        setNoticeBadgeVisible(settings?.noticeBadge?.active);
+        updateApiKeyExpirationWarning();
         alert('공지 뱃지 설정을 저장했습니다.');
     } catch (error) {
         alert(error.message || '공지 뱃지 설정 중 오류가 발생했습니다.');
+    } finally {
+        if (button) {
+            button.disabled = false;
+            button.textContent = '저장';
+        }
+    }
+}
+
+async function handleSaveApiKeySettings() {
+    if (!canUseFeature(AUTH_FEATURES.API_KEY_MANAGE, getAuthState())) {
+        alert('관리자 권한이 필요합니다.');
+        return;
+    }
+
+    const button = document.getElementById('api-key-save-btn');
+    const payload = getApiKeyModalPayload();
+    if (!payload.key) {
+        alert('API 키를 입력하세요.');
+        return;
+    }
+
+    if (button) {
+        button.disabled = true;
+        button.textContent = '저장 중...';
+    }
+
+    try {
+        const result = await updateApiKeySettings(payload);
+        const settings = await fetchAppSettings({ force: true }) || result?.settings;
+        if (settings) {
+            latestNoticeBadgeSettings = settings;
+            syncApiKeyModal(settings);
+            updateApiKeyExpirationWarning();
+        }
+        alert('API 키 설정을 저장했습니다.');
+    } catch (error) {
+        alert(error.message || 'API 키 설정 중 오류가 발생했습니다.');
     } finally {
         if (button) {
             button.disabled = false;
@@ -747,6 +886,7 @@ export function initAuthUiEventListeners() {
     document.getElementById('settings-verification-code-row')?.addEventListener('click', handleVerificationCodeInput);
     document.getElementById('settings-verification-code-create-row')?.addEventListener('click', openVerificationCodeCreateModal);
     document.getElementById('settings-notice-badge-row')?.addEventListener('click', openNoticeBadgeSettingsModal);
+    document.getElementById('settings-api-key-row')?.addEventListener('click', openApiKeySettingsModal);
     document.getElementById('settings-admin-users-row')?.addEventListener('click', openAdminUsersModal);
     document.getElementById('auth-modal-close')?.addEventListener('click', closeAuthModal);
     document.getElementById('auth-modal-overlay')?.addEventListener('click', (event) => {
@@ -769,6 +909,11 @@ export function initAuthUiEventListeners() {
         if (event.target.id === 'notice-badge-settings-modal-overlay') closeNoticeBadgeSettingsModal();
     });
     document.getElementById('notice-badge-save-btn')?.addEventListener('click', handleSaveNoticeBadgeSettings);
+    document.getElementById('api-key-settings-modal-close')?.addEventListener('click', closeApiKeySettingsModal);
+    document.getElementById('api-key-settings-modal-overlay')?.addEventListener('click', (event) => {
+        if (event.target.id === 'api-key-settings-modal-overlay') closeApiKeySettingsModal();
+    });
+    document.getElementById('api-key-save-btn')?.addEventListener('click', handleSaveApiKeySettings);
     document.getElementById('auth-info-modal-close')?.addEventListener('click', closeAuthInfoModal);
     document.getElementById('auth-info-modal-overlay')?.addEventListener('click', (event) => {
         if (event.target.id === 'auth-info-modal-overlay') closeAuthInfoModal();

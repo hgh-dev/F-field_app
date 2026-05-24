@@ -9,6 +9,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { Capacitor } from '@capacitor/core';
 import { App } from '@capacitor/app';
+import { APP_SETTINGS_CACHE_TTL_MS, setVworldApiKey } from './config.js';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -21,6 +22,7 @@ export const AUTH_FEATURES = Object.freeze({
     ADMIN_USERS: 'admin_users',
     VERIFICATION_CODE_CREATE: 'verification_code_create',
     NOTICE_BADGE_MANAGE: 'notice_badge_manage',
+    API_KEY_MANAGE: 'api_key_manage',
     AUTH_INFO: 'auth_info'
 });
 
@@ -34,8 +36,10 @@ const FEATURE_TIERS = Object.freeze({
     [AUTH_FEATURES.ADMIN_USERS]: new Set(['admin']),
     [AUTH_FEATURES.VERIFICATION_CODE_CREATE]: new Set(['admin']),
     [AUTH_FEATURES.NOTICE_BADGE_MANAGE]: new Set(['admin']),
+    [AUTH_FEATURES.API_KEY_MANAGE]: new Set(['admin']),
     [AUTH_FEATURES.AUTH_INFO]: new Set(['verified', 'premium', 'admin'])
 });
+const APP_SETTINGS_CACHE_KEY = 'f-field-app-settings-cache';
 const ANDROID_AUTH_REDIRECT_URL = 'app.ffield.mobile://auth-callback';
 const AUTH_URL_PARAM_KEYS = new Set([
     'access_token',
@@ -410,9 +414,50 @@ export async function createVerificationCode(options = {}) {
     return result;
 }
 
-export async function fetchAppSettings() {
+function getCachedAppSettings() {
+    try {
+        const raw = localStorage.getItem(APP_SETTINGS_CACHE_KEY);
+        if (!raw) return null;
+        const cached = JSON.parse(raw);
+        if (!cached?.fetchedAt || Date.now() - new Date(cached.fetchedAt).getTime() > APP_SETTINGS_CACHE_TTL_MS) return null;
+        return cached.settings || null;
+    } catch (_error) {
+        return null;
+    }
+}
+
+function cacheAppSettings(settings) {
+    try {
+        localStorage.setItem(APP_SETTINGS_CACHE_KEY, JSON.stringify({
+            settings,
+            fetchedAt: new Date().toISOString()
+        }));
+    } catch (_error) {
+        // 캐시 실패는 앱 동작에 영향을 주지 않습니다.
+    }
+}
+
+function applyRuntimeAppSettings(settings) {
+    const vworld = settings?.apiKeys?.vworld;
+    if (vworld?.key) {
+        setVworldApiKey(vworld.key, {
+            expiresAt: vworld.expiresAt || null,
+            updatedAt: vworld.updatedAt || null
+        });
+    }
+}
+
+export async function fetchAppSettings(options = {}) {
     if (!supabase || !SUPABASE_URL || !SUPABASE_ANON_KEY) {
         return null;
+    }
+
+    if (!options.force) {
+        const cached = getCachedAppSettings();
+        if (cached) {
+            applyRuntimeAppSettings(cached);
+            return cached;
+        }
     }
 
     let response;
@@ -431,7 +476,10 @@ export async function fetchAppSettings() {
     if (!response.ok) return null;
 
     try {
-        return await response.json();
+        const settings = await response.json();
+        cacheAppSettings(settings);
+        applyRuntimeAppSettings(settings);
+        return settings;
     } catch (_error) {
         return null;
     }
@@ -474,6 +522,58 @@ export async function updateNoticeBadgeSettings(options = {}) {
 
     if (!response.ok) {
         throw new Error(result?.error || '공지 뱃지 설정 중 오류가 발생했습니다.');
+    }
+
+    try {
+        localStorage.removeItem(APP_SETTINGS_CACHE_KEY);
+    } catch (_error) {
+        // 캐시 삭제 실패는 다음 조회 시 서버 응답으로 복구됩니다.
+    }
+
+    return result;
+}
+
+export async function updateApiKeySettings(options = {}) {
+    if (!supabase || !SUPABASE_URL || !SUPABASE_ANON_KEY) {
+        throw new Error('.env.local에 Supabase 설정이 없습니다.');
+    }
+    if (!canUseFeature(AUTH_FEATURES.API_KEY_MANAGE)) {
+        throw new Error('관리자 권한이 필요합니다.');
+    }
+
+    const { data, error } = await supabase.auth.getSession();
+    if (error) throw error;
+    const accessToken = data.session?.access_token;
+    if (!accessToken) throw new Error('로그인이 필요합니다.');
+
+    let response;
+    try {
+        response = await fetch(`${SUPABASE_URL}/functions/v1/update-api-key`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${accessToken}`
+            },
+            body: JSON.stringify(options)
+        });
+    } catch (_error) {
+        throw new Error('API 키 설정 중 오류가 발생했습니다.');
+    }
+
+    let result = null;
+    try {
+        result = await response.json();
+    } catch (_error) {
+        result = null;
+    }
+
+    if (!response.ok) {
+        throw new Error(result?.error || 'API 키 설정 중 오류가 발생했습니다.');
+    }
+
+    if (result?.settings) {
+        applyRuntimeAppSettings(result.settings);
     }
 
     return result;

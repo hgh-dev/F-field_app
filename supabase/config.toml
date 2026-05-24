@@ -13,6 +13,9 @@ verify_jwt = false
 [functions.update-notice-badge]
 verify_jwt = false
 
+[functions.update-api-key]
+verify_jwt = false
+
 [functions.get-auth-info]
 verify_jwt = false
 

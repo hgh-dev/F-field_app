@@ -27,6 +27,7 @@ import {
 } from './features/tracking.js';
 import {
     closeAccountActionsModal,
+    closeApiKeySettingsModal,
     closeAdminMenuModal,
     closeAdminUsersModal,
     closeAuthInfoModal,
@@ -129,6 +130,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     initAndroidBackButtonExit({
         closeDeleteAccountModal,
         closeVerificationCodeCreateModal,
+        closeApiKeySettingsModal,
         closeNoticeBadgeSettingsModal,
         closeAuthInfoModal,
         closeAdminUsersModal,

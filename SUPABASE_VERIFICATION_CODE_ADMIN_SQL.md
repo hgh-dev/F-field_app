@@ -85,6 +85,13 @@ on public.app_settings
 for select
 to anon, authenticated
 using (key = 'notice_badge');
+
+drop policy if exists "app_settings_api_keys_read" on public.app_settings;
+create policy "app_settings_api_keys_read"
+on public.app_settings
+for select
+to anon, authenticated
+using (key = 'api_keys');
 ```
 
 공지 뱃지 Edge Function 배포:
@@ -92,4 +99,15 @@ using (key = 'notice_badge');
 ```bash
 supabase functions deploy get-app-settings
 supabase functions deploy update-notice-badge
+```
+
+## API 키 관리 기능
+
+`app_settings.api_keys`에 VWorld API 키와 만료일을 저장한다. 앱은 설정을 하루 단위로 로컬 캐시하고, 캐시가 없거나 만료되면 `get-app-settings`에서 다시 가져온다.
+
+API 키 관리 Edge Function 배포:
+
+```bash
+supabase functions deploy get-app-settings
+supabase functions deploy update-api-key
 ```
