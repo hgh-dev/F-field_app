@@ -1,0 +1,39 @@
+{
+  "name": "f-field",
+  "version": "1.0.3",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "prebuild": "npm run version:check",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "version:set": "node scripts/set-version.mjs",
+    "version:check": "node scripts/check-version.mjs",
+    "android:copy": "npm run build && cap copy android",
+    "android:sync": "npm run build && cap sync android",
+    "android:open": "cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.3.1",
+    "@capacitor/app": "^8.1.0",
+    "@capacitor/cli": "^8.3.1",
+    "@capacitor/core": "^8.3.1",
+    "@capacitor/filesystem": "^8.1.2",
+    "@capacitor/share": "^8.0.1",
+    "@crmackey/shp-write": "0.4.5",
+    "@supabase/supabase-js": "^2.105.4",
+    "@turf/turf": "^6.5.0",
+    "jszip": "^3.10.1",
+    "leaflet": "^1.9.4",
+    "leaflet-draw": "^1.0.4",
+    "localforage": "^1.10.0",
+    "pmtiles": "^4.4.1",
+    "proj4": "^2.11.0",
+    "shpjs": "^3.6.3",
+    "sql.js": "^1.14.1"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  }
+}

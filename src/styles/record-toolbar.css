@@ -1,0 +1,399 @@
+        /* --- 기록 FAB (그리기 도구) --- */
+        .record-fab {
+            position: absolute;
+            right: 16px;
+            bottom: calc(18px + env(safe-area-inset-bottom));
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 10px;
+            z-index: 2100;
+            pointer-events: none;
+        }
+
+        .record-fab-menu {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 10px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(10px);
+            pointer-events: none;
+            transition: opacity 0.18s ease, transform 0.18s ease, visibility 0s linear 0.18s;
+        }
+
+        .record-fab.expanded .record-fab-menu {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+            pointer-events: auto;
+            transition-delay: 0s;
+        }
+
+        .record-fab-group {
+            width: 164px;
+            padding: 8px 0;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.98);
+            box-shadow: 0 4px 14px rgba(15, 23, 42, 0.22);
+            overflow: hidden;
+        }
+
+        .record-fab-main {
+            width: 40px;
+            height: 40px;
+            border: none;
+            border-radius: 50%;
+            background: var(--color-primary);
+            color: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 0;
+            box-sizing: border-box;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.28);
+            transition: background-color 0.18s, color 0.18s, transform 0.12s, box-shadow 0.18s;
+            pointer-events: auto;
+        }
+
+        .record-fab-main {
+            font-size: 26px;
+            font-weight: 300;
+            line-height: 1;
+        }
+
+        .record-fab-main.is-recording {
+            background: var(--color-primary);
+            color: #fff;
+            box-shadow: 0 6px 16px rgba(59, 130, 246, 0.36);
+            cursor: default;
+            pointer-events: auto;
+        }
+
+        .record-fab.expanded .record-fab-main {
+            background: #fff;
+            color: #111827;
+            box-shadow: 0 6px 18px rgba(15, 23, 42, 0.35);
+        }
+
+        .record-fab-main:focus {
+            outline: none;
+        }
+
+        .record-fab-main:active,
+        .bottom-btn:active {
+            transform: scale(0.95);
+        }
+
+        .record-fab-plus,
+        .record-fab-close,
+        .record-fab-active-icon {
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .record-fab-close {
+            font-size: 26px;
+            font-weight: 300;
+            line-height: 1;
+        }
+
+        .record-fab:not(.expanded) .record-fab-main:not(.is-recording) .record-fab-plus,
+        .record-fab.expanded .record-fab-close,
+        .record-fab:not(.expanded) .record-fab-main.is-recording .record-fab-active-icon {
+            display: flex;
+        }
+
+        .record-fab-active-icon,
+        .record-fab-active-icon .icon-box,
+        .record-fab-active-icon svg {
+            width: 22px;
+            height: 22px;
+        }
+
+        .record-fab-label {
+            color: #222;
+            font-size: 13px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            white-space: nowrap;
+        }
+
+        .bottom-btn {
+            width: 100%;
+            height: 38px;
+            border: none;
+            background: transparent;
+            color: #555;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 10px;
+            min-width: 0;
+            min-height: var(--tap-min);
+            padding: 0 14px;
+            box-sizing: border-box;
+            cursor: pointer;
+            box-shadow: none;
+            flex-direction: row;
+            transition: background-color 0.16s, color 0.16s;
+            pointer-events: none;
+        }
+
+        .record-fab.expanded .bottom-btn {
+            pointer-events: auto;
+        }
+
+        .bottom-btn:active {
+            background: #f3f4f6;
+            transform: none;
+        }
+
+        .bottom-btn .icon-circle {
+            width: 22px;
+            height: 22px;
+            flex: 0 0 22px;
+            color: var(--record-icon-color, var(--color-primary));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .bottom-btn .icon-box {
+            width: 22px;
+            height: 22px;
+            margin-bottom: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .bottom-btn .icon-box svg {
+            width: 22px;
+            height: 22px;
+        }
+
+        #btn-poly {
+            --record-icon-color: #f97316;
+        }
+
+        #btn-line {
+            --record-icon-color: #0ea5e9;
+        }
+
+        #btn-point {
+            --record-icon-color: #22c55e;
+        }
+
+        #btn-track {
+            --record-icon-color: #8b5cf6;
+        }
+
+        #btn-photo-point {
+            --record-icon-color: #ec4899;
+        }
+
+        #auth-status-btn.premium {
+            color: #0f766e;
+        }
+
+        .active-btn {
+            background: #eff6ff;
+            color: var(--color-primary) !important;
+        }
+
+        .active-btn .icon-circle {
+            color: var(--color-primary) !important;
+        }
+
+        .active-btn .svg-icon {
+            fill: currentColor;
+            stroke: currentColor;
+        }
+
+        /* --- 그리기 진행 중 액션 바 --- */
+        .action-toolbar {
+            position: absolute;
+            right: calc(16px + 40px + 12px);
+            bottom: calc(18px + env(safe-area-inset-bottom));
+            width: min(340px, calc(100vw - 86px));
+            max-width: 340px;
+            height: auto;
+            padding: var(--space-2);
+            box-sizing: border-box;
+
+            /* Glassmorphism Style */
+            background: rgba(255, 255, 255, 0.94);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(229, 231, 235, 0.95);
+
+            border-radius: 20px;
+            display: none;
+            /* 그리기 모드일 때만 flex로 변경 */
+            flex-direction: column;
+            justify-content: center;
+            align-items: stretch;
+            gap: var(--space-3);
+
+            z-index: 2000;
+            box-shadow: 0 6px 18px rgba(15, 23, 42, 0.18);
+            transition: all 0.3s ease;
+        }
+
+        .action-toolbar-main {
+            display: flex;
+            flex-direction: row;
+            justify-content: space-evenly;
+            align-items: center;
+            gap: var(--space-2);
+        }
+
+        .edit-action-toolbar {
+            width: min(370px, calc(100vw - 86px));
+            max-width: 370px;
+        }
+
+        .edit-action-group {
+            display: flex;
+            min-width: 0;
+            gap: var(--space-1);
+            width: 100%;
+        }
+
+        .edit-vertex-action-group {
+            display: none;
+        }
+
+        .edit-confirm-action-group {
+            display: flex;
+        }
+
+        .edit-action-toolbar.vertex-selected .edit-vertex-action-group {
+            display: flex;
+        }
+
+        .edit-action-toolbar.vertex-selected .edit-confirm-action-group {
+            display: none;
+        }
+
+        .edit-action-toolbar.marker-edit .edit-vertex-action-group,
+        .edit-action-toolbar.marker-edit .edit-confirm-action-group {
+            display: contents;
+        }
+
+        .edit-action-toolbar.marker-edit .action-toolbar-main {
+            gap: var(--space-1);
+        }
+
+        .edit-action-toolbar.marker-edit .action-btn {
+            flex: 1 1 0;
+            width: 0;
+        }
+
+        .action-btn {
+            border: none;
+            background: none;
+            flex: 1;
+            min-width: 0;
+            min-height: 50px;
+            padding: var(--space-2) var(--space-1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: var(--space-1);
+            font-size: 11px;
+            /* 11 × 0.9 ≈ 10 */
+            font-weight: 600;
+            color: #555;
+            cursor: pointer;
+            border-radius: var(--radius-lg);
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .edit-action-group .action-btn {
+            min-height: 48px;
+            font-size: 10px;
+        }
+
+        .edit-vertex-action-group .action-btn {
+            background: #F3F4F6;
+            border: 1px solid #E5E7EB;
+            color: #374151;
+        }
+
+        .edit-vertex-action-group .action-btn svg {
+            fill: #4B5563 !important;
+        }
+
+        .action-btn:active {
+            background-color: rgba(0, 0, 0, 0.05);
+            transform: scale(0.95);
+        }
+
+        .action-btn:disabled {
+            opacity: 0.4;
+            cursor: default;
+            pointer-events: none;
+        }
+
+        .btn-gps {
+            color: #3B82F6;
+        }
+
+        .btn-gps svg {
+            fill: #3B82F6 !important;
+        }
+
+        .btn-delete-vertex {
+            color: #EF4444;
+        }
+
+        .btn-delete-vertex svg {
+            fill: #EF4444 !important;
+        }
+
+        .edit-vertex-action-group .action-btn.btn-gps {
+            color: #3B82F6;
+        }
+
+        .edit-vertex-action-group .action-btn.btn-gps svg {
+            fill: #3B82F6 !important;
+        }
+
+        .edit-vertex-action-group .action-btn.btn-delete-vertex {
+            color: #EF4444;
+        }
+
+        .edit-vertex-action-group .action-btn.btn-delete-vertex svg {
+            fill: #EF4444 !important;
+        }
+
+        .btn-done {
+            color: #10B981;
+            background-color: rgba(16, 185, 129, 0.1);
+        }
+
+        .btn-done svg {
+            fill: #10B981 !important;
+        }
+
+        .action-btn svg {
+            width: 24px;
+            height: 24px;
+            fill: #666;
+            margin-bottom: 2px;
+            transition: fill 0.2s;
+        }
+
+        /* 행정경계 레이어 필터: 위성 산림색과 구분되는 고채도 연두색 */
+        .admin-layer {
+            filter: invert(84%) sepia(100%) saturate(2200%) hue-rotate(28deg) brightness(120%) contrast(135%);
+        }
+

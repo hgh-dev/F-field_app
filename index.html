@@ -1,0 +1,1869 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <!-- 
+    ==========================================================================
+    1. 헤더 및 메타데이터 (Head & Meta)
+    ==========================================================================
+    문서의 제목, 설정, 외부 라이브러리 등을 정의하는 곳입니다.
+    -->
+    <title>F-Field</title>
+
+    <!-- 모바일 기기에서 화면 배율을 설정합니다. (확대/축소 방지) -->
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta charset="utf-8" />
+
+    <!-- PWA (웹앱) 설정: 홈 화면에 추가할 때 앱처럼 보이게 합니다. -->
+    <link rel="manifest" href="%BASE_URL%manifest.webmanifest">
+    <meta name="theme-color" content="transparent">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes"> <!-- iOS 호환성을 위해 남겨둠 -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="icon" href="%BASE_URL%favicon.ico">
+    <link rel="apple-touch-icon" href="%BASE_URL%icon-192.png">
+
+    <!-- 
+    외부 라이브러리 불러오기
+    Leaflet: 지도 라이브러리
+    Turf: 공간 분석 라이브러리
+    Proj4: 좌표 변환 라이브러리
+    -->
+    <!-- 외부 라이브러리는 npm/Vite 번들에서 로드합니다. -->
+
+    <!-- 
+    ==========================================================================
+    2. 스타일 (CSS Styles)
+    ==========================================================================
+    화면의 생김새와 배치를 담당하는 CSS 코드입니다.
+    -->
+    <link rel="stylesheet" href="%BASE_URL%src/styles/base.css">
+    <link rel="stylesheet" href="%BASE_URL%src/styles/record-toolbar.css">
+    <link rel="stylesheet" href="%BASE_URL%src/styles/sidebar.css">
+    <link rel="stylesheet" href="%BASE_URL%src/styles/auth-admin.css">
+    <link rel="stylesheet" href="%BASE_URL%src/styles/photo.css">
+    <link rel="stylesheet" href="%BASE_URL%src/styles/bottom-sheet.css">
+    <link rel="stylesheet" href="%BASE_URL%src/styles/style-modal.css">
+</head>
+
+<body>
+    <!-- 
+    ==========================================================================
+    3. 바디 구조 (Main UI Structure)
+    ==========================================================================
+    -->
+
+    <!-- 지도 상단 플로팅 버튼 -->
+    <div class="map-top-controls">
+        <div class="map-top-left">
+            <button class="map-control-btn" onclick="openSidebar()" aria-label="메뉴 열기" title="메뉴">
+                <svg class="svg-icon" viewBox="0 0 24 24">
+                    <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" />
+                </svg>
+            </button>
+        </div>
+
+        <div class="map-top-right">
+            <button id="btn-search-toggle" class="map-control-btn" onclick="toggleSearchBox()" aria-label="검색창 열기"
+                title="검색">
+                <svg class="svg-icon" viewBox="0 0 24 24">
+                    <path
+                        d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
+                </svg>
+            </button>
+            <button class="map-control-btn" onclick="openLocationActionModal()" aria-label="내 위치 공유" title="내 위치 공유">
+                <svg class="svg-icon" viewBox="0 0 24 24">
+                    <path
+                        d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11A2.99 2.99 0 1 0 15 5c0 .24.04.47.09.7L8.04 9.81A3 3 0 1 0 8.04 14.2l7.12 4.18c-.05.2-.08.41-.08.62a2.92 2.92 0 1 0 2.92-2.92z" />
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- 
+    ==========================================================================
+    [구조 2] 검색 컨테이너 (Search Container)
+    평소에는 보이지 않다가(display: none 또는 height: 0), 
+    검색 버튼을 눌렀을 때 나타나는 영역입니다.
+    ==========================================================================
+    -->
+    <div id="search-container">
+        <div class="search-tabs">
+            <button class="search-tab-btn active" data-tab="address" onclick="switchSearchTab('address')">주소 및
+                장소</button>
+            <button class="search-tab-btn" data-tab="national" onclick="switchSearchTab('national')">국가지점번호</button>
+            <button class="search-tab-btn" data-tab="coord" onclick="switchSearchTab('coord')">좌표</button>
+        </div>
+
+        <div id="search-content-address" class="search-tab-content active">
+            <input type="text" id="search-input-address" placeholder="주소(지번, 도로명) 또는 장소명을 입력하세요"
+                onkeypress="if(event.key==='Enter') executeSearch('address')" onfocus="showHistoryPanel()">
+            <button id="search-go-btn" onclick="executeSearch('address')">이동</button>
+        </div>
+
+        <div id="search-content-national" class="search-tab-content">
+            <input type="text" id="search-input-national" placeholder="예: 가나 1234 5678"
+                onkeypress="if(event.key==='Enter') executeSearch('national')" onfocus="showHistoryPanel()">
+            <button id="search-go-btn-national" onclick="executeSearch('national')">이동</button>
+        </div>
+
+        <div id="search-content-coord" class="search-tab-content">
+            <div id="search-coord-inputs" class="coord-input-container">
+                <!-- Javascript에서 동적 렌더링 -->
+            </div>
+            <button id="search-go-btn-coord" onclick="executeSearch('coord')">이동</button>
+        </div>
+
+        <!-- 검색 기록 -->
+        <div id="history-panel">
+            <div class="history-header">
+                <label style="display:flex; align-items:center; gap:5px; cursor:pointer;">
+                    <input type="checkbox" id="chk-history-save" onchange="toggleHistorySave(this.checked)" checked> 기록
+                    저장
+                </label>
+                <span class="btn-clear-history" onclick="clearHistoryAll()">전체 삭제</span>
+            </div>
+            <ul id="history-list" class="history-list"></ul>
+        </div>
+
+        <!-- 검색 결과 -->
+        <div id="search-result-panel" class="search-result-panel">
+            <div class="search-result-header">
+                <span>검색 결과</span>
+                <button onclick="closeSearchResult()"
+                    style="background:none; border:none; font-size:20px; line-height:1; cursor:pointer; color:#999; padding:0 5px;">&times;</button>
+            </div>
+            <ul id="search-result-list" class="search-result-list"></ul>
+        </div>
+    </div>
+
+    <!-- [우측] GPS 및 위치 추적 버튼 -->
+    <div class="gps-btn-group">
+        <button class="circle-btn" onclick="findMe()" title="내 위치로 이동">
+            <svg class="svg-icon-lg" viewBox="0 0 100 100"
+                style="fill:none; stroke:#000000; stroke-width:4; stroke-linecap:round;">
+                <circle cx="50" cy="50" r="38" />
+                <line x1="50" y1="12" x2="50" y2="28" />
+                <line x1="50" y1="88" x2="50" y2="72" />
+                <line x1="12" y1="50" x2="28" y2="50" />
+                <line x1="88" y1="50" x2="72" y2="50" />
+                <circle cx="50" cy="50" r="5" style="fill:#000000; stroke:none;" />
+            </svg>
+        </button>
+
+        <button id="toggle-track-btn" class="circle-btn" onclick="toggleTracking()" title="위치 추적">
+            <svg id="tracking-svg-icon" viewBox="0 0 100 100">
+                <path d="M20 35 L20 20 L35 20 M80 35 L80 20 L65 20 M20 65 L20 80 L35 80 M80 65 L80 80 L65 80"
+                    fill="none" stroke="#F44336" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+                <circle cx="50" cy="50" r="28" fill="none" stroke="#000000" stroke-width="2" />
+                <path d="M50 16 L50 26 M50 74 L50 84 M16 50 L26 50 M74 50 L84 50" fill="none" stroke="#000000"
+                    stroke-width="2" stroke-linecap="round" />
+                <path d="M50 26 L34 62 L50 52 L66 62 Z" fill="#4285F4" stroke="#1967D2" stroke-width="2"
+                    stroke-linejoin="round" transform="rotate(45 50 50)" />
+            </svg>
+        </button>
+    </div>
+
+
+    <!-- 
+    ==========================================================================
+    [구조 3] 지도 컨테이너 (Map Container)
+    Leaflet.js 라이브러리가 지도를 렌더링하는 핵심 영역입니다.
+    화면 전체를 차지하도록 CSS가 설정되어 있습니다.
+    ==========================================================================
+    -->
+
+    <!-- 
+    ==========================================================================
+    [구조 3-1] 바텀 시트 (Bottom Sheet)
+    지도 위 정보(주소, 좌표, 기록 상세)를 하단 슬라이드 패널로 표시합니다.
+    기존 Leaflet bindPopup 말풍선을 대체합니다.
+    ==========================================================================
+    -->
+    <div id="bottom-sheet">
+        <div id="bottom-sheet-handle" onclick="toggleBottomSheetState()"></div>
+        <!-- 더보기 버튼 (수정, 삭제) -->
+        <button id="bottom-sheet-more-btn" onclick="toggleBottomSheetMoreMenu(event)">
+            <svg viewBox="0 0 24 24">
+                <path
+                    d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+            </svg>
+        </button>
+        <!-- 바텀시트 더보기 메뉴 -->
+        <div id="bottom-sheet-more-menu" class="more-context-menu"
+            style="display: none; position: absolute; top: 45px; right: 48px; min-width: 120px; z-index: 10000;">
+            <div class="more-menu-item" onclick="handleBottomSheetEdit()">
+                <svg viewBox="0 0 24 24">
+                    <path
+                        d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
+                </svg>
+                수정
+            </div>
+            <div class="more-menu-item" onclick="handleBottomSheetStyle()">
+                <svg viewBox="0 0 24 24">
+                    <path
+                        d="M12 3C7.03 3 3 6.58 3 11c0 3.31 2.69 6 6 6h1.5c.83 0 1.5.67 1.5 1.5S12.67 20 13.5 20H15c3.31 0 6-2.69 6-6v-3c0-4.42-4.03-8-9-8zM7.5 11C6.67 11 6 10.33 6 9.5S6.67 8 7.5 8 9 8.67 9 9.5 8.33 11 7.5 11zm3-3C9.67 8 9 7.33 9 6.5S9.67 5 10.5 5 12 5.67 12 6.5 11.33 8 10.5 8zm3 0C12.67 8 12 7.33 12 6.5S12.67 5 13.5 5 15 5.67 15 6.5 14.33 8 13.5 8zm3 3c-.83 0-1.5-.67-1.5-1.5S15.67 8 16.5 8 18 8.67 18 9.5 17.33 11 16.5 11z" />
+                </svg>
+                스타일 설정
+            </div>
+            <div id="bottom-sheet-hole-item" class="more-menu-item" onclick="handleBottomSheetHole()">
+                <svg viewBox="0 0 24 24">
+                    <path fill-rule="evenodd" clip-rule="evenodd"
+                        d="M12 2L2 9L6 21H18L22 9L12 2ZM12 8.2L8.7 10.55L10.05 14.45H13.95L15.3 10.55L12 8.2Z" />
+                </svg>
+                구멍 그리기
+            </div>
+            <div id="bottom-sheet-hole-fill-item" class="more-menu-item" onclick="handleBottomSheetHoleFill()">
+                <svg viewBox="0 0 24 24">
+                    <path d="M12 2L2 9L6 21H18L22 9L12 2Z" />
+                </svg>
+                구멍 채우기
+            </div>
+            <hr style="width:100%; margin:4px 0; border:none; border-top:1px solid #f0f0f0;">
+            <div class="more-menu-item" onclick="handleBottomSheetBringToFront()">
+                <svg viewBox="0 0 24 24">
+                    <line x1="5" y1="18" x2="19" y2="18" stroke="currentColor" stroke-width="1.8"
+                        stroke-linecap="round" />
+                    <line x1="9" y1="13" x2="9" y2="5.5" stroke="currentColor" stroke-width="1.8"
+                        stroke-linecap="round" />
+                    <polyline points="6.8,7.7 9,5.5 11.2,7.7" fill="none" stroke="currentColor" stroke-width="1.8"
+                        stroke-linecap="round" stroke-linejoin="round" />
+                    <line x1="15" y1="13" x2="15" y2="5.5" stroke="currentColor" stroke-width="1.8"
+                        stroke-linecap="round" />
+                    <polyline points="12.8,7.7 15,5.5 17.2,7.7" fill="none" stroke="currentColor" stroke-width="1.8"
+                        stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                맨앞으로
+            </div>
+            <div class="more-menu-item" onclick="handleBottomSheetBringForward()">
+                <svg viewBox="0 0 24 24">
+                    <line x1="5" y1="18" x2="19" y2="18" stroke="currentColor" stroke-width="1.8"
+                        stroke-linecap="round" />
+                    <line x1="12" y1="13" x2="12" y2="5.5" stroke="currentColor" stroke-width="1.8"
+                        stroke-linecap="round" />
+                    <polyline points="9.8,7.7 12,5.5 14.2,7.7" fill="none" stroke="currentColor" stroke-width="1.8"
+                        stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                앞으로
+            </div>
+            <div class="more-menu-item" onclick="handleBottomSheetSendBackward()">
+                <svg viewBox="0 0 24 24">
+                    <line x1="5" y1="6" x2="19" y2="6" stroke="currentColor" stroke-width="1.8"
+                        stroke-linecap="round" />
+                    <line x1="12" y1="10.5" x2="12" y2="18" stroke="currentColor" stroke-width="1.8"
+                        stroke-linecap="round" />
+                    <polyline points="9.8,15.8 12,18 14.2,15.8" fill="none" stroke="currentColor" stroke-width="1.8"
+                        stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                뒤로
+            </div>
+            <div class="more-menu-item" onclick="handleBottomSheetSendToBack()">
+                <svg viewBox="0 0 24 24">
+                    <line x1="5" y1="6" x2="19" y2="6" stroke="currentColor" stroke-width="1.8"
+                        stroke-linecap="round" />
+                    <line x1="9" y1="10.5" x2="9" y2="18" stroke="currentColor" stroke-width="1.8"
+                        stroke-linecap="round" />
+                    <polyline points="6.8,15.8 9,18 11.2,15.8" fill="none" stroke="currentColor" stroke-width="1.8"
+                        stroke-linecap="round" stroke-linejoin="round" />
+                    <line x1="15" y1="10.5" x2="15" y2="18" stroke="currentColor" stroke-width="1.8"
+                        stroke-linecap="round" />
+                    <polyline points="12.8,15.8 15,18 17.2,15.8" fill="none" stroke="currentColor" stroke-width="1.8"
+                        stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                맨뒤로
+            </div>
+            <hr style="width:100%; margin:4px 0; border:none; border-top:1px solid #f0f0f0;">
+            <div class="more-menu-item danger" onclick="handleBottomSheetDelete()">
+                <svg viewBox="0 0 24 24">
+                    <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
+                </svg>
+                삭제
+            </div>
+        </div>
+        <!-- 닫기 버튼은 컨테이너 내에서 우측 상단 절대 위치 -->
+        <button id="bottom-sheet-close" onclick="closeBottomSheet()">✕</button>
+        <div id="bottom-sheet-body"></div>
+    </div>
+
+    <div id="map"></div>
+
+    <!-- 지도 상단부 중앙: 현재 프로젝트 뱃지 -->
+    <div id="map-active-project-badge" onclick="openSidebar(); switchSidebarTab('project')" role="button"
+        aria-label="프로젝트 관리 열기" title="프로젝트 관리"></div>
+
+    <!-- 
+    ==========================================================================
+    [구조 4] 하단 툴바 (Bottom Toolbar)
+    점, 선, 면 그리기 도구를 선택할 수 있는 플로팅 버튼 영역입니다.
+    모바일 환경을 고려하여 화면 오른쪽 하단에서 세로로 확장됩니다.
+    ==========================================================================
+    -->
+    <div id="record-fab" class="record-fab">
+        <div class="record-fab-menu">
+            <div class="record-fab-group">
+                <button id="btn-poly" class="bottom-btn" onclick="closeRecordFab(); startDraw('polygon')" title="면 기록">
+                    <span class="icon-circle">
+                        <span class="icon-box">
+                            <svg class="svg-icon" viewBox="0 0 24 24">
+                                <path d="M12 2L2 9L6 21H18L22 9L12 2Z" fill="currentColor" fill-opacity="0.3"
+                                    stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+                            </svg>
+                        </span>
+                    </span>
+                    <span class="record-fab-label">면 기록</span>
+                </button>
+                <button id="btn-line" class="bottom-btn" onclick="closeRecordFab(); startDraw('polyline')" title="선 기록">
+                    <span class="icon-circle">
+                        <span class="icon-box">
+                            <svg class="svg-icon" viewBox="0 0 24 24">
+                                <path
+                                    d="M23 8c0 1.1-.9 2-2 2-.18 0-.35-.02-.51-.07l-3.56 3.55c.05.16.07.34.07.52 0 1.1-.9 2-2 2s-2-.9-2-2c0-.18.02-.36.07-.52l-2.55-2.55c-.16.05-.34.07-.52.07s-.36-.02-.52-.07l-4.55 4.56c.05.16.07.33.07.51 0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2c.18 0 .35.02.51.07l4.56-4.55C8.02 9.36 8 9.18 8 9c0-1.1.9-2 2-2s2 .9 2 2c0 .18-.02.36-.07.52l2.55 2.55c.16-.05.34-.07.52-.07s.36.02.52-.07l3.55-3.56C19.02 8.35 19 8.18 19 8c0-1.1.9-2 2-2s2 .9 2 2z" />
+                            </svg>
+                        </span>
+                    </span>
+                    <span class="record-fab-label">선 기록</span>
+                </button>
+                <button id="btn-point" class="bottom-btn" onclick="closeRecordFab(); startDraw('marker')" title="점 기록">
+                    <span class="icon-circle">
+                        <span class="icon-box">
+                            <svg class="svg-icon" viewBox="0 0 24 24">
+                                <path
+                                    d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
+                            </svg>
+                        </span>
+                    </span>
+                    <span class="record-fab-label">점 기록</span>
+                </button>
+            </div>
+            <div id="premium-record-tools" class="record-fab-group">
+                <button id="btn-track" class="bottom-btn" onclick="closeRecordFab(); startTrackRecording()"
+                    title="트랙 기록">
+                    <span class="icon-circle">
+                        <span class="icon-box">
+                            <svg class="svg-icon" viewBox="0 0 24 24">
+                                <path
+                                    d="M13.49 5.48c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm-3.6 13.9l1-4.4 2.1 2v6h2v-7.5l-2.1-2 .6-3c1.3 1.5 3.3 2.5 5.5 2.5v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1l-5.2 2.2v4.7h2v-3.4l1.8-.7-1.6 8.1-4.9-1-.4 2 7 1.4z" />
+                            </svg>
+                        </span>
+                    </span>
+                    <span class="record-fab-label">트랙 기록</span>
+                </button>
+                <button id="btn-photo-point" class="bottom-btn" onclick="closeRecordFab(); startPhotoPoint()"
+                    title="사진 기록">
+                    <span class="icon-circle">
+                        <span class="icon-box">
+                            <svg class="svg-icon" viewBox="0 0 24 24">
+                                <path fill="currentColor" opacity="0.4"
+                                    d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" />
+                                <path fill="currentColor"
+                                    d="M14 9h-1.5l-1-1h-3l-1 1H6c-.55 0-1 .45-1 1v5c0 .55.45 1 1 1h8c.55 0 1-.45 1-1v-5c0-.55-.45-1-1-1zm-4 5.5c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z" />
+                            </svg>
+                        </span>
+                    </span>
+                    <span class="record-fab-label">사진 기록</span>
+                </button>
+            </div>
+        </div>
+        <button id="record-fab-main" class="record-fab-main" onclick="toggleRecordFab()" aria-label="기록 도구 열기">
+            <span class="record-fab-plus">+</span>
+            <span class="record-fab-close">×</span>
+            <span id="record-fab-active-icon" class="record-fab-active-icon"></span>
+        </button>
+    </div>
+
+    <!-- [중앙 하단] 그리기 액션바 (그리기 중에만 표시됨) -->
+    <div id="action-toolbar" class="action-toolbar">
+        <div class="action-toolbar-main">
+            <button class="action-btn btn-gps" onclick="addGpsVertex()">
+                <svg viewBox="0 0 24 24">
+                    <path
+                        d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z" />
+                </svg>
+                현위치기록
+            </button>
+            <button class="action-btn btn-done" onclick="completeDrawing()">
+                <svg viewBox="0 0 24 24">
+                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                </svg>
+                기록 완료
+            </button>
+            <button class="action-btn" onclick="deleteLastVertex()">
+                <svg viewBox="0 0 24 24">
+                    <path
+                        d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z" />
+                </svg>
+                되돌리기
+            </button>
+            <button class="action-btn" onclick="cancelDrawing()">
+                <svg viewBox="0 0 24 24">
+                    <path
+                        d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                </svg>
+                취소
+            </button>
+        </div>
+    </div>
+
+    <!-- [중앙 하단] 트랙 기록 액션바 (트랙 모드 중에만 표시됨) -->
+    <div id="track-action-toolbar" class="action-toolbar" style="display:none;">
+        <div class="action-toolbar-main">
+            <button class="action-btn btn-done" onclick="completeTrackRecording()">
+                <svg viewBox="0 0 24 24">
+                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                </svg>
+                기록 완료
+            </button>
+            <button class="action-btn" onclick="startSleepMode()">
+                <svg viewBox="0 0 24 24">
+                    <path
+                        d="M9 2c-1.05 0-2.05.16-3 .46 4.06 1.27 7 5.06 7 9.54s-2.94 8.27-7 9.54c.95.3 1.95.46 3 .46 5.52 0 10-4.48 10-10S14.52 2 9 2z" />
+                </svg>
+                절전
+            </button>
+            <button id="btn-track-photo-point" class="action-btn" onclick="addTrackPhotoPoint(event)">
+                <svg viewBox="0 0 24 24">
+                    <path
+                        d="M4 4h3l2-2h6l2 2h3c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2zm8 3c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zm0 8c-1.65 0-3-1.35-3-3s1.35-3 3-3 3 1.35 3 3-1.35 3-3 3z" />
+                </svg>
+                사진 추가
+            </button>
+            <button class="action-btn" onclick="cancelTrackRecording()">
+                <svg viewBox="0 0 24 24">
+                    <path
+                        d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                </svg>
+                취소
+            </button>
+        </div>
+    </div>
+
+    <!-- [중앙 하단] 수정 모드 액션바 (개별 도형 수정 중에만 표시됨) -->
+    <div id="edit-action-toolbar" class="action-toolbar edit-action-toolbar" style="display:none;">
+        <div class="action-toolbar-main">
+            <div id="edit-vertex-action-group" class="edit-action-group edit-vertex-action-group">
+                <button id="btn-edit-move-gps" class="action-btn btn-gps" onclick="moveSelectedEditVertexToGps()" disabled>
+                    <svg viewBox="0 0 24 24">
+                        <path
+                            d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A9.004 9.004 0 0 0 13 3.06V1h-2v2.06A9.004 9.004 0 0 0 3.06 11H1v2h2.06A9.004 9.004 0 0 0 11 20.94V23h2v-2.06A9.004 9.004 0 0 0 20.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z" />
+                    </svg>
+                    현 위치로 이동
+                </button>
+                <button id="btn-edit-delete-vertex" class="action-btn btn-delete-vertex" onclick="deleteSelectedEditVertex()" disabled>
+                    <svg viewBox="0 0 24 24">
+                        <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
+                    </svg>
+                    버텍스 삭제
+                </button>
+                <button id="btn-edit-clear-vertex" class="action-btn" onclick="clearSelectedEditVertexSelection()" disabled>
+                    <svg viewBox="0 0 24 24">
+                        <path
+                            d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                    </svg>
+                    선택해제
+                </button>
+            </div>
+            <div class="edit-action-group edit-confirm-action-group">
+                <button class="action-btn btn-done" onclick="completeSingleEdit()">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                    </svg>
+                    수정 완료
+                </button>
+                <button class="action-btn" onclick="revertSingleEdit()">
+                    <svg viewBox="0 0 24 24">
+                        <path
+                            d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z" />
+                    </svg>
+                    원상복구
+                </button>
+                <button class="action-btn" onclick="cancelSingleEdit()">
+                    <svg viewBox="0 0 24 24">
+                        <path
+                            d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                    </svg>
+                    취소
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 
+    ==========================================================================
+    4. 오버레이 및 모달 (Overlays & Modals)
+    ==========================================================================
+    -->
+
+    <!-- 인증/관리자 모달은 src/templates/auth-admin-modals.js에서 주입합니다. -->
+
+    <div id="settings-choice-modal-overlay" class="nav-modal-overlay center-modal-overlay"
+        onclick="closeSettingsChoiceModal()">
+        <div class="nav-modal-content center-modal-content compact settings-choice-modal-content"
+            onclick="event.stopPropagation()">
+            <div id="settings-choice-modal-title" class="settings-choice-modal-title">설정 선택</div>
+            <div id="settings-choice-list" class="settings-choice-list"></div>
+        </div>
+    </div>
+
+    <!-- 
+    ==========================================================================
+    [구조 5] 사이드바 (Sidebar)
+    메뉴 버튼 클릭 시 왼쪽에서 슬라이드되어 나오는 오버레이 영역입니다.
+    지도 설정과 기록 관리를 위한 탭 인터페이스를 포함합니다.
+    ==========================================================================
+    -->
+    <div id="sidebar-overlay" class="sidebar-overlay" onclick="if(event.target === this) closeSidebar()">
+        <div class="sidebar-content">
+            <div class="sidebar-header">
+                <button class="btn-sidebar-action" onclick="closeSidebar()">
+                    <svg class="svg-icon" viewBox="0 0 24 24">
+                        <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
+                    </svg>
+                </button>
+                <div style="display:flex; gap:10px;">
+                    <button id="btn-notice" class="btn-sidebar-action" type="button" title="공지사항" aria-label="공지사항"
+                        onclick="window.open('https://f-field.blogspot.com/', '_blank')">
+                        <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+                            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                        </svg>
+                        <span class="notice-badge-dot" aria-hidden="true"></span>
+                    </button>
+                    <button id="btn-settings" class="btn-sidebar-action" onclick="openSettingsModal()" title="설정">
+                        <svg class="svg-icon" viewBox="0 0 24 24">
+                            <path
+                                d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="sidebar-tabs">
+                <button class="tab-btn active" onclick="switchSidebarTab('map')" id="tab-btn-map">지도 설정</button>
+                <button class="tab-btn" onclick="switchSidebarTab('project')" id="tab-btn-project">프로젝트 관리</button>
+                <button class="tab-btn" onclick="switchSidebarTab('record')" id="tab-btn-record">기록 관리</button>
+            </div>
+            <div class="sidebar-body">
+                <!-- 탭 1: 지도 설정 -->
+                <div id="content-map" class="tab-content active">
+                    <div class="menu-section">
+                        <div class="menu-title accordion-header active"
+                            onclick="toggleAccordion('section-base-map', this)"
+                            style="cursor:pointer; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding-bottom:8px; margin-bottom:10px;">
+                            <span>기본 지도</span><span class="toggle-icon"></span>
+                        </div>
+                        <div id="section-base-map" class="accordion-content" style="display: block;">
+                            <div class="check-group">
+                                <div class="option-row" style="border-bottom:none; padding-bottom:5px;">
+                                    <div class="accordion-header" onclick="toggleAccordion('base-layer-options', this)">
+                                        <span class="toggle-icon"></span>
+                                        <span>배경지도</span>
+                                    </div>
+                                    <input type="checkbox" id="chk-base-layer" checked
+                                        onchange="toggleBaseLayer(this.checked)">
+                                </div>
+                                <div id="base-layer-options" class="accordion-content"
+                                    style="margin-top: 0; padding: 10px 15px; background: #f8f9fa; border-radius: 8px; margin-bottom: 10px;">
+                                    <label class="option-row" style="padding:8px 0;">
+                                        <span style="flex:1;">위성지도</span>
+                                        <input type="radio" name="baseMap" value="satellite"
+                                            onchange="changeBaseMap('satellite')">
+                                    </label>
+                                    <label class="option-row" style="padding:8px 0;">
+                                        <span style="flex:1;">위성지도</span>
+                                        <input type="radio" name="baseMap" value="esri"
+                                            onchange="changeBaseMap('esri')">
+                                    </label>
+                                    <label class="option-row" style="border:none; padding:8px 0;">
+                                        <span style="flex:1;">일반지도</span>
+                                        <input type="radio" name="baseMap" value="base"
+                                            onchange="changeBaseMap('base')">
+                                    </label>
+                                </div>
+                                <label class="option-row">
+                                    <span class="static-icon"></span>
+                                    <span style="flex:1;">하이브리드(도로/지명)</span>
+                                    <input type="checkbox" id="chk-hybrid"
+                                        onchange="toggleOverlay('hybrid', this.checked)">
+                                </label>
+                                <label class="option-row">
+                                    <span class="static-icon"></span>
+                                    <span style="flex:1;">행정경계</span>
+                                    <input type="checkbox" id="chk-admin"
+                                        onchange="toggleOverlay('admin', this.checked)">
+                                </label>
+                                <div class="option-row" style="border-bottom:none; padding-bottom:5px;">
+                                    <div class="accordion-header"
+                                        onclick="toggleAccordion('cadastral-layer-options', this)">
+                                        <span class="toggle-icon"></span>
+                                        <span>지적도</span>
+                                    </div>
+                                    <input type="checkbox" id="chk-cadastral"
+                                        onchange="toggleOverlay('cadastral', this.checked)">
+                                </div>
+                                <div id="cadastral-layer-options" class="accordion-content"
+                                    style="margin-top: 0; padding: 10px 15px; background: #f8f9fa; border-radius: 8px; margin-bottom: 10px;">
+                                    <label class="option-row" style="padding:8px 0;"><span
+                                            style="flex:1;">연속지적도</span><input type="radio" name="cadastralMap"
+                                            value="continuous" checked
+                                            onchange="changeCadastralMap('continuous')"></label>
+                                    <label class="option-row" style="border:none; padding:8px 0;"><span
+                                            style="flex:1;">LX맵</span><input type="radio" name="cadastralMap" value="lx"
+                                            onchange="changeCadastralMap('lx')"></label>
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+                    <div class="menu-section">
+                        <div class="menu-title accordion-header active" onclick="toggleAccordion('section-topic-groups', this)"
+                            style="cursor:pointer; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding-bottom:8px; margin-bottom:10px;">
+                            <span>주제도</span><span class="toggle-icon"></span>
+                        </div>
+                        <div id="section-topic-groups" class="accordion-content topic-map-groups"
+                            style="display: block;">
+                            <div class="option-row" style="border-bottom:none; padding-bottom:5px;">
+                                <div class="accordion-header" onclick="toggleAccordion('section-land-use', this)">
+                                    <span class="toggle-icon"></span>
+                                    <span>국토의 용도 구분</span>
+                                </div>
+                                <input type="checkbox" disabled>
+                            </div>
+                            <div id="section-land-use" class="accordion-content" style="display: none;">
+                                <label class="option-row">
+                                    <span class="static-icon"></span>
+                                    <span style="flex:1;">도시지역</span>
+                                    <input type="checkbox" id="chk-cityzone"
+                                        onchange="toggleOverlay('cityzone', this.checked)">
+                                </label>
+                                <div id="legend-cityzone" class="vworld-legend" style="display:none;"></div>
+                                <label class="option-row">
+                                    <span class="static-icon"></span>
+                                    <span style="flex:1;">관리지역</span>
+                                    <input type="checkbox" id="chk-managezone"
+                                        onchange="toggleOverlay('managezone', this.checked)">
+                                </label>
+                                <div id="legend-managezone" class="vworld-legend" style="display:none;"></div>
+                                <label class="option-row">
+                                    <span class="static-icon"></span>
+                                    <span style="flex:1;">농림지역</span>
+                                    <input type="checkbox" id="chk-farmzone"
+                                        onchange="toggleOverlay('farmzone', this.checked)">
+                                </label>
+                                <div id="legend-farmzone" class="vworld-legend" style="display:none;"></div>
+                                <label class="option-row" style="border-bottom:none; padding-bottom:5px;">
+                                    <span class="static-icon"></span>
+                                    <span style="flex:1;">자연환경보전지역</span>
+                                    <input type="checkbox" id="chk-envpreserve"
+                                        onchange="toggleOverlay('envpreserve', this.checked)">
+                                </label>
+                                <div id="legend-envpreserve" class="vworld-legend" style="display:none;"></div>
+                            </div>
+                            <div class="option-row" style="border-bottom:none; padding-bottom:5px;">
+                                <div class="accordion-header" onclick="toggleAccordion('section-zone-map', this)">
+                                    <span class="toggle-icon"></span>
+                                    <span>다른 법률에 따른 지역·지구·구역</span>
+                                </div>
+                                <input type="checkbox" disabled>
+                            </div>
+                            <div id="section-zone-map" class="accordion-content" style="display: none;">
+                                <label class="option-row">
+                                    <span class="static-icon"></span>
+                                    <span style="flex:1;">개발제한구역</span>
+                                    <input type="checkbox" id="chk-restriction"
+                                        onchange="toggleOverlay('restriction', this.checked)">
+                                </label>
+                                <div id="legend-restriction" class="vworld-legend" style="display:none;"></div>
+                                <label class="option-row">
+                                    <span class="static-icon"></span>
+                                    <span style="flex:1;">산림보호구역</span>
+                                    <input type="checkbox" id="chk-forest"
+                                        onchange="toggleOverlay('forest', this.checked)">
+                                </label>
+                                <div id="legend-forest" class="vworld-legend" style="display:none;"></div>
+                                <label class="option-row">
+                                    <span class="static-icon"></span>
+                                    <span style="flex:1;">국가유산 지정/보호구역</span>
+                                    <input type="checkbox" id="chk-heritage"
+                                        onchange="toggleOverlay('heritage', this.checked)">
+                                </label>
+                                <div id="legend-heritage" class="vworld-legend" style="display:none;"></div>
+                                <label class="option-row">
+                                    <span class="static-icon"></span>
+                                    <span style="flex:1;">도시자연공원구역</span>
+                                    <input type="checkbox" id="chk-citypark"
+                                        onchange="toggleOverlay('citypark', this.checked)">
+                                </label>
+                                <div id="legend-citypark" class="vworld-legend" style="display:none;"></div>
+                                <label class="option-row">
+                                    <span class="static-icon"></span>
+                                    <span style="flex:1;">임업 및 산촌 진흥권역</span>
+                                    <input type="checkbox" id="chk-forestry"
+                                        onchange="toggleOverlay('forestry', this.checked)">
+                                </label>
+                                <div id="legend-forestry" class="vworld-legend" style="display:none;"></div>
+
+                                <label class="option-row">
+                                    <span class="static-icon"></span>
+                                    <span style="flex:1;">백두대간보호지역</span>
+                                    <input type="checkbox" id="chk-baekdu"
+                                        onchange="toggleOverlay('baekdu', this.checked)">
+                                </label>
+                                <div id="legend-baekdu" class="vworld-legend" style="display:none;"></div>
+                                <label class="option-row">
+                                    <span class="static-icon"></span>
+                                    <span style="flex:1;">습지보호지역</span>
+                                    <input type="checkbox" id="chk-wetland"
+                                        onchange="toggleOverlay('wetland', this.checked)">
+                                </label>
+                                <div id="legend-wetland" class="vworld-legend" style="display:none;"></div>
+                                <label class="option-row">
+                                    <span class="static-icon"></span>
+                                    <span style="flex:1;">야생생물보호구역</span>
+                                    <input type="checkbox" id="chk-wildlife"
+                                        onchange="toggleOverlay('wildlife', this.checked)">
+                                </label>
+                                <div id="legend-wildlife" class="vworld-legend" style="display:none;"></div>
+                                <label class="option-row">
+                                    <span class="static-icon"></span>
+                                    <span style="flex:1;">상수원보호구역</span>
+                                    <input type="checkbox" id="chk-watersource"
+                                        onchange="toggleOverlay('watersource', this.checked)">
+                                </label>
+                                <div id="legend-watersource" class="vworld-legend" style="display:none;"></div>
+                                <label class="option-row">
+                                    <span class="static-icon"></span>
+                                    <span style="flex:1;">자연공원</span>
+                                    <input type="checkbox" id="chk-naturepark"
+                                        onchange="toggleOverlay('naturepark', this.checked)">
+                                </label>
+                                <div id="legend-naturepark" class="vworld-legend" style="display:none;"></div>
+                                <label class="option-row" style="border-bottom:none; padding-bottom:5px;">
+                                    <span class="static-icon"></span>
+                                    <span style="flex:1;">급경사재해예방지역</span>
+                                    <input type="checkbox" id="chk-steep-slope"
+                                        onchange="toggleOverlay('steepSlope', this.checked)">
+                                </label>
+                                <div id="legend-steepSlope" class="vworld-legend" style="display:none;"></div>
+                            </div>
+
+                            <div class="option-row" style="border-bottom:none; padding-bottom:5px;">
+                                <div class="accordion-header" onclick="toggleAccordion('section-city-planning', this)">
+                                    <span class="toggle-icon"></span>
+                                    <span>도시계획</span>
+                                </div>
+                                <input type="checkbox" disabled>
+                            </div>
+                            <div id="section-city-planning" class="accordion-content" style="display: none;">
+                                <label class="option-row">
+                                    <span class="static-icon"></span>
+                                    <span style="flex:1;">도로</span>
+                                    <input type="checkbox" id="chk-cityroad"
+                                        onchange="toggleOverlay('cityroad', this.checked)">
+                                </label>
+                                <div id="legend-cityroad" class="vworld-legend" style="display:none;"></div>
+                                <label class="option-row">
+                                    <span class="static-icon"></span>
+                                    <span style="flex:1;">철도·항만·공항·주차장</span>
+                                    <input type="checkbox" id="chk-city-transport"
+                                        onchange="toggleOverlay('cityTransport', this.checked)">
+                                </label>
+                                <div id="legend-cityTransport" class="vworld-legend" style="display:none;"></div>
+                                <label class="option-row">
+                                    <span class="static-icon"></span>
+                                    <span style="flex:1;">공간시설</span>
+                                    <input type="checkbox" id="chk-city-space"
+                                        onchange="toggleOverlay('citySpace', this.checked)">
+                                </label>
+                                <div id="legend-citySpace" class="vworld-legend" style="display:none;"></div>
+                                <label class="option-row">
+                                    <span class="static-icon"></span>
+                                    <span style="flex:1;">공공문화체육시설</span>
+                                    <input type="checkbox" id="chk-city-public-culture"
+                                        onchange="toggleOverlay('cityPublicCulture', this.checked)">
+                                </label>
+                                <div id="legend-cityPublicCulture" class="vworld-legend" style="display:none;"></div>
+                                <label class="option-row">
+                                    <span class="static-icon"></span>
+                                    <span style="flex:1;">방재시설</span>
+                                    <input type="checkbox" id="chk-city-disaster"
+                                        onchange="toggleOverlay('cityDisaster', this.checked)">
+                                </label>
+                                <div id="legend-cityDisaster" class="vworld-legend" style="display:none;"></div>
+                                <label class="option-row" style="border-bottom:none; padding-bottom:5px;">
+                                    <span class="static-icon"></span>
+                                    <span style="flex:1;">환경기초시설</span>
+                                    <input type="checkbox" id="chk-city-environment"
+                                        onchange="toggleOverlay('cityEnvironment', this.checked)">
+                                </label>
+                                <div id="legend-cityEnvironment" class="vworld-legend" style="display:none;"></div>
+                            </div>
+
+                            <div class="option-row" style="border-bottom:none; padding-bottom:5px;">
+                                <div class="accordion-header" onclick="toggleAccordion('section-urban-planning', this)">
+                                    <span class="toggle-icon"></span>
+                                    <span>토지이용 및 개발</span>
+                                </div>
+                                <input type="checkbox" disabled>
+                            </div>
+                            <div id="section-urban-planning" class="accordion-content" style="display: none;">
+                                <label class="option-row">
+                                    <span class="static-icon"></span>
+                                    <span style="flex:1;">[택지개발지구]사업지구경계도</span>
+                                    <input type="checkbox" id="chk-bizzone"
+                                        onchange="toggleOverlay('bizzone', this.checked)">
+                                </label>
+                                <div id="legend-bizzone" class="vworld-legend" style="display:none;"></div>
+                                <label class="option-row">
+                                    <span class="static-icon"></span>
+                                    <span style="flex:1;">[택지개발지구]토지이용계획도</span>
+                                    <input type="checkbox" id="chk-landuse"
+                                        onchange="toggleOverlay('landuse', this.checked)">
+                                </label>
+                                <div id="legend-landuse" class="vworld-legend" style="display:none;"></div>
+                                <label class="option-row">
+                                    <span class="static-icon"></span>
+                                    <span style="flex:1;">[산업단지]경계</span>
+                                    <input type="checkbox" id="chk-industrial-boundary"
+                                        onchange="toggleOverlay('industrialBoundary', this.checked)">
+                                </label>
+                                <div id="legend-industrialBoundary" class="vworld-legend" style="display:none;"></div>
+                                <label class="option-row">
+                                    <span class="static-icon"></span>
+                                    <span style="flex:1;">[산업단지]시설용지</span>
+                                    <input type="checkbox" id="chk-industrial-facility"
+                                        onchange="toggleOverlay('industrialFacility', this.checked)">
+                                </label>
+                                <div id="legend-industrialFacility" class="vworld-legend" style="display:none;"></div>
+                                <label class="option-row">
+                                    <span class="static-icon"></span>
+                                    <span style="flex:1;">[산업단지]용도지역</span>
+                                    <input type="checkbox" id="chk-industrial-usezone"
+                                        onchange="toggleOverlay('industrialUsezone', this.checked)">
+                                </label>
+                                <div id="legend-industrialUsezone" class="vworld-legend" style="display:none;"></div>
+                                <label class="option-row" style="border-bottom:none; padding-bottom:5px;">
+                                    <span class="static-icon"></span>
+                                    <span style="flex:1;">[산업단지]유치업종</span>
+                                    <input type="checkbox" id="chk-industrial-business"
+                                        onchange="toggleOverlay('industrialBusiness', this.checked)">
+                                </label>
+                                <div id="legend-industrialBusiness" class="vworld-legend" style="display:none;"></div>
+                            </div>
+
+                            <div class="option-row" style="border-bottom:none; padding-bottom:5px;">
+                                <div class="accordion-header" onclick="toggleAccordion('section-topic-map', this)">
+                                    <span class="toggle-icon"></span>
+                                    <span>기타 주제도</span>
+                                </div>
+                                <input type="checkbox" disabled>
+                            </div>
+                            <div id="section-topic-map" class="accordion-content" style="display: none;">
+                                <label class="option-row">
+                                    <span class="static-icon"></span>
+                                    <span style="flex:1;">도로구분</span>
+                                    <input type="checkbox" id="chk-road-class"
+                                        onchange="toggleOverlay('roadClass', this.checked)">
+                                </label>
+                                <div id="legend-roadClass" class="vworld-legend" style="display:none;"></div>
+                                <label class="option-row">
+                                    <span class="static-icon"></span>
+                                    <span style="flex:1;">비행금지구역</span>
+                                    <input type="checkbox" id="chk-flight-prohibit"
+                                        onchange="toggleOverlay('flightProhibit', this.checked)">
+                                </label>
+                                <div id="legend-flightProhibit" class="vworld-legend" style="display:none;"></div>
+                                <label class="option-row">
+                                    <span class="static-icon"></span>
+                                    <span style="flex:1;">비행제한구역</span>
+                                    <input type="checkbox" id="chk-flight-restrict"
+                                        onchange="toggleOverlay('flightRestrict', this.checked)">
+                                </label>
+                                <div id="legend-flightRestrict" class="vworld-legend" style="display:none;"></div>
+                                <label class="option-row">
+                                    <span class="static-icon"></span>
+                                    <span style="flex:1;">산림입지토양도</span>
+                                    <input type="checkbox" id="chk-forest-soil"
+                                        onchange="toggleOverlay('forestSoil', this.checked)">
+                                </label>
+                                <div id="legend-forestSoil" class="vworld-legend" style="display:none;"></div>
+                                <label class="option-row">
+                                    <span class="static-icon"></span>
+                                    <span style="flex:1;">등산로</span>
+                                    <input type="checkbox" id="chk-hiking-trail"
+                                        onchange="toggleOverlay('hikingTrail', this.checked)">
+                                </label>
+                                <div id="legend-hikingTrail" class="vworld-legend" style="display:none;"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="menu-section">
+                        <div class="menu-title accordion-header" onclick="toggleAccordion('section-user-map', this)"
+                            style="cursor:pointer; display: flex; justify-content: space-between; align-items: center; border-bottom:1px solid #eee; padding-bottom:8px; margin-bottom:10px;">
+                            <span>사용자 지도</span>
+                        </div>
+                        <div id="section-user-map" class="accordion-content" style="display: block;">
+                            <div id="user-map-list" style="margin-top: 6px;"></div>
+                            <button type="button" class="mono-btn" onclick="addUserMapFromUrl()"
+                                style="width:100%; min-height:40px; margin-top:10px; padding: 9px 12px; font-size: 12px; font-weight: 700; background: #007bff; color: white; border: none; border-radius: 6px; justify-content:center;">
+                                <svg viewBox="0 0 24 24"
+                                    style="width:14px;height:14px;fill:currentColor;margin-right:4px;">
+                                    <path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z" />
+                                </svg>
+                                <span>불러오기</span>
+                            </button>
+                            <div id="user-map-status"
+                                style="font-size: 11px; color: #888; margin-top: 6px; text-align: left;">
+                                <ul style="padding-left: 18px; margin: 6px 0 0 0; line-height: 1.4;">
+                                    <li>로컬에서 Shp파일을 불러오거나 타일 지도의 URL을 입력하여 지도 위에 표시할 수 있습니다.</li>
+                                    <li style="margin-top: 2px;">외부 지도 주소는 CORS가 허용되어야 표시됩니다.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="offline-map-section" class="menu-section" style="display:none;">
+                        <div class="menu-title accordion-header" onclick="toggleAccordion('section-offline-map', this)"
+                            style="cursor:pointer; display: flex; justify-content: space-between; align-items: center; border-bottom:1px solid #eee; padding-bottom:8px; margin-bottom:10px;">
+                            <span>오프라인 지도</span>
+                        </div>
+                        <div id="section-offline-map" class="accordion-content" style="display: block;">
+                            <div
+                                style="margin-top:0; margin-bottom:12px; border-bottom:1px solid #f0f0f0; padding-bottom:10px;">
+                                <div id="offline-map-package-empty" style="font-size:11px; color:#888;">다운로드된 오프라인 지도가
+                                    없습니다.</div>
+                                <div id="offline-map-package-list"></div>
+                            </div>
+                            <button id="btn-offline-map" class="mono-btn"
+                                style="width:100%; min-height:40px; margin-top:10px; padding: 9px 12px; font-size: 12px; font-weight: 700; background: #007bff; color: white; border: none; border-radius: 6px; justify-content:center;"
+                                disabled onclick="downloadOfflineMap()">
+                                <svg viewBox="0 0 24 24"
+                                    style="width:14px;height:14px;fill:currentColor;margin-right:4px;">
+                                    <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
+                                </svg>
+                                <span id="btn-offline-map-text">다운로드</span>
+                            </button>
+                            <div id="offline-map-status"
+                                style="font-size: 11px; color: #888; margin-top: 6px; text-align: left;">
+                                <ul style="padding-left: 18px; margin: 6px 0 0 0; line-height: 1.4;">
+                                    <li>15레벨 이상 확대 시 현재 화면의 배경지도를 다운로드할 수 있습니다.</li>
+                                    <li style="margin-top: 2px;">다운로드된 지도는 오프라인 상태에서 볼 수 있습니다.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="sidebar-warning">
+                        <ul>
+                            <li>모든 정보는 법적 효력이 없으며, 참고용으로만 활용하시기 바랍니다.</li>
+                            <li>많은 레이어를 표시할 경우 오류가 발생할 수 있습니다.</li>
+                        </ul>
+                    </div>
+                </div>
+                <!-- 탭 2: 프로젝트 관리 -->
+                <div id="content-project" class="tab-content">
+                    <!-- 프로젝트 목록 -->
+                    <div id="project-list-area"
+                        style="flex:1; overflow-y:auto; min-height:0; margin-bottom:var(--space-3);">
+                    </div>
+                    <!-- 하단 버튼 (2x2 그리드) -->
+                    <div class="project-bottom-actions"
+                        style="flex-shrink:0; display:grid; grid-template-columns: 1fr 1fr; gap:var(--space-2);">
+                        <button onclick="createNewProject()" class="mono-btn"
+                            style="justify-content:center; padding:var(--space-3); font-size:13px;">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+                            </svg>
+                            새 프로젝트
+                        </button>
+                        <button onclick="triggerFileInput()" class="mono-btn"
+                            style="justify-content:center; padding: var(--space-3); font-size: 13px;">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z" />
+                            </svg>
+                            불러오기
+                        </button>
+                        <button onclick="backupAllProjects()" class="mono-btn"
+                            style="justify-content:center; padding: var(--space-3); font-size: 13px; color: #000000;">
+                            <svg viewBox="0 0 24 24" style="fill: #000000;">
+                                <path
+                                    d="M19 12v7H5v-7H3v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zm-6 .67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 12.67V3h2z" />
+                            </svg>
+                            데이터 백업
+                        </button>
+                        <button onclick="clearAllData()" class="mono-btn danger"
+                            style="justify-content:center; padding: var(--space-3); font-size: 13px;">
+                            <svg viewBox="0 0 24 24">
+                                <path
+                                    d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" />
+                            </svg>
+                            초기화
+                        </button>
+                    </div>
+                    <div class="sidebar-warning" style="flex-shrink:0; margin-top:8px;">
+                        <ul>
+                            <li>많은 기록이나 용량이 큰 파일을 불러오면 앱이 느려지거나 오류가 발생할 수 있습니다.</li>
+                            <li>브라우저 사이트 데이터 삭제, 앱 삭제 또는 앱 데이터 삭제 시 기록이 없어질 수 있으니, 중요한 기록은 미리 저장하거나 데이터 백업 버튼을 눌러 보관하시기 바랍니다.</li>
+                        </ul>
+                    </div>
+                    <!-- select는 다른 모듈에서 참조하므로 숨김 처리 -->
+                    <select id="project-select" onchange="switchProject(this.value)" style="display:none;"></select>
+                </div>
+
+                <!-- 탭 3: 기록 관리 -->
+                <div id="content-record" class="tab-content">
+
+                    <!-- 현재 프로젝트 표시 배너 -->
+                    <div id="current-project-banner" onclick="switchSidebarTab('project')"
+                        style="display:flex; align-items:center; gap:var(--space-2); padding:var(--space-2) var(--space-3); margin-bottom:var(--space-3); border-radius:var(--radius-md); background:#EFF6FF; border:1px solid #DBEAFE; cursor:pointer;">
+                        <svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:#3B82F6;flex-shrink:0;">
+                            <path
+                                d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2z" />
+                        </svg>
+                        <span id="current-project-name"
+                            style="font-size:13px; font-weight:600; color:#1D4ED8; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">프로젝트
+                            로딩 중...</span>
+                        <svg viewBox="0 0 24 24" style="width:12px;height:12px;fill:#93c5fd;flex-shrink:0;">
+                            <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z" />
+                        </svg>
+                    </div>
+
+                    <!-- 상단: 헤더 -->
+                    <div
+                        style="display:flex; justify-content:space-between; align-items:center; margin-bottom:var(--space-1); font-size:11px; color:#888; flex-shrink: 0;">
+                        <label style="cursor:pointer; color:#333; display:flex; align-items:center;"><input
+                                type="checkbox" id="chk-select-all" checked onchange="toggleAllLayers(this.checked)"
+                                style="margin-right:5px;"> 전체 선택</label>
+
+                        <div class="dropdown-container">
+                            <button onclick="toggleMoreMenu(event)" class="btn-more">
+                                <svg viewBox="0 0 24 24">
+                                    <path
+                                        d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+                                </svg>
+                            </button>
+                            <div id="more-menu" class="dropdown-menu">
+                                <div class="dropdown-item" onclick="openSortModal()">
+                                    <svg viewBox="0 0 24 24">
+                                        <path d="M3 18h6v-2H3v2zM3 6v2h18V6H3zm0 7h12v-2H3v2z" />
+                                    </svg>
+                                    정렬 방식
+                                </div>
+                                <div class="dropdown-item" onclick="openMoveSelectionModal()">
+                                    <!-- 폴더 + 화살표 커스텀 아이콘 -->
+                                    <svg viewBox="0 0 24 24">
+                                        <path
+                                            d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h11v-2H4V8h16v4h2V8c0-1.1-.9-2-2-2z" />
+                                        <path d="M14 13v-3l7 4.5-7 4.5v-3H9v-3h5z" />
+                                    </svg>
+                                    선택 이동
+                                </div>
+                                <div class="dropdown-item" onclick="groupSelectedLayers()">
+                                    <svg viewBox="0 0 24 24">
+                                        <path d="M7 4h13v10H7V4zm-3 3h2v8h11v2H4V7zm-3 3h2v8h11v2H1V10z" />
+                                    </svg>
+                                    선택 그룹화
+                                </div>
+                                <div class="dropdown-item" onclick="exportSelectedLayers()">
+                                    <svg viewBox="0 0 24 24">
+                                        <path
+                                            d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" />
+                                    </svg>
+                                    선택 저장
+                                </div>
+                                <div class="dropdown-item danger" onclick="deleteSelectedLayers()">
+                                    <svg viewBox="0 0 24 24">
+                                        <path
+                                            d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
+                                    </svg>
+                                    선택 삭제
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 중간: 리스트 (유연하게 늘어남) -->
+                    <div id="survey-list-area" class="survey-list-container"
+                        style="flex:1; overflow-y:auto; min-height:0; margin-bottom:var(--space-3); max-height:none;">
+                    </div>
+
+                    <!-- 하단: 버튼 그룹 (고정) -->
+                    <!-- 하단: 버튼 그룹 (고정) -->
+                    <div style="flex-shrink: 0;">
+                        <div style="display:flex; gap:var(--space-2); margin-bottom:2px;">
+                            <button onclick="triggerFileInput()" class="mono-btn"
+                                style="flex:1; justify-content:center; padding: var(--space-3); font-size: 13px;">
+                                <svg viewBox="0 0 24 24">
+                                    <path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z" />
+                                </svg>
+                                불러오기
+                            </button>
+                            <button onclick="exportCurrentProject()" class="mono-btn"
+                                style="flex:1; justify-content:center; padding: var(--space-3); font-size: 13px;">
+                                <svg viewBox="0 0 24 24">
+                                    <path
+                                        d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h16c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" />
+                                </svg>
+                                프로젝트 저장
+                            </button>
+                        </div>
+                    </div>
+                    <div class="sidebar-warning" style="margin-top:4px;">
+                        <ul>
+                            <li>많은 기록이나 용량이 큰 파일을 불러오면 앱이 느려지거나 오류가 발생할 수 있습니다.</li>
+                            <li>브라우저 사이트 데이터 삭제, 앱 삭제 또는 앱 데이터 삭제 시 기록이 없어질 수 있으니, 중요한 기록은 미리 저장하거나 데이터 백업 버튼을 눌러 보관하시기 바랍니다.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    </div>
+
+    <!-- 네비게이션 앱 선택 모달 -->
+    <div id="nav-modal-overlay" class="nav-modal-overlay" onclick="closeNavModal()">
+        <div class="nav-modal-content" onclick="event.stopPropagation()">
+            <div class="nav-modal-header"
+                style="font-size:18px; font-weight:bold; margin-bottom:20px; text-align:center;">길찾기 앱 선택</div>
+            <div class="nav-app-list">
+                <div class="nav-app-item" onclick="executeNavigation('tmap')">
+                    <div class="nav-app-icon nav-icon-tmap">T</div><span style="font-size:13px;">티맵</span>
+                </div>
+                <div class="nav-app-item" onclick="executeNavigation('naver')">
+                    <div class="nav-app-icon nav-icon-naver">N</div><span style="font-size:13px;">네이버</span>
+                </div>
+                <div class="nav-app-item" onclick="executeNavigation('kakao')">
+                    <div class="nav-app-icon nav-icon-kakao">K</div><span style="font-size:13px;">카카오</span>
+                </div>
+            </div>
+            <button onclick="closeNavModal()"
+                style="width:100%; padding:14px; background:#f5f5f5; border:none; border-radius:12px; font-weight:bold; color:#666;">취소</button>
+        </div>
+    </div>
+
+    <!-- 지도 검색 앱 선택 모달 -->
+    <div id="search-modal-overlay" class="nav-modal-overlay" onclick="closeSearchModal()">
+        <div class="nav-modal-content" onclick="event.stopPropagation()">
+            <div class="nav-modal-header"
+                style="font-size:18px; font-weight:bold; margin-bottom:20px; text-align:center;">지도 검색</div>
+            <div class="nav-app-list" style="justify-content:center; gap:20px;">
+                <div class="nav-app-item" onclick="executeMapSearch('google')">
+                    <div class="nav-app-icon nav-icon-google">G</div><span style="font-size:13px;">구글</span>
+                </div>
+                <div class="nav-app-item" onclick="executeMapSearch('naver')">
+                    <div class="nav-app-icon nav-icon-naver">N</div><span style="font-size:13px;">네이버</span>
+                </div>
+                <div class="nav-app-item" onclick="executeMapSearch('kakao')">
+                    <div class="nav-app-icon nav-icon-kakao">K</div><span style="font-size:13px;">카카오</span>
+                </div>
+            </div>
+            <button onclick="closeSearchModal()"
+                style="width:100%; padding:14px; background:#f5f5f5; border:none; border-radius:12px; font-weight:bold; color:#666;">취소</button>
+        </div>
+    </div>
+
+    <!-- 오프라인 지도 다운로드 모달 -->
+    <div id="offline-download-modal-overlay" class="nav-modal-overlay" style="z-index:9999;">
+        <div class="nav-modal-content" onclick="event.stopPropagation()">
+            <div class="nav-modal-header"
+                style="font-size:18px; font-weight:bold; margin-bottom:20px; text-align:center;">지도 다운로드 중</div>
+            <div style="text-align:center; padding: 20px 0;">
+                <div style="font-size:24px; font-weight:bold; color:#3B82F6; margin-bottom:10px;">
+                    <span id="offline-download-progress">0</span> / <span id="offline-download-total">0</span>
+                </div>
+                <div style="font-size:13px; color:#555;">앱을 종료하지 마세요.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 위치 액션 모달 (주소 클릭 시) -->
+    <div id="location-action-modal-overlay" class="nav-modal-overlay" onclick="closeLocationActionModal()">
+        <div class="nav-modal-content" onclick="event.stopPropagation()">
+            <div class="nav-modal-header"
+                style="font-size:18px; font-weight:bold; margin-bottom:20px; text-align:center;">내 위치 공유</div>
+            <div class="location-summary">
+                <div class="location-summary-row">
+                    <div id="address-display">주소 확인 중...</div>
+                </div>
+                <div class="location-summary-row">
+                    <div id="coord-display">좌표 수신중...</div>
+                </div>
+            </div>
+            <div style="display:flex; gap:8px; margin-bottom:16px;">
+                <button onclick="copyCurrentAddress()" class="mono-btn"
+                    style="flex:1; padding:10px 8px; justify-content:center; font-size:11px;">
+                    주소 복사
+                </button>
+                <button onclick="copyCurrentCoords()" class="mono-btn"
+                    style="flex:1; padding:10px 8px; justify-content:center; font-size:11px;">
+                    좌표 복사
+                </button>
+                <button onclick="shareMyLocation()" class="mono-btn"
+                    style="flex:1; padding:10px 8px; justify-content:center; font-size:11px;">
+                    내 위치 공유
+                </button>
+            </div>
+            <button onclick="closeLocationActionModal()"
+                style="width:100%; padding:14px; background:#f5f5f5; border:none; border-radius:12px; font-weight:bold; color:#666;">취소</button>
+        </div>
+    </div>
+
+    <!-- 스타일 설정 모달 -->
+    <div id="style-modal-overlay" class="nav-modal-overlay" onclick="closeStyleModal()">
+        <div class="nav-modal-content" id="style-modal" onclick="event.stopPropagation()">
+            <div class="nav-modal-header"
+                style="font-size:18px; font-weight:bold; margin-bottom:20px; text-align:center;">
+                스타일 설정
+            </div>
+
+            <div id="style-polygon-tabs" class="style-modal-tabs">
+                <button type="button" id="style-fill-tab-btn" class="style-tab-btn selected"
+                    onclick="selectStyleTab('fill')">면 설정</button>
+                <button type="button" id="style-line-tab-btn" class="style-tab-btn" onclick="selectStyleTab('line')">선
+                    설정</button>
+            </div>
+
+            <div class="setting-group" id="style-fill-color-section">
+                <div class="setting-title" id="style-color-title">색상 선택</div>
+                <div class="color-palette" id="style-color-palette">
+                    <!-- 1행: 빨강/핑크 계열 -->
+                    <div class="color-circle" data-color="#7F1D1D" style="background-color: #7F1D1D;"
+                        onclick="selectStyleColor('#7F1D1D')"></div>
+                    <div class="color-circle" data-color="#B91C1C" style="background-color: #B91C1C;"
+                        onclick="selectStyleColor('#B91C1C')"></div>
+                    <div class="color-circle" data-color="#FF0000" style="background-color: #FF0000;"
+                        onclick="selectStyleColor('#FF0000')"></div>
+                    <div class="color-circle" data-color="#EF4444" style="background-color: #EF4444;"
+                        onclick="selectStyleColor('#EF4444')"></div>
+                    <div class="color-circle" data-color="#F87171" style="background-color: #F87171;"
+                        onclick="selectStyleColor('#F87171')"></div>
+                    <div class="color-circle" data-color="#FEE2E2" style="background-color: #FEE2E2;"
+                        onclick="selectStyleColor('#FEE2E2')"></div>
+
+                    <!-- 2행: 주황/노랑 계열 -->
+                    <div class="color-circle" data-color="#C2410C" style="background-color: #C2410C;"
+                        onclick="selectStyleColor('#C2410C')"></div>
+                    <div class="color-circle" data-color="#F97316" style="background-color: #F97316;"
+                        onclick="selectStyleColor('#F97316')"></div>
+                    <div class="color-circle" data-color="#FB923C" style="background-color: #FB923C;"
+                        onclick="selectStyleColor('#FB923C')"></div>
+                    <div class="color-circle" data-color="#FFFF00" style="background-color: #FFFF00;"
+                        onclick="selectStyleColor('#FFFF00')"></div>
+                    <div class="color-circle" data-color="#F59E0B" style="background-color: #F59E0B;"
+                        onclick="selectStyleColor('#F59E0B')"></div>
+                    <div class="color-circle" data-color="#FEF3C7" style="background-color: #FEF3C7;"
+                        onclick="selectStyleColor('#FEF3C7')"></div>
+
+                    <!-- 3행: 녹색 계열 -->
+                    <div class="color-circle" data-color="#064E3B" style="background-color: #064E3B;"
+                        onclick="selectStyleColor('#064E3B')"></div>
+                    <div class="color-circle" data-color="#047857" style="background-color: #047857;"
+                        onclick="selectStyleColor('#047857')"></div>
+                    <div class="color-circle" data-color="#00FF00" style="background-color: #00FF00;"
+                        onclick="selectStyleColor('#00FF00')"></div>
+                    <div class="color-circle" data-color="#10B981" style="background-color: #10B981;"
+                        onclick="selectStyleColor('#10B981')"></div>
+                    <div class="color-circle" data-color="#34D399" style="background-color: #34D399;"
+                        onclick="selectStyleColor('#34D399')"></div>
+                    <div class="color-circle" data-color="#D1FAE5" style="background-color: #D1FAE5;"
+                        onclick="selectStyleColor('#D1FAE5')"></div>
+
+                    <!-- 4행: 하늘/파랑 계열 -->
+                    <div class="color-circle" data-color="#00FFFF" style="background-color: #00FFFF;"
+                        onclick="selectStyleColor('#00FFFF')"></div>
+                    <div class="color-circle" data-color="#0891B2" style="background-color: #0891B2;"
+                        onclick="selectStyleColor('#0891B2')"></div>
+                    <div class="color-circle" data-color="#22D3EE" style="background-color: #22D3EE;"
+                        onclick="selectStyleColor('#22D3EE')"></div>
+                    <div class="color-circle" data-color="#1E3A8A" style="background-color: #1E3A8A;"
+                        onclick="selectStyleColor('#1E3A8A')"></div>
+                    <div class="color-circle" data-color="#3B82F6" style="background-color: #3B82F6;"
+                        onclick="selectStyleColor('#3B82F6')"></div>
+                    <div class="color-circle" data-color="#DBEAFE" style="background-color: #DBEAFE;"
+                        onclick="selectStyleColor('#DBEAFE')"></div>
+
+                    <!-- 5행: 파랑/보라 계열 -->
+                    <div class="color-circle" data-color="#0000FF" style="background-color: #0000FF;"
+                        onclick="selectStyleColor('#0000FF')"></div>
+                    <div class="color-circle" data-color="#1D4ED8" style="background-color: #1D4ED8;"
+                        onclick="selectStyleColor('#1D4ED8')"></div>
+                    <div class="color-circle" data-color="#4C1D95" style="background-color: #4C1D95;"
+                        onclick="selectStyleColor('#4C1D95')"></div>
+                    <div class="color-circle" data-color="#6D28D9" style="background-color: #6D28D9;"
+                        onclick="selectStyleColor('#6D28D9')"></div>
+                    <div class="color-circle" data-color="#8B5CF6" style="background-color: #8B5CF6;"
+                        onclick="selectStyleColor('#8B5CF6')"></div>
+                    <div class="color-circle" data-color="#EDE9FE" style="background-color: #EDE9FE;"
+                        onclick="selectStyleColor('#EDE9FE')"></div>
+
+                    <!-- 6행: 자주/무채색 계열 -->
+                    <div class="color-circle" data-color="#FF00FF" style="background-color: #FF00FF;"
+                        onclick="selectStyleColor('#FF00FF')"></div>
+                    <div class="color-circle" data-color="#EC4899" style="background-color: #EC4899;"
+                        onclick="selectStyleColor('#EC4899')"></div>
+                    <div class="color-circle" data-color="#000000" style="background-color: #000000;"
+                        onclick="selectStyleColor('#000000')"></div>
+                    <div class="color-circle" data-color="#9CA3AF" style="background-color: #9CA3AF;"
+                        onclick="selectStyleColor('#9CA3AF')"></div>
+                    <div class="color-circle" data-color="#FFFFFF" style="background-color: #FFFFFF;"
+                        onclick="selectStyleColor('#FFFFFF')"></div>
+                    <input type="color" id="style-custom-color" class="color-picker-input"
+                        style="width: 24px; height: 24px; padding: 0; border: none; flex-shrink: 0;"
+                        onchange="selectStyleColor(this.value)">
+                </div>
+            </div>
+
+            <!-- 면 전용: 면 투명도 -->
+            <div class="setting-group" id="style-polygon-section" style="display:none;">
+                <div id="style-fill-pattern-section">
+                    <div class="setting-title">면 채우기</div>
+                    <div class="style-choice-group fill-pattern-grid" id="style-fill-pattern-choices">
+                        <button class="style-btn fill-pattern-btn" data-pattern="none"
+                            onclick="selectFillPattern('none')" title="면 없음" aria-label="면 없음">
+                            <svg viewBox="0 0 120 28" aria-hidden="true">
+                                <rect x="16" y="5" width="88" height="18" fill="none" stroke="#333" stroke-width="2" />
+                                <line x1="18" y1="22" x2="102" y2="6" stroke="#ef4444" stroke-width="2" />
+                            </svg>
+                        </button>
+                        <button class="style-btn fill-pattern-btn" data-pattern="solid"
+                            onclick="selectFillPattern('solid')" title="단색" aria-label="단색">
+                            <svg viewBox="0 0 120 28" aria-hidden="true">
+                                <rect x="16" y="7" width="88" height="14" fill="#e5e5e5" stroke="#333"
+                                    stroke-width="2" />
+                            </svg>
+                        </button>
+                        <button class="style-btn fill-pattern-btn fill-pattern-advanced" data-pattern="horizontal"
+                            onclick="selectFillPattern('horizontal')" title="가로선" aria-label="가로선">
+                            <svg viewBox="0 0 120 28" aria-hidden="true">
+                                <rect x="16" y="5" width="88" height="18" fill="none" stroke="#333" stroke-width="2" />
+                                <path d="M16 10 H104 M16 16 H104" stroke="#333" stroke-width="1.5" />
+                            </svg>
+                        </button>
+                        <button class="style-btn fill-pattern-btn fill-pattern-advanced" data-pattern="vertical"
+                            onclick="selectFillPattern('vertical')" title="세로선" aria-label="세로선">
+                            <svg viewBox="0 0 120 28" aria-hidden="true">
+                                <rect x="16" y="5" width="88" height="18" fill="none" stroke="#333" stroke-width="2" />
+                                <path
+                                    d="M24 5 V23 M32 5 V23 M40 5 V23 M48 5 V23 M56 5 V23 M64 5 V23 M72 5 V23 M80 5 V23 M88 5 V23 M96 5 V23"
+                                    stroke="#333" stroke-width="1.4" />
+                            </svg>
+                        </button>
+                        <button class="style-btn fill-pattern-btn fill-pattern-advanced" data-pattern="diagonal-right"
+                            onclick="selectFillPattern('diagonal-right')" title="우상향 사선" aria-label="우상향 사선">
+                            <svg viewBox="0 0 120 28" aria-hidden="true">
+                                <defs>
+                                    <clipPath id="fill-preview-diag-r">
+                                        <rect x="16" y="5" width="88" height="18" />
+                                    </clipPath>
+                                </defs>
+                                <rect x="16" y="5" width="88" height="18" fill="none" stroke="#333" stroke-width="2" />
+                                <g clip-path="url(#fill-preview-diag-r)" stroke="#333" stroke-width="1.3">
+                                    <path
+                                        d="M8 26 L32 2 M20 28 L46 2 M34 28 L60 2 M48 28 L74 2 M62 28 L88 2 M76 28 L102 2 M90 28 L114 4" />
+                                </g>
+                            </svg>
+                        </button>
+                        <button class="style-btn fill-pattern-btn fill-pattern-advanced" data-pattern="diagonal-left"
+                            onclick="selectFillPattern('diagonal-left')" title="우하향 사선" aria-label="우하향 사선">
+                            <svg viewBox="0 0 120 28" aria-hidden="true">
+                                <defs>
+                                    <clipPath id="fill-preview-diag-l">
+                                        <rect x="16" y="5" width="88" height="18" />
+                                    </clipPath>
+                                </defs>
+                                <rect x="16" y="5" width="88" height="18" fill="none" stroke="#333" stroke-width="2" />
+                                <g clip-path="url(#fill-preview-diag-l)" stroke="#333" stroke-width="1.3">
+                                    <path
+                                        d="M8 2 L32 26 M20 0 L46 26 M34 0 L60 26 M48 0 L74 26 M62 0 L88 26 M76 0 L102 26 M90 0 L114 24" />
+                                </g>
+                            </svg>
+                        </button>
+                        <button class="style-btn fill-pattern-btn fill-pattern-advanced" data-pattern="grid"
+                            onclick="selectFillPattern('grid')" title="격자" aria-label="격자">
+                            <svg viewBox="0 0 120 28" aria-hidden="true">
+                                <rect x="16" y="5" width="88" height="18" fill="none" stroke="#333" stroke-width="2" />
+                                <path
+                                    d="M16 11 H104 M16 17 H104 M28 5 V23 M40 5 V23 M52 5 V23 M64 5 V23 M76 5 V23 M88 5 V23"
+                                    stroke="#333" stroke-width="1.2" />
+                            </svg>
+                        </button>
+                        <button class="style-btn fill-pattern-btn fill-pattern-advanced" data-pattern="crosshatch"
+                            onclick="selectFillPattern('crosshatch')" title="교차 사선" aria-label="교차 사선">
+                            <svg viewBox="0 0 120 28" aria-hidden="true">
+                                <defs>
+                                    <clipPath id="fill-preview-cross">
+                                        <rect x="16" y="5" width="88" height="18" />
+                                    </clipPath>
+                                </defs>
+                                <rect x="16" y="5" width="88" height="18" fill="none" stroke="#333" stroke-width="2" />
+                                <g clip-path="url(#fill-preview-cross)" stroke="#333" stroke-width="1.1">
+                                    <path
+                                        d="M8 26 L32 2 M20 28 L46 2 M34 28 L60 2 M48 28 L74 2 M62 28 L88 2 M76 28 L102 2 M90 28 L114 4" />
+                                    <path
+                                        d="M8 2 L32 26 M20 0 L46 26 M34 0 L60 26 M48 0 L74 26 M62 0 L88 26 M76 0 L102 26 M90 0 L114 24" />
+                                </g>
+                            </svg>
+                        </button>
+                    </div>
+                    <button type="button" id="style-fill-pattern-more-btn" class="style-btn fill-pattern-more-btn"
+                        onclick="toggleFillPatternOptions()">
+                        <span class="expand-label">무늬 더보기</span>
+                        <span class="collapse-label">무늬 접기</span>
+                    </button>
+                </div>
+                <div id="style-fill-opacity-section" style="margin-top:14px;">
+                    <div class="setting-title">면 투명도</div>
+                    <div style="display:flex; align-items:center; gap: 10px;">
+                        <input type="range" id="style-fill-opacity" min="0" max="1" value="0.2" step="0.05"
+                            style="flex:1;" oninput="updateFillOpacityLabel(this.value)"
+                            onchange="selectFillOpacity(this.value)">
+                        <span id="style-fill-opacity-label"
+                            style="font-weight:bold; font-size:14px; width:34px; text-align:center;">0.2</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 면 전용: 선 색상 -->
+            <div class="setting-group" id="style-line-color-section" style="display:none;">
+                <div class="setting-title">선 색상 선택</div>
+                <div class="style-choice-group" id="style-line-color-mode-choices" style="margin-bottom:10px;">
+                    <button class="style-btn" data-mode="same" onclick="selectLineColorMode('same')">면 색상과 동일</button>
+                    <button class="style-btn" data-mode="custom" onclick="selectLineColorMode('custom')">다른 색상
+                        선택</button>
+                </div>
+                <div class="color-palette" id="style-line-color-palette" style="display:none;"></div>
+            </div>
+
+            <!-- 선/면 공통: 선 모양 -->
+            <div class="setting-group" id="style-line-section">
+                <div class="setting-title">선 모양</div>
+                <div class="style-choice-group line-style-grid" id="style-line-choices">
+                    <button class="style-btn line-style-btn" data-style="none" onclick="selectLineStyle('none')"
+                        title="선 없음" aria-label="선 없음">
+                        <svg viewBox="0 0 140 22" aria-hidden="true">
+                            <line x1="16" y1="17" x2="124" y2="5" stroke="#ef4444" stroke-width="2" />
+                            <rect x="15" y="4" width="110" height="14" fill="none" stroke="#333" stroke-width="1.5" />
+                        </svg>
+                    </button>
+                    <button class="style-btn line-style-btn" data-style="solid" onclick="selectLineStyle('solid')"
+                        title="실선" aria-label="실선">
+                        <svg viewBox="0 0 140 22" aria-hidden="true">
+                            <line x1="18" y1="11" x2="122" y2="11" stroke="#333" stroke-width="3"
+                                stroke-linecap="round" />
+                        </svg>
+                    </button>
+                    <button class="style-btn line-style-btn" data-style="dashed" onclick="selectLineStyle('dashed')"
+                        title="파선" aria-label="파선">
+                        <svg viewBox="0 0 140 22" aria-hidden="true">
+                            <line x1="18" y1="11" x2="122" y2="11" stroke="#333" stroke-width="3" stroke-dasharray="8 5"
+                                stroke-linecap="round" />
+                        </svg>
+                    </button>
+                    <button class="style-btn line-style-btn line-style-advanced" data-style="long-dashed"
+                        onclick="selectLineStyle('long-dashed')" title="긴 파선" aria-label="긴 파선">
+                        <svg viewBox="0 0 140 22" aria-hidden="true">
+                            <line x1="18" y1="11" x2="122" y2="11" stroke="#333" stroke-width="3"
+                                stroke-dasharray="18 8" stroke-linecap="round" />
+                        </svg>
+                    </button>
+                    <button class="style-btn line-style-btn line-style-advanced" data-style="dotted"
+                        onclick="selectLineStyle('dotted')" title="점선" aria-label="점선">
+                        <svg viewBox="0 0 140 22" aria-hidden="true">
+                            <line x1="18" y1="11" x2="122" y2="11" stroke="#333" stroke-width="3"
+                                stroke-dasharray="0.01 5" stroke-linecap="round" />
+                        </svg>
+                    </button>
+                    <button class="style-btn line-style-btn line-style-advanced" data-style="dash-dot"
+                        onclick="selectLineStyle('dash-dot')" title="일점쇄선" aria-label="일점쇄선">
+                        <svg viewBox="0 0 140 22" aria-hidden="true">
+                            <line x1="18" y1="11" x2="122" y2="11" stroke="#333" stroke-width="3"
+                                stroke-dasharray="12 6 0.01 6" stroke-linecap="round" />
+                        </svg>
+                    </button>
+                    <button class="style-btn line-style-btn line-style-advanced" data-style="dash-dot-dot"
+                        onclick="selectLineStyle('dash-dot-dot')" title="이점쇄선" aria-label="이점쇄선">
+                        <svg viewBox="0 0 140 22" aria-hidden="true">
+                            <line x1="18" y1="11" x2="122" y2="11" stroke="#333" stroke-width="3"
+                                stroke-dasharray="12 5 0.01 5 0.01 5" stroke-linecap="round" />
+                        </svg>
+                    </button>
+                    <button class="style-btn line-style-btn line-style-advanced" data-style="solid-dot"
+                        onclick="selectLineStyle('solid-dot')" title="실선+점" aria-label="실선+점">
+                        <svg viewBox="0 0 140 22" aria-hidden="true">
+                            <line x1="18" y1="11" x2="122" y2="11" stroke="#333" stroke-width="3"
+                                stroke-linecap="round" />
+                            <circle cx="42" cy="11" r="5" fill="#333" />
+                            <circle cx="70" cy="11" r="5" fill="#333" />
+                            <circle cx="98" cy="11" r="5" fill="#333" />
+                        </svg>
+                    </button>
+                </div>
+                <button type="button" id="style-line-more-btn" class="style-btn line-style-more-btn"
+                    onclick="toggleLineStyleOptions()">
+                    <span class="expand-label">선 종류 더보기</span>
+                    <span class="collapse-label">선 종류 접기</span>
+                </button>
+            </div>
+
+            <!-- 선/면 공통: 선 굵기 -->
+            <div class="setting-group" id="style-line-weight-section">
+                <div class="setting-title">선 굵기</div>
+                <div style="display:flex; align-items:center; gap: 10px;">
+                    <input type="range" id="style-line-weight" min="1" max="5" value="3" step="0.5" style="flex:1;"
+                        oninput="updateLineWeightLabel(this.value)" onchange="selectLineWeight(this.value)">
+                    <span id="style-line-weight-label"
+                        style="font-weight:bold; font-size:14px; width:26px; text-align:center;">3</span>
+                </div>
+            </div>
+
+            <!-- 점 전용: 마커 모양 -->
+            <div class="setting-group" id="style-marker-section">
+                <div class="setting-title">마커 모양</div>
+                <div class="emoji-palette" id="style-marker-choices">
+                    <button class="emoji-btn" data-marker-style="" onclick="selectMarkerStyle('')" title="기본마커"
+                        aria-label="기본마커">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path
+                                d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" />
+                        </svg>
+                    </button>
+                    <button class="emoji-btn" data-marker-style="circle" onclick="selectMarkerStyle('circle')" title="원"
+                        aria-label="원">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <circle cx="12" cy="12" r="3.6" />
+                        </svg>
+                    </button>
+                    <button class="emoji-btn" data-marker-style="triangle" onclick="selectMarkerStyle('triangle')"
+                        title="삼각형" aria-label="삼각형">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M12 7.7 L16.3 16.3 H7.7 Z" />
+                        </svg>
+                    </button>
+                    <button class="emoji-btn" data-marker-style="square" onclick="selectMarkerStyle('square')"
+                        title="사각형" aria-label="사각형">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <rect x="7.8" y="7.8" width="8.4" height="8.4" rx="0.9" />
+                        </svg>
+                    </button>
+                    <button class="emoji-btn" data-marker-style="pentagon" onclick="selectMarkerStyle('pentagon')"
+                        title="오각형" aria-label="오각형">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M12 7.1 L16.6 10.55 L14.85 16.1 H9.15 L7.4 10.55 Z" />
+                        </svg>
+                    </button>
+                    <button class="emoji-btn" data-marker-style="diamond" onclick="selectMarkerStyle('diamond')"
+                        title="다이아몬드" aria-label="다이아몬드">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M12 7.2 L16.8 12 L12 16.8 L7.2 12 Z" />
+                        </svg>
+                    </button>
+                    <button class="emoji-btn" data-marker-style="star" onclick="selectMarkerStyle('star')" title="별"
+                        aria-label="별">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path
+                                d="M12 6.9 L13.45 10.05 L17 10.5 L14.35 12.9 L15.05 16.45 L12 14.6 L8.95 16.45 L9.65 12.9 L7 10.5 L10.55 10.05 Z" />
+                        </svg>
+                    </button>
+                    <button class="emoji-btn marker-emoji-btn" data-emoji="📍"
+                        onclick="selectMarkerStyle('📍')">📍</button>
+                    <button class="emoji-btn marker-emoji-btn" data-emoji="📌"
+                        onclick="selectMarkerStyle('📌')">📌</button>
+                    <button class="emoji-btn marker-emoji-btn" data-emoji="🚩"
+                        onclick="selectMarkerStyle('🚩')">🚩</button>
+                    <button class="emoji-btn marker-emoji-btn" data-emoji="⭐"
+                        onclick="selectMarkerStyle('⭐')">⭐</button>
+                    <button class="emoji-btn marker-emoji-btn" data-emoji="✅"
+                        onclick="selectMarkerStyle('✅')">✅</button>
+                    <button class="emoji-btn marker-emoji-btn" data-emoji="❌"
+                        onclick="selectMarkerStyle('❌')">❌</button>
+                    <button class="emoji-btn marker-emoji-btn" data-emoji="❗️"
+                        onclick="selectMarkerStyle('❗️')">❗️</button>
+                    <button class="emoji-btn marker-emoji-btn" data-emoji="❓"
+                        onclick="selectMarkerStyle('❓')">❓</button>
+                    <button class="emoji-btn marker-emoji-btn" data-emoji="🟦"
+                        onclick="selectMarkerStyle('🟦')">🟦</button>
+                    <button class="emoji-btn marker-emoji-btn" data-emoji="🔴"
+                        onclick="selectMarkerStyle('🔴')">🔴</button>
+                    <button class="emoji-btn marker-emoji-btn" data-emoji="🔶"
+                        onclick="selectMarkerStyle('🔶')">🔶</button>
+                    <button class="emoji-btn marker-emoji-btn" data-emoji="📷"
+                        onclick="selectMarkerStyle('📷')">📷</button>
+                    <button class="emoji-btn marker-emoji-btn" data-emoji="🗒️"
+                        onclick="selectMarkerStyle('🗒️')">🗒️</button>
+                    <button class="emoji-btn marker-emoji-btn" data-emoji="🌳"
+                        onclick="selectMarkerStyle('🌳')">🌳</button>
+                    <button class="emoji-btn marker-emoji-btn" data-emoji="🌲"
+                        onclick="selectMarkerStyle('🌲')">🌲</button>
+                    <button class="emoji-btn marker-emoji-btn" data-emoji="🪾"
+                        onclick="selectMarkerStyle('🪾')">🪾</button>
+                    <button class="emoji-btn marker-emoji-btn" data-emoji="🪵"
+                        onclick="selectMarkerStyle('🪵')">🪵</button>
+                    <button class="emoji-btn marker-emoji-btn" data-emoji="🌱"
+                        onclick="selectMarkerStyle('🌱')">🌱</button>
+                    <button class="emoji-btn marker-emoji-btn" data-emoji="🌸"
+                        onclick="selectMarkerStyle('🌸')">🌸</button>
+                    <button class="emoji-btn marker-emoji-btn" data-emoji="🌾"
+                        onclick="selectMarkerStyle('🌾')">🌾</button>
+                    <button class="emoji-btn marker-emoji-btn" data-emoji="🥬"
+                        onclick="selectMarkerStyle('🥬')">🥬</button>
+                    <button class="emoji-btn marker-emoji-btn" data-emoji="⛰️"
+                        onclick="selectMarkerStyle('⛰️')">⛰️</button>
+                    <button class="emoji-btn marker-emoji-btn" data-emoji="💧"
+                        onclick="selectMarkerStyle('💧')">💧</button>
+                    <button class="emoji-btn marker-emoji-btn" data-emoji="🐍"
+                        onclick="selectMarkerStyle('🐍')">🐍</button>
+                    <button class="emoji-btn marker-emoji-btn" data-emoji="🏠"
+                        onclick="selectMarkerStyle('🏠')">🏠</button>
+                    <button class="emoji-btn marker-emoji-btn" data-emoji="🏢"
+                        onclick="selectMarkerStyle('🏢')">🏢</button>
+                    <button class="emoji-btn marker-emoji-btn" data-emoji="🏭"
+                        onclick="selectMarkerStyle('🏭')">🏭</button>
+                    <button class="emoji-btn marker-emoji-btn" data-emoji="🚧"
+                        onclick="selectMarkerStyle('🚧')">🚧</button>
+                    <button class="emoji-btn marker-emoji-btn" data-emoji="⚠️"
+                        onclick="selectMarkerStyle('⚠️')">⚠️</button>
+                    <button class="emoji-btn marker-emoji-btn" data-emoji="🔥"
+                        onclick="selectMarkerStyle('🔥')">🔥</button>
+                    <button class="emoji-btn marker-emoji-btn" data-emoji="🧯"
+                        onclick="selectMarkerStyle('🧯')">🧯</button>
+                    <button class="emoji-btn marker-emoji-btn" data-emoji="👮"
+                        onclick="selectMarkerStyle('👮')">👮</button>
+                    <button class="emoji-btn marker-emoji-btn" data-emoji="🧑‍🚒"
+                        onclick="selectMarkerStyle('🧑‍🚒')">🧑‍🚒</button>
+                    <button class="emoji-btn marker-emoji-btn" data-emoji="🚓"
+                        onclick="selectMarkerStyle('🚓')">🚓</button>
+                    <button class="emoji-btn marker-emoji-btn" data-emoji="🚒"
+                        onclick="selectMarkerStyle('🚒')">🚒</button>
+                    <button class="emoji-btn marker-emoji-btn" data-emoji="🚑"
+                        onclick="selectMarkerStyle('🚑')">🚑</button>
+                    <button class="emoji-btn marker-emoji-btn" data-emoji="☕️"
+                        onclick="selectMarkerStyle('☕️')">☕️</button>
+                </div>
+                <button type="button" id="style-marker-emoji-more-btn" class="style-btn marker-emoji-more-btn"
+                    onclick="toggleMarkerEmojiOptions()">
+                    <span class="expand-label">더보기</span>
+                    <span class="collapse-label">접기</span>
+                </button>
+            </div>
+
+            <!-- 점 전용: 마커 크기 -->
+            <div class="setting-group" id="style-marker-size-section">
+                <div class="setting-title">마커 크기</div>
+                <div style="display:flex; align-items:center; gap: 10px;">
+                    <input type="range" id="style-marker-size" min="1" max="5" value="3" step="1" style="flex:1;"
+                        oninput="updateMarkerSizeLabel(this.value)" onchange="selectMarkerSize(this.value)">
+                    <span id="style-marker-size-label"
+                        style="font-weight:bold; font-size:14px; width:20px; text-align:center;">3</span>
+                </div>
+            </div>
+
+            <!-- 타일지도 전용: 투명도 -->
+            <div class="setting-group" id="style-tile-opacity-section" style="display:none;">
+                <div class="setting-title">투명도</div>
+                <div style="display:flex; align-items:center; gap: 10px;">
+                    <input type="range" id="style-tile-opacity" min="0" max="1" value="1" step="0.05" style="flex:1;"
+                        oninput="updateTileOpacityLabel(this.value)" onchange="selectTileOpacity(this.value)">
+                    <span id="style-tile-opacity-label"
+                        style="font-weight:bold; font-size:14px; width:34px; text-align:center;">1</span>
+                </div>
+            </div>
+
+
+            <div class="style-modal-actions">
+                <button class="style-modal-cancel-btn" onclick="closeStyleModal()">취소</button>
+                <button class="style-modal-apply-btn" onclick="applyStyleSettings()">적용</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 설정 모달 -->
+    <div id="settings-modal-overlay" class="nav-modal-overlay settings-page-overlay" onclick="closeSettingsModal()">
+        <div class="nav-modal-content settings-page-content" onclick="event.stopPropagation()">
+            <header class="settings-page-header">
+                <button class="settings-back-btn" type="button" onclick="closeSettingsModal()"
+                    aria-label="설정 닫기"></button>
+                <div class="settings-page-title">설정</div>
+                <div></div>
+            </header>
+
+            <div id="settings-update-banner" class="settings-update-banner">
+                <div>
+                    <div class="settings-update-banner-title">새 버전이 있습니다.</div>
+                    <div class="settings-update-banner-meta">업데이트 후 최신 기능과 수정사항이 적용됩니다.</div>
+                </div>
+                <button class="settings-update-banner-btn" type="button" onclick="forceAppUpdate()">업데이트</button>
+            </div>
+
+            <section class="settings-section">
+                <div id="settings-account-row" class="settings-row settings-link-row settings-account-row">
+                    <div class="settings-account-avatar" id="settings-account-avatar">?</div>
+                    <div class="settings-account-main">
+                        <div id="settings-account-email" class="settings-account-email">로그인이 필요합니다.</div>
+                        <div id="settings-account-status" class="settings-account-status">비회원</div>
+                    </div>
+                    <div id="settings-account-tier-badge" class="settings-account-tier-badge">FREE</div>
+                    <span class="settings-chevron"></span>
+                </div>
+                <div id="settings-auth-info-row" class="settings-row settings-link-row settings-auth-info-row">
+                    <div>
+                        <div class="settings-label">인증정보</div>
+                        <div class="settings-help">인증일, 만료일, 남은 기간을 확인합니다.</div>
+                    </div>
+                    <span class="settings-chevron"></span>
+                </div>
+                <div id="settings-admin-menu-row" class="settings-row settings-link-row settings-admin-menu-row">
+                    <div>
+                        <div class="settings-label">관리자 메뉴</div>
+                        <div class="settings-help">회원 권한, 인증코드, 공지 뱃지를 관리합니다.</div>
+                    </div>
+                    <span class="settings-chevron"></span>
+                </div>
+                <div id="settings-verification-code-row" class="settings-row settings-link-row settings-code-row">
+                    <div>
+                        <div class="settings-label">인증코드 입력하기</div>
+                        <div class="settings-help">인증코드가 있다면 계정 권한을 활성화합니다.</div>
+                    </div>
+                    <span class="settings-chevron"></span>
+                </div>
+            </section>
+
+            <section class="settings-section">
+                <div id="settings-coordinate-info-row" class="settings-row settings-link-row">
+                    <div>
+                        <div class="settings-label">좌표계 안내</div>
+                        <div class="settings-help">앱의 좌표 저장, 표시, 계산 기준을 확인합니다.</div>
+                    </div>
+                    <span class="settings-chevron"></span>
+                </div>
+                <div class="settings-row settings-link-row" onclick="openSettingsChoiceModal('coord')">
+                    <div>
+                        <div class="settings-label">좌표 표시 방식</div>
+                    </div>
+                    <div class="settings-row-action">
+                        <span id="settings-coord-mode-value" class="settings-value">도분초</span>
+                        <span class="settings-chevron"></span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="settings-section">
+                <div class="settings-row">
+                    <div>
+                        <div class="settings-label">스냅기능</div>
+                        <div class="settings-help">측량 및 수정 중 주변 꼭지점과 선에 맞춤</div>
+                    </div>
+                    <div class="settings-toggle" aria-label="스냅기능">
+                        <label>
+                            <input type="radio" name="snap-enabled-select" value="false"
+                                onclick="setSnapEnabled(false)">
+                        </label>
+                        <label>
+                            <input type="radio" name="snap-enabled-select" value="true" onclick="setSnapEnabled(true)">
+                        </label>
+                        <span class="settings-toggle-thumb"></span>
+                    </div>
+                </div>
+                <div id="settings-track-interval-section" class="settings-row settings-link-row" style="display:none;"
+                    onclick="openSettingsChoiceModal('track')">
+                    <div>
+                        <div class="settings-label">트랙 기록 간격</div>
+                        <div class="settings-help">GPS 위치가 설정 거리 이상 이동했을 때 좌표를 기록합니다.</div>
+                    </div>
+                    <div class="settings-row-action">
+                        <span id="settings-track-interval-value" class="settings-value">10m</span>
+                        <span class="settings-chevron"></span>
+                    </div>
+                </div>
+                <div class="settings-row">
+                    <div>
+                        <div class="settings-label">축소 시 도형 단순화</div>
+                        <div class="settings-help">지도를 축소했을 때 선과 면을 단순화하여 렌더링 부담을 줄입니다.</div>
+                    </div>
+                    <div class="settings-toggle" aria-label="도형 단순화">
+                        <label>
+                            <input type="radio" name="viewport-simplify-select" value="false"
+                                onclick="setViewportSimplifyEnabled(false)">
+                        </label>
+                        <label>
+                            <input type="radio" name="viewport-simplify-select" value="true"
+                                onclick="setViewportSimplifyEnabled(true)">
+                        </label>
+                        <span class="settings-toggle-thumb"></span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="settings-section">
+                <div class="settings-row settings-link-row" onclick="openSettingsDocument('./privacy-policy.html')">
+                    <div class="settings-label">개인정보처리방침</div>
+                    <span class="settings-chevron"></span>
+                </div>
+                <div class="settings-row settings-link-row"
+                    onclick="openSettingsDocument('./open-source-licenses.html')">
+                    <div class="settings-label">오픈소스 라이선스</div>
+                    <span class="settings-chevron"></span>
+                </div>
+            </section>
+
+            <section class="settings-section">
+                <div class="settings-row settings-link-row"
+                    onclick="window.open('https://getupnote.com/share/notes/ixIE9WYlfTPrpRbRIt446szGaIn2/019cd019-143e-772b-9609-7720b35fb002', '_blank')">
+                    <div class="settings-label">도움말</div>
+                    <span class="settings-chevron"></span>
+                </div>
+                <div class="settings-row settings-link-row"
+                    onclick="window.open('https://docs.google.com/forms/d/e/1FAIpQLSdfvKXEvISCs3G8mQDiN9uNMCRa0q_s-o1qkZw4oPv0rT-ufg/viewform?usp=preview', '_blank')">
+                    <div class="settings-label">피드백 보내기</div>
+                    <span class="settings-chevron"></span>
+                </div>
+                <div class="settings-row settings-version-row">
+                    <div>
+                        <div class="settings-label">버전</div>
+                        <div class="settings-version-meta">
+                            현재 <span id="app-version-display"></span> / 최신 <span id="latest-version-display"></span>
+                        </div>
+                    </div>
+                    <button id="btn-app-update" class="settings-update-btn" type="button" onclick="forceAppUpdate()">
+                        업데이트
+                    </button>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- 불러오기 안내 모달 -->
+    <!-- 앱 공용 모달은 src/templates/app-modals.js에서 주입합니다. -->
+
+    <!-- 절전 모드 까만 오버레이 -->
+    <div id="sleep-mode-overlay" class="sleep-mode-overlay" style="display:none;">
+        <div class="sleep-slider-container">
+            <div class="sleep-slider-text">오른쪽으로 밀어서 절전 해제</div>
+            <div id="sleep-slider-thumb" class="sleep-slider-thumb">
+                <svg viewBox="0 0 24 24" fill="#aaa" style="width:28px;height:28px;">
+                    <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />
+                </svg>
+            </div>
+        </div>
+    </div>
+
+    <!-- 메인 스크립트 연결 -->
+    <script type="module" src="%BASE_URL%src/script.js"></script>
+    <script>
+        // PWA 서비스 워커 등록
+        // 개발 서버에서는 Vite HMR과 캐시가 충돌할 수 있어 기존 localhost 등록을 정리합니다.
+        if ('serviceWorker' in navigator) {
+            const isLocalDevHost = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
+            window.addEventListener('load', () => {
+                if (isLocalDevHost) {
+                    navigator.serviceWorker.getRegistrations()
+                        .then(regs => regs.forEach(reg => reg.unregister()))
+                        .catch(() => { });
+                    return;
+                }
+                navigator.serviceWorker.register('%BASE_URL%service-worker.js', { updateViaCache: 'none' });
+            });
+        }
+    </script>
+</body>
+
+</html>

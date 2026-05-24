@@ -1,0 +1,23 @@
+[functions.verify-code]
+verify_jwt = false
+
+[functions.delete-account]
+verify_jwt = false
+
+[functions.create-verification-code]
+verify_jwt = false
+
+[functions.get-app-settings]
+verify_jwt = false
+
+[functions.update-notice-badge]
+verify_jwt = false
+
+[functions.get-auth-info]
+verify_jwt = false
+
+[functions.list-admin-users]
+verify_jwt = false
+
+[functions.update-user-entitlement]
+verify_jwt = false

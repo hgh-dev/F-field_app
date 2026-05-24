@@ -1,0 +1,206 @@
+        /* 바텀 시트 메인 컨테이너 */
+        #bottom-sheet {
+            position: fixed;
+            bottom: 0;
+            left: 50%;
+            width: 100%;
+            max-width: 500px;
+            background: #fff;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+            border-top-left-radius: 16px;
+            border-top-right-radius: 16px;
+            z-index: 4000;
+            transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+            /* 기본적으로 화면 아래로 숨김 상태 (-50%는 가로축 중앙정렬용) */
+            transform: translate(-50%, 100%);
+            /* 플로팅 버튼과 동일하게 하단 safe-area 값에 반응 */
+            padding: 0 var(--space-3) calc(var(--space-4) + var(--app-floating-bottom));
+            box-sizing: border-box;
+            max-height: 72vh;
+            overflow-y: auto;
+            /* 스크롤 시 배경이 보이지 않도록 */
+            -webkit-overflow-scrolling: touch;
+        }
+
+        #bottom-sheet.open {
+            transform: translate(-50%, 0);
+        }
+
+        /* 드래그 핸들 */
+        #bottom-sheet-handle {
+            width: 40px;
+            height: 4px;
+            background: #e0e0e0;
+            border-radius: 2px;
+            margin: var(--space-2) auto var(--space-2);
+            /* 위아래 여백 축소 */
+            flex-shrink: 0;
+            cursor: grab;
+        }
+
+        #bottom-sheet-handle:active {
+            cursor: grabbing;
+        }
+
+        #bottom-sheet-header {
+            display: none;
+        }
+
+        #bottom-sheet-more-btn {
+            position: absolute;
+            top: var(--space-2);
+            right: calc(var(--space-3) + 36px);
+            z-index: 10;
+            background: #f0f0f0;
+            border: none;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: background 0.2s;
+        }
+
+        #bottom-sheet-more-btn:active {
+            background: #ddd;
+        }
+
+        #bottom-sheet-more-btn svg {
+            width: 16px;
+            height: 16px;
+            fill: currentColor;
+        }
+
+        #bottom-sheet-close {
+            position: absolute;
+            top: var(--space-2);
+            right: var(--space-3);
+            z-index: 10;
+            background: #f0f0f0;
+            border: none;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            font-size: 14px;
+            color: #666;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: background 0.2s;
+        }
+
+        #bottom-sheet-close:active {
+            background: #ddd;
+        }
+
+        /* 컨텐츠 영역 */
+        #bottom-sheet-body {
+            /* 기존 padding-bottom: 4px 대신 하단 여백은 상위 부모에서 조절함 */
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        /* 바텀시트 반열림(스와이프 확장)용 추가 정보 영역 */
+        .bottom-sheet-extra {
+            display: grid;
+            grid-template-rows: 0fr;
+            transition: grid-template-rows 0.3s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.3s ease-out;
+            opacity: 0;
+            pointer-events: none;
+            /* 닫혀있을 때 클릭 방지 */
+        }
+
+        .bottom-sheet-extra .extra-inner {
+            overflow: hidden;
+        }
+
+        /* 완전 열림 상태 강제 부여 시 */
+        #bottom-sheet.full-open .bottom-sheet-extra {
+            grid-template-rows: 1fr;
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        /* --- 절전 모드 레이어 및 슬라이더 --- */
+        .sleep-mode-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: black;
+            z-index: 99999;
+            /* 파란 비네팅 효과나 바텀시트 등 다른 요소들보다 최상단에 위치하게 함 */
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            padding-bottom: 50px;
+            /* 선택 방지 */
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .sleep-slider-container {
+            width: 80%;
+            max-width: 400px;
+            height: 60px;
+            background-color: #222;
+            border-radius: 30px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            touch-action: none;
+            /* 스와이프 제스처 간섭 방지 */
+        }
+
+        .sleep-slider-text {
+            color: #888;
+            font-size: 14px;
+            font-weight: bold;
+            pointer-events: none;
+        }
+
+        .sleep-slider-thumb {
+            position: absolute;
+            left: 5px;
+            top: 5px;
+            width: 50px;
+            height: 50px;
+            background-color: #444;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .sleep-slider-thumb.dragging {
+            transition: none;
+            background-color: #555;
+        }
+
+        @supports (-webkit-touch-callout: none) {
+            #bottom-sheet {
+                padding-bottom: max(18px, env(safe-area-inset-bottom));
+            }
+
+            .nav-modal-content {
+                padding-bottom: max(24px, env(safe-area-inset-bottom));
+            }
+
+            @media (display-mode: standalone) {
+                .record-fab {
+                    bottom: 18px;
+                }
+            }
+        }
+
