@@ -34,6 +34,18 @@ function createShpCrsSelectOptions(selectedValue = 'auto') {
     `).join('');
 }
 
+function createShpSimplifySelectOptions(selectedValue = 'off') {
+    const options = [
+        { value: 'off', label: '꺼짐' },
+        { value: 'low', label: '약하게' },
+        { value: 'medium', label: '중간' },
+        { value: 'high', label: '강하게' }
+    ];
+    return options.map(option => `
+        <option value="${escapeHtml(option.value)}"${option.value === selectedValue ? ' selected' : ''}>${escapeHtml(option.label)}</option>
+    `).join('');
+}
+
 
 function ensureUserMapModal() {
     let overlay = document.getElementById('user-map-modal-overlay');
@@ -102,6 +114,13 @@ function ensureUserMapModal() {
                     </label>
                 </div>
                 <div id="user-map-zoom-help" style="display:block; margin-top:-6px; margin-bottom:12px; font-size:11px; line-height:1.45; color:#6b7280;"></div>
+                <label id="user-map-shp-simplify-row" style="display:none; margin-bottom:12px;">
+                    <span style="display:block; font-size:12px; font-weight:700; color:#4b5563; margin-bottom:6px;">도형 단순화</span>
+                    <select id="user-map-shp-simplify-input" style="width:100%; min-height:44px; border:1px solid #d1d5db; border-radius:8px; padding:0 12px; font-size:15px; background:#fff; box-sizing:border-box;">
+                        ${createShpSimplifySelectOptions()}
+                    </select>
+                    <span style="display:block; margin-top:6px; font-size:11px; line-height:1.45; color:#6b7280;">축소 시 복잡한 선과 면을 단순화합니다. 지도 렌더링이 느리거나 오류가 발생할 경우 사용하세요.</span>
+                </label>
                 <div style="display:flex; gap:8px; margin-top:16px;">
                     <button id="user-map-cancel-btn" type="button" style="flex:1; min-height:44px; border:0; border-radius:8px; background:#f3f4f6; color:#4b5563; font-size:14px; font-weight:700;">취소</button>
                     <button id="user-map-save-btn" type="submit" style="flex:1; min-height:44px; border:0; border-radius:8px; background:#2563eb; color:#fff; font-size:14px; font-weight:800;">저장</button>
@@ -137,6 +156,8 @@ export function showUserMapModal(existing = null, deps = {}) {
     const fileInput = overlay.querySelector('#user-map-file-input');
     const shpCrsRow = overlay.querySelector('#user-map-shp-crs-row');
     const shpCrsInput = overlay.querySelector('#user-map-shp-crs-input');
+    const shpSimplifyRow = overlay.querySelector('#user-map-shp-simplify-row');
+    const shpSimplifyInput = overlay.querySelector('#user-map-shp-simplify-input');
     const wmsRow = overlay.querySelector('#user-map-wms-layer-row');
     const wmsLayersInput = overlay.querySelector('#user-map-wms-layers-input');
     const minZoomInput = overlay.querySelector('#user-map-min-zoom-input');
@@ -157,6 +178,10 @@ export function showUserMapModal(existing = null, deps = {}) {
         shpCrsInput.innerHTML = createShpCrsSelectOptions(existing?.sourceCrs || 'auto');
         shpCrsInput.value = existing?.sourceCrs || 'auto';
     }
+    if (shpSimplifyInput) {
+        shpSimplifyInput.innerHTML = createShpSimplifySelectOptions(existing?.simplifyLevel || 'off');
+        shpSimplifyInput.value = existing?.simplifyLevel || 'off';
+    }
     wmsLayersInput.value = existing?.wms?.layers || '';
     minZoomInput.value = existing?.minZoom ?? 12;
     maxNativeZoomInput.value = existing?.maxNativeZoom ?? (isTileUserMapType(typeInput.value) ? 18 : 22);
@@ -167,6 +192,7 @@ export function showUserMapModal(existing = null, deps = {}) {
         urlRow.style.display = isLocalShp ? 'none' : 'block';
         fileRow.style.display = isLocalShp ? 'block' : 'none';
         if (shpCrsRow) shpCrsRow.style.display = isLocalShp ? 'block' : 'none';
+        if (shpSimplifyRow) shpSimplifyRow.style.display = isLocalShp ? 'block' : 'none';
         wmsRow.style.display = typeInput.value === 'wms' ? 'block' : 'none';
         if (maxZoomLabel) maxZoomLabel.textContent = isTileMap ? '타일 제공 최대 줌' : '최대 줌';
         if (zoomHelp) {
@@ -261,6 +287,7 @@ export function showUserMapModal(existing = null, deps = {}) {
             item.url = '';
             item.sourceName = existing?.sourceName || '';
             item.sourceCrs = shpCrsInput?.value || existing?.sourceCrs || 'auto';
+            item.simplifyLevel = shpSimplifyInput?.value || existing?.simplifyLevel || 'off';
             item.geojsonKey = existing?.geojsonKey || `${item.id}-geojson`;
             item.featureCount = existing?.featureCount || 0;
 
@@ -316,5 +343,3 @@ export function showUserMapModal(existing = null, deps = {}) {
         });
     });
 }
-
-

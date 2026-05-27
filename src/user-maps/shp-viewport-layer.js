@@ -13,6 +13,27 @@ import { getUserMapLayerZIndex } from './layer-pane.js';
 import { bboxIntersects, bboxToLeafletBounds, collectLatLngSegments, getBufferedMapBbox, getStoredFeatureBbox } from './spatial-utils.js';
 import { getFeatureUserMapStyle, getUserMapGeometryType, isFeatureCategoryVisible } from './style-state.js';
 
+function getBaseSmoothFactorForZoom(zoom) {
+    if (zoom >= 15) return 1;
+    if (zoom === 14) return 2;
+    if (zoom === 13) return 4;
+    if (zoom <= 11) return 10;
+    return 7;
+}
+
+function getShpSmoothFactor(item) {
+    const level = item?.simplifyLevel || 'off';
+    if (level === 'off') return 1;
+
+    const multipliers = {
+        low: 0.5,
+        medium: 1,
+        high: 2
+    };
+    const multiplier = multipliers[level] || multipliers.low;
+    return Math.max(1, getBaseSmoothFactorForZoom(map.getZoom()) * multiplier);
+}
+
 function addSolidDotUserMapDots(group, pathLayer, featureStyle, paneName, renderer) {
     if (!group || !pathLayer || typeof pathLayer.getLatLngs !== 'function') return;
     if (featureStyle?.customLineStyle !== 'solid-dot') return;
@@ -64,10 +85,14 @@ function getShpRenderGeojson(item, geojson) {
 }
 
 function buildShpFeatureLayer(item, geojson, paneName, renderer) {
+    const smoothFactor = getShpSmoothFactor(item);
     const baseLayer = L.geoJSON(geojson, {
         pane: paneName,
         renderer,
-        style: feature => getFeatureUserMapStyle(item, feature),
+        style: feature => ({
+            ...getFeatureUserMapStyle(item, feature),
+            smoothFactor
+        }),
         pointToLayer: (feature, latlng) => {
             const featureStyle = getFeatureUserMapStyle(item, feature);
             if (getUserMapGeometryType(item) === 'marker') {
@@ -104,7 +129,7 @@ export function syncShpViewportLayer(layer, item) {
     if (!layer?.__fFieldShp || !layer.__allGeojson) return;
 
     const viewportBbox = getBufferedMapBbox();
-    const renderKey = `${map.getZoom()}|${viewportBbox.map(value => value.toFixed(5)).join('|')}|${(item.categoryVisibleValues || []).join('|')}|${JSON.stringify(item.style || {})}|${JSON.stringify(item.categoryStyles || {})}`;
+    const renderKey = `${map.getZoom()}|${viewportBbox.map(value => value.toFixed(5)).join('|')}|${item.simplifyLevel || 'off'}|${(item.categoryVisibleValues || []).join('|')}|${JSON.stringify(item.style || {})}|${JSON.stringify(item.categoryStyles || {})}`;
     if (layer.__lastRenderKey === renderKey) return;
 
     const visibleGeojson = getShpRenderGeojson(item, layer.__allGeojson);

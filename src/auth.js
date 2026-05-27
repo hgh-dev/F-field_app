@@ -40,6 +40,8 @@ const FEATURE_TIERS = Object.freeze({
     [AUTH_FEATURES.AUTH_INFO]: new Set(['verified', 'premium', 'admin'])
 });
 const APP_SETTINGS_CACHE_KEY = 'f-field-app-settings-cache';
+const OFFLINE_ENTITLEMENT_CACHE_KEY = 'f-field-offline-entitlement-cache';
+const OFFLINE_ENTITLEMENT_CACHE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 const ANDROID_AUTH_REDIRECT_URL = 'app.ffield.mobile://auth-callback';
 const AUTH_URL_PARAM_KEYS = new Set([
     'access_token',
@@ -65,6 +67,7 @@ const authState = {
     initialized: false,
     user: null,
     tier: 'free',
+    offlineMapAccessFromCache: false,
     error: null
 };
 let appUrlOpenListener = null;
@@ -90,7 +93,8 @@ export function isAdminAccount(state = authState) {
 export function canUseFeature(feature, state = authState) {
     const tier = normalizeAuthTier(state?.tier);
     const allowedTiers = FEATURE_TIERS[feature];
-    return Boolean(state?.user && allowedTiers?.has(tier));
+    if (state?.user && allowedTiers?.has(tier)) return true;
+    return Boolean(feature === AUTH_FEATURES.OFFLINE_MAP && state?.user && state?.offlineMapAccessFromCache);
 }
 
 export function hasPremiumAccess() {
@@ -101,14 +105,54 @@ export function hasOfflineMapAccess() {
     return canUseFeature(AUTH_FEATURES.OFFLINE_MAP);
 }
 
-async function fetchEntitlementTier(userId) {
-    if (!supabase || !userId) return 'free';
+function getCachedOfflineEntitlement(userId) {
+    try {
+        const cached = JSON.parse(localStorage.getItem(OFFLINE_ENTITLEMENT_CACHE_KEY) || 'null');
+        if (!cached || cached.userId !== userId) return null;
 
-    const normalizeTier = (row) => {
+        const tier = normalizeAuthTier(cached.tier);
+        if (!PREMIUM_TIERS.has(tier)) return null;
+
+        const validatedAt = new Date(cached.validatedAt || 0).getTime();
+        if (!Number.isFinite(validatedAt) || Date.now() - validatedAt > OFFLINE_ENTITLEMENT_CACHE_MAX_AGE_MS) return null;
+
+        const expiresAt = cached.expiresAt ? new Date(cached.expiresAt).getTime() : null;
+        if (expiresAt && Number.isFinite(expiresAt) && expiresAt <= Date.now()) return null;
+
+        return { ...cached, tier };
+    } catch {
+        return null;
+    }
+}
+
+function saveOfflineEntitlement(user, entitlement) {
+    if (!user?.id) return;
+
+    const tier = normalizeAuthTier(entitlement?.tier);
+    if (!PREMIUM_TIERS.has(tier)) {
+        const cached = getCachedOfflineEntitlement(user.id);
+        if (cached) localStorage.removeItem(OFFLINE_ENTITLEMENT_CACHE_KEY);
+        return;
+    }
+
+    localStorage.setItem(OFFLINE_ENTITLEMENT_CACHE_KEY, JSON.stringify({
+        userId: user.id,
+        email: user.email || '',
+        tier,
+        expiresAt: entitlement?.expiresAt || null,
+        validatedAt: new Date().toISOString()
+    }));
+}
+
+async function fetchEntitlementInfo(userId) {
+    if (!supabase || !userId) return { tier: 'free', expiresAt: null };
+
+    const normalizeEntitlement = (row) => {
         const tier = String(row?.tier || 'free').trim().toLowerCase();
-        if (tier === 'admin') return 'admin';
-        if (row.expires_at && new Date(row.expires_at).getTime() <= Date.now()) return 'free';
-        return PREMIUM_TIERS.has(tier) ? tier : 'free';
+        const expiresAt = row?.expires_at || null;
+        if (tier === 'admin') return { tier: 'admin', expiresAt };
+        if (expiresAt && new Date(expiresAt).getTime() <= Date.now()) return { tier: 'free', expiresAt };
+        return { tier: PREMIUM_TIERS.has(tier) ? tier : 'free', expiresAt };
     };
 
     const byUserId = await supabase
@@ -117,7 +161,7 @@ async function fetchEntitlementTier(userId) {
         .eq('user_id', userId)
         .maybeSingle();
 
-    if (!byUserId.error && byUserId.data) return normalizeTier(byUserId.data);
+    if (!byUserId.error && byUserId.data) return normalizeEntitlement(byUserId.data);
 
     const byId = await supabase
         .from('entitlements')
@@ -126,22 +170,26 @@ async function fetchEntitlementTier(userId) {
         .maybeSingle();
 
     if (byId.error) throw byId.error;
-    return normalizeTier(byId.data);
+    return normalizeEntitlement(byId.data);
 }
 
 async function refreshEntitlement(session) {
     authState.user = session?.user || null;
     authState.tier = 'free';
+    authState.offlineMapAccessFromCache = false;
     authState.error = null;
 
     if (!authState.user) return getAuthState();
 
     try {
-        authState.tier = await fetchEntitlementTier(authState.user.id);
+        const entitlement = await fetchEntitlementInfo(authState.user.id);
+        authState.tier = entitlement.tier;
+        saveOfflineEntitlement(authState.user, entitlement);
     } catch (error) {
         console.warn('권한 확인 실패:', error);
         authState.error = error.message || '권한 확인에 실패했습니다.';
         authState.tier = 'free';
+        authState.offlineMapAccessFromCache = Boolean(getCachedOfflineEntitlement(authState.user.id));
     }
 
     return getAuthState();

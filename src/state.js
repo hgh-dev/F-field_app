@@ -18,6 +18,8 @@ export const AppState = {
     isSnapEnabled: localStorage.getItem('setting_snap_enabled') !== 'false',
     // 줌아웃 시 도형 단순화 사용 여부
     isViewportSimplifyEnabled: localStorage.getItem('setting_viewport_simplify') === 'true',
+    // 빠른 지도 이동 후 도형 렌더링을 마지막 이동 이후로 지연할지 여부
+    isVectorRenderDelayEnabled: localStorage.getItem('setting_vector_render_delay') === 'true',
 
     /* ----------------------------------------------------------------------
        2) 지도 위치/추적 상태

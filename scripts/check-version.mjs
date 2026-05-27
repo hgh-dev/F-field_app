@@ -32,11 +32,13 @@ function matchRequired(path, pattern, label) {
 
 const packageVersion = readJson('package.json').version;
 const expectedVersionCode = String(getVersionCode(packageVersion));
+const publicVersionInfo = readJson('public/version.json');
 
 const checks = [
     ['package-lock.json root', readJson('package-lock.json').version],
     ['package-lock.json package', readJson('package-lock.json').packages?.['']?.version],
-    ['public/version.json', readJson('public/version.json').version],
+    ['public/version.json version', publicVersionInfo.version],
+    ['public/version.json androidVersionName', publicVersionInfo.androidVersionName],
     ['src/config.js APP_VERSION', matchRequired('src/config.js', /APP_VERSION = "(\d+\.\d+\.\d+)"/, 'APP_VERSION')],
     ['public/service-worker.js cache', matchRequired('public/service-worker.js', /F-field-v(\d+\.\d+\.\d+)/, 'service worker cache')],
     ['src/assets/pwa/service-worker.js cache', matchRequired('src/assets/pwa/service-worker.js', /F-field-v(\d+\.\d+\.\d+)/, 'archived service worker cache')],
@@ -52,6 +54,15 @@ for (const [label, value] of checks) {
 const androidVersionCode = matchRequired('android/app/build.gradle', /versionCode (\d+)/, 'Android versionCode');
 if (androidVersionCode !== expectedVersionCode) {
     fail(`Android versionCode is ${androidVersionCode || '(missing)'}, expected ${expectedVersionCode}`);
+}
+
+const jsVersionCode = matchRequired('src/config.js', /APP_VERSION_CODE = (\d+)/, 'APP_VERSION_CODE');
+if (jsVersionCode !== expectedVersionCode) {
+    fail(`APP_VERSION_CODE is ${jsVersionCode || '(missing)'}, expected ${expectedVersionCode}`);
+}
+
+if (String(publicVersionInfo.androidVersionCode) !== expectedVersionCode) {
+    fail(`public/version.json androidVersionCode is ${publicVersionInfo.androidVersionCode || '(missing)'}, expected ${expectedVersionCode}`);
 }
 
 if (!process.exitCode) {

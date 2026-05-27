@@ -14,11 +14,27 @@ import { updateLayerInfo } from './ui-core.js';
 import { renderSurveyList } from './ui-project.js';
 import { isNativeApp, saveBase64FileNative } from './native-bridge.js';
 import { showAppConfirm } from './app-dialog.js';
-import { AUTH_FEATURES, canUseFeature, getAuthState } from './auth.js';
 
 export let currentPhotoList = [];
 export let currentPhotoIndex = 0;
 export let currentPhotoLayerId = null;
+
+const PHOTO_INPUT_PERMISSION_GRACE_MS = 5 * 60 * 1000;
+let pendingPhotoInputPermission = null;
+
+function authorizePendingPhotoInput(layerId) {
+    pendingPhotoInputPermission = {
+        layerId,
+        expiresAt: Date.now() + PHOTO_INPUT_PERMISSION_GRACE_MS
+    };
+}
+
+function consumePendingPhotoInputPermission(layerId) {
+    if (!pendingPhotoInputPermission) return false;
+    const isValid = pendingPhotoInputPermission.layerId === layerId && pendingPhotoInputPermission.expiresAt >= Date.now();
+    pendingPhotoInputPermission = null;
+    return isValid;
+}
 
 /**
  * [함수] createPhotoThumbnailItem
@@ -128,15 +144,6 @@ function createPhotoActionGridSection(layerId) {
  * [원리] 썸네일 영역과 액션 그리드 구성을 한 번에 묶어 호출부가 구조만 조합하도록 만든다.
  */
 export function createLayerPhotoSection(layerId, photos) {
-    if (!canUseFeature(AUTH_FEATURES.PHOTO_RECORDING, getAuthState())) {
-        return {
-            thumbnailsHtml: createPhotoThumbnailSection(layerId, photos),
-            inputElementsHtml: '',
-            actionButtonHtml: '',
-            gridStyle: 'display:none;'
-        };
-    }
-
     const actionGrid = createPhotoActionGridSection(layerId);
 
     return {
@@ -157,10 +164,6 @@ export function openPhotoSelectMenu(e, id) {
     if (e) {
         e.stopPropagation();
         e.preventDefault();
-    }
-    if (!canUseFeature(AUTH_FEATURES.PHOTO_RECORDING, getAuthState())) {
-        alert('사진 추가는 인증된 회원과 관리자 계정만 사용할 수 있습니다.');
-        return;
     }
     currentPhotoLayerId = id;
     const overlay = document.getElementById('photo-modal-overlay');
@@ -205,12 +208,8 @@ export function closePhotoSelectMenu() {
  */
 export function handlePhotoMenuAction(type) {
     if (!currentPhotoLayerId) return;
-    if (!canUseFeature(AUTH_FEATURES.PHOTO_RECORDING, getAuthState())) {
-        closePhotoSelectMenu();
-        alert('사진 추가는 인증된 회원과 관리자 계정만 사용할 수 있습니다.');
-        return;
-    }
     const targetId = currentPhotoLayerId;
+    authorizePendingPhotoInput(targetId);
     closePhotoSelectMenu();
     setTimeout(() => {
         if (type === 'camera') {
@@ -230,11 +229,8 @@ export function handlePhotoMenuAction(type) {
  *        대상 속성에 반영하고 저장 및 화면 갱신을 연쇄 실행한다.
  */
 export function processPhotoFiles(input, layerId) {
-    if (!canUseFeature(AUTH_FEATURES.PHOTO_RECORDING, getAuthState())) {
-        alert('사진 추가는 인증된 회원과 관리자 계정만 사용할 수 있습니다.');
-        input.value = '';
-        return;
-    }
+    consumePendingPhotoInputPermission(layerId);
+    pendingPhotoInputPermission = null;
     const files = input.files;
     if (!files || files.length === 0) return;
     const layer = drawnItems.getLayers().find(l => l.feature.properties.id === layerId);

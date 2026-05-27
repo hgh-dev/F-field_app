@@ -219,6 +219,14 @@ const AUTH_ADMIN_MODALS_HTML = `    <div id="auth-modal-overlay" class="nav-moda
                 <input id="admin-users-search" class="admin-users-search" type="search" placeholder="이메일 검색">
                 <button id="admin-users-refresh-btn" class="admin-user-save" type="button">새로고침</button>
             </div>
+            <div id="admin-users-tier-tabs" class="admin-users-tier-tabs" role="tablist" aria-label="회원 등급 필터">
+                <button class="admin-users-tier-tab active" type="button" data-tier-filter="all">전체</button>
+                <button class="admin-users-tier-tab" type="button" data-tier-filter="admin">admin</button>
+                <button class="admin-users-tier-tab" type="button" data-tier-filter="verified">verified</button>
+                <button class="admin-users-tier-tab" type="button" data-tier-filter="premium">premium</button>
+                <button class="admin-users-tier-tab" type="button" data-tier-filter="free">free</button>
+            </div>
+            <div id="admin-users-tier-count" class="admin-users-tier-count">회원 수 : 0명</div>
             <div id="admin-users-list" class="admin-users-list">
                 <div class="verification-code-help">불러오는 중...</div>
             </div>

@@ -51,6 +51,7 @@ export async function addUserMapFromFileAction(file, {
         maxZoom: DEFAULT_MAX_ZOOM,
         minZoom: 12,
         maxNativeZoom: 22,
+        simplifyLevel: 'off',
         opacity: 1
     };
 

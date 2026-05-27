@@ -1777,9 +1777,9 @@
                 <div class="settings-row">
                     <div>
                         <div class="settings-label">축소 시 도형 단순화</div>
-                        <div class="settings-help">지도를 축소했을 때 선과 면을 단순화하여 렌더링 부담을 줄입니다.</div>
+                        <div class="settings-help">기록관리 내의 선과 면을 단순화하여 렌더링 부담을 줄입니다.</div>
                     </div>
-                    <div class="settings-toggle" aria-label="도형 단순화">
+                    <div class="settings-toggle" aria-label="기록관리 도형 단순화">
                         <label>
                             <input type="radio" name="viewport-simplify-select" value="false"
                                 onclick="setViewportSimplifyEnabled(false)">
@@ -1787,6 +1787,23 @@
                         <label>
                             <input type="radio" name="viewport-simplify-select" value="true"
                                 onclick="setViewportSimplifyEnabled(true)">
+                        </label>
+                        <span class="settings-toggle-thumb"></span>
+                    </div>
+                </div>
+                <div class="settings-row">
+                    <div>
+                        <div class="settings-label">도형 렌더링 지연</div>
+                        <div class="settings-help">지도를 빠르게 여러 번 이동 시 마지막 이동 후 도형을 렌더링합니다.</div>
+                    </div>
+                    <div class="settings-toggle" aria-label="도형 렌더링 지연">
+                        <label>
+                            <input type="radio" name="vector-render-delay-select" value="false"
+                                onclick="setVectorRenderDelayEnabled(false)">
+                        </label>
+                        <label>
+                            <input type="radio" name="vector-render-delay-select" value="true"
+                                onclick="setVectorRenderDelayEnabled(true)">
                         </label>
                         <span class="settings-toggle-thumb"></span>
                     </div>

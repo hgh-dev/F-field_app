@@ -93,6 +93,10 @@
             z-index: 10001;
         }
 
+        body.is-native-app .photo-modal-controls {
+            top: calc(20px + max(env(safe-area-inset-top), 18px));
+        }
+
         /* 컨트롤 버튼 공통 (다운로드, 닫기) */
         #photo-modal-download,
         #photo-modal-close {
@@ -350,4 +354,3 @@
             color: #374151;
             border: 1px solid #d1d5db;
         }
-

@@ -320,6 +320,7 @@ export function openSettingsModal() {
     document.getElementsByName('track-interval-select').forEach(r => { if (parseInt(r.value) === AppState.trackInterval) r.checked = true; });
     document.getElementsByName('snap-enabled-select').forEach(r => { if ((r.value === 'true') === AppState.isSnapEnabled) r.checked = true; });
     document.getElementsByName('viewport-simplify-select').forEach(r => { if ((r.value === 'true') === AppState.isViewportSimplifyEnabled) r.checked = true; });
+    document.getElementsByName('vector-render-delay-select').forEach(r => { if ((r.value === 'true') === AppState.isVectorRenderDelayEnabled) r.checked = true; });
     const overlay = document.getElementById('settings-modal-overlay');
     overlay.style.display = 'flex';
     setTimeout(() => { overlay.classList.add('visible'); }, 10);
@@ -636,7 +637,7 @@ export function initUiEventListeners() {
     // 오프라인 지도 확대 레벨 체크 + 선/면 렌더링 최적화
     map.on('zoomend', updateOfflineButton);
     map.on('moveend', updateOfflineButton);
-    map.on('zoomend moveend', scheduleViewportVectorOptimization);
+    map.on('zoomend moveend', () => scheduleViewportVectorOptimization({ delay: true }));
     map.on('zoomend moveend', syncSolidDotOverlays);
     map.on('zoomend moveend', syncFillPatternOverlays);
     drawnItems.on('layeradd layerremove', scheduleViewportVectorOptimization);

@@ -79,13 +79,24 @@ function optimizeViewportVectorRendering() {
 }
 
 let isViewportOptimizationScheduled = false;
+let viewportOptimizationDelayTimer = null;
 /**
  * [함수] scheduleViewportVectorOptimization
  * [역할] 비용이 큰 작업을 지연 예약해 호출 빈도를 제어한다.
  * [원리] requestAnimationFrame 예약 플래그를 사용해 연속 호출을 하나로 합치고,
  *        고비용 렌더 작업을 프레임 단위로 지연 실행해 성능 부담을 줄인다.
  */
-export function scheduleViewportVectorOptimization() {
+export function scheduleViewportVectorOptimization(options = {}) {
+    const shouldDelay = options.delay === true && AppState.isVectorRenderDelayEnabled;
+    if (shouldDelay) {
+        clearTimeout(viewportOptimizationDelayTimer);
+        viewportOptimizationDelayTimer = setTimeout(() => {
+            viewportOptimizationDelayTimer = null;
+            scheduleViewportVectorOptimization();
+        }, 500);
+        return;
+    }
+
     if (isViewportOptimizationScheduled) return;
     isViewportOptimizationScheduled = true;
     requestAnimationFrame(() => {
@@ -93,4 +104,3 @@ export function scheduleViewportVectorOptimization() {
         optimizeViewportVectorRendering();
     });
 }
-

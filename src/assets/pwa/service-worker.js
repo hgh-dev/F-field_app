@@ -6,8 +6,9 @@
    [참고]
    - 캐시 이름, 오프라인 동작, 서비스 워커 업데이트 정책을 바꿀 때 확인합니다.
    ========================================================================== */
-const STATIC_CACHE_NAME = 'F-field-v1.0.3';
+const STATIC_CACHE_NAME = 'F-field-v1.0.5';
 const MAP_CACHE_NAME = 'F-field-map-v1';
+const OFFLINE_MAP_PACKAGE_CACHE_PREFIX = 'F-field-map-package-';
 const MAP_CACHE_MAX_ITEMS = 15000;
 const MAP_CACHE_TRIM_WRITE_INTERVAL = 100;
 const MAP_CACHE_TRIM_TIME_INTERVAL_MS = 60 * 1000;
@@ -68,7 +69,7 @@ self.addEventListener('activate', (event) => {
     event.waitUntil(
         caches.keys().then((keyList) => {
             return Promise.all(keyList.map((key) => {
-                if (!cacheWhitelist.includes(key)) {
+                if (!cacheWhitelist.includes(key) && !key.startsWith(OFFLINE_MAP_PACKAGE_CACHE_PREFIX)) {
                     return caches.delete(key);
                 }
             }));

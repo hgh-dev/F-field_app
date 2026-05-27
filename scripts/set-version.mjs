@@ -56,12 +56,23 @@ updateJson('package-lock.json', (data) => {
 
 updateJson('public/version.json', (data) => {
     data.version = nextVersion;
+    data.androidVersionName = nextVersion;
+    data.androidVersionCode = nextVersionCode;
+    if (!data.playStoreUrl) {
+        data.playStoreUrl = 'https://play.google.com/store/apps/details?id=app.ffield.mobile';
+    }
 });
 
 replaceRequired(
     'src/config.js',
     /export const APP_VERSION\s*=\s*["']\d+\.\d+\.\d+["'];/,
     `export const APP_VERSION = "${nextVersion}";`
+);
+
+replaceRequired(
+    'src/config.js',
+    /export const APP_VERSION_CODE\s*=\s*\d+;/,
+    `export const APP_VERSION_CODE = ${nextVersionCode};`
 );
 
 replaceRequired(

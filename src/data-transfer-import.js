@@ -17,12 +17,92 @@ let renderProjectSelector = () => {};
 let jsZipPromise = null;
 let shpParserPromise = null;
 let largeShpImportModal = null;
+let shpCrsSelectModal = null;
+
+const SHP_CRS_OPTIONS = [
+    { value: 'auto', label: '자동 선택(.prj)' },
+    { value: 'EPSG:4326', label: 'WGS84 경위도(EPSG:4326)' },
+    { value: 'EPSG:5179', label: 'Korea 2000 통합좌표계(EPSG:5179)' },
+    { value: 'EPSG:5186', label: 'Korea 2000 중부원점 2010(EPSG:5186)' },
+    { value: 'EPSG:5181', label: 'Korea 2000 중부원점(EPSG:5181)' },
+    { value: 'EPSG:5174', label: 'Korean 1985 중부원점(EPSG:5174)' }
+];
 
 export function configureDataTransferImport(callbacks = {}) {
     saveToStorage = callbacks.saveToStorage || saveToStorage;
     loadCurrentProjectFeatures = callbacks.loadCurrentProjectFeatures || loadCurrentProjectFeatures;
     restoreFeatures = callbacks.restoreFeatures || restoreFeatures;
     renderProjectSelector = callbacks.renderProjectSelector || renderProjectSelector;
+}
+
+/**
+ * SHP/DBF 불러오기 시 잘릴 수 있는 속성명(최대 10자)을 표준 키로 보정합니다.
+ * 동작 원리:
+ * - DBF 필드 길이 제한으로 `customColor -> customcolo`처럼 잘린 키를 원래 키로 매핑합니다.
+ * - 타입(숫자/불리언)으로 쓰이는 값은 후속 렌더링 충돌을 막기 위해 한 번 더 정규화합니다.
+ */
+function normalizeImportedFeatureProperties(feature) {
+    if (!feature || typeof feature !== 'object') return;
+    const props = feature.properties || (feature.properties = {});
+
+    const pickFirstDefined = (keys) => {
+        for (const key of keys) {
+            if (Object.prototype.hasOwnProperty.call(props, key) && props[key] !== undefined && props[key] !== null && props[key] !== '') {
+                return props[key];
+            }
+        }
+        return undefined;
+    };
+
+    const assignIfMissing = (targetKey, aliasKeys) => {
+        if (props[targetKey] !== undefined && props[targetKey] !== null && props[targetKey] !== '') return;
+        const value = pickFirstDefined(aliasKeys);
+        if (value !== undefined) props[targetKey] = value;
+    };
+
+    assignIfMissing('customColor', ['customcolo', 'CUSTOMCOLO', 'customcolor', 'CUSTOMCOLOR', 'color', 'COLOR']);
+    assignIfMissing('customEmoji', ['customemoj', 'CUSTOMEMOJ']);
+    assignIfMissing('customMarkerSize', ['custommarke', 'CUSTOMMARKE']);
+    assignIfMissing('customDashArray', ['customdash', 'CUSTOMDASH']);
+    assignIfMissing('customWeight', ['customweig', 'CUSTOMWEIG', 'weight', 'WEIGHT']);
+    assignIfMissing('customFillOpacity', ['customfill', 'CUSTOMFILL', 'fillopacit', 'FILLOPACIT']);
+    assignIfMissing('description', ['descriptio', 'DESCRIPTIO']);
+    assignIfMissing('name', ['name', 'NAME', 'memo', 'MEMO']);
+    assignIfMissing('memo', ['memo', 'MEMO', 'name', 'NAME']);
+    ensureRecordNameAlias(props);
+
+    if (props.customMarkerSize !== undefined) {
+        const parsed = parseInt(props.customMarkerSize, 10);
+        if (!Number.isNaN(parsed)) {
+            props.customMarkerSize = Math.min(5, Math.max(1, parsed));
+        }
+    }
+    if (props.customWeight !== undefined) {
+        const parsed = parseInt(props.customWeight, 10);
+        if (!Number.isNaN(parsed)) {
+            props.customWeight = Math.min(5, Math.max(1, parsed));
+        }
+    }
+    if (props.customFillOpacity !== undefined) {
+        const parsed = parseFloat(props.customFillOpacity);
+        if (!Number.isNaN(parsed)) {
+            props.customFillOpacity = Math.min(1, Math.max(0, parsed));
+        }
+    }
+
+    if (typeof props.isHidden === 'string') {
+        const v = props.isHidden.trim().toLowerCase();
+        props.isHidden = (v === 'true' || v === 't' || v === '1' || v === 'y');
+    }
+    if (typeof props.customFill === 'string') {
+        const v = props.customFill.trim().toLowerCase();
+        props.customFill = (v === 'true' || v === 't' || v === '1' || v === 'y');
+    }
+}
+
+function ensureFeatureCollectionRecordNames(featureCollection) {
+    if (!featureCollection || !Array.isArray(featureCollection.features)) return;
+    featureCollection.features.forEach(feature => normalizeImportedFeatureProperties(feature));
 }
 
 function cloneRecordGroups(recordGroups) {
@@ -39,6 +119,15 @@ function cloneRecordGroups(recordGroups) {
 
 function makeImportedRecordGroupId() {
     return `record-group-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+}
+
+function escapeModalHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 function showLargeShpImportChoice(featureCount) {
@@ -85,6 +174,60 @@ function showLargeShpImportChoice(featureCount) {
 
         document.body.appendChild(overlay);
         largeShpImportModal = overlay;
+        setTimeout(() => overlay.classList.add('visible'), 10);
+    });
+}
+
+function showShpCrsSelectModal(fileName) {
+    if (shpCrsSelectModal) {
+        shpCrsSelectModal.remove();
+        shpCrsSelectModal = null;
+    }
+
+    return new Promise(resolve => {
+        const overlay = document.createElement('div');
+        overlay.className = 'nav-modal-overlay center-modal-overlay';
+        overlay.style.display = 'flex';
+        overlay.style.zIndex = '13000';
+        overlay.innerHTML = `
+            <div class="nav-modal-content center-modal-content compact" onclick="event.stopPropagation()" style="display:flex; flex-direction:column; gap:14px;">
+                <div style="font-size:18px; font-weight:800; color:#111827;">SHP 좌표계 선택</div>
+                <div style="padding:12px; border-radius:8px; background:#f8f9fa; color:#4b5563; font-size:13px; line-height:1.55;">
+                    ${escapeModalHtml(fileName)} 파일의 원본 좌표계를 선택하세요.<br>
+                    .prj 파일을 기준으로 불러오려면 자동 선택을 사용하세요.
+                </div>
+                <label style="display:block;">
+                    <span style="display:block; font-size:12px; font-weight:800; color:#4b5563; margin-bottom:6px;">좌표계</span>
+                    <select id="shp-import-crs-select" class="verification-code-input" style="width:100%;">
+                        ${SHP_CRS_OPTIONS.map(option => `<option value="${escapeModalHtml(option.value)}">${escapeModalHtml(option.label)}</option>`).join('')}
+                    </select>
+                </label>
+                <div style="display:flex; flex-direction:column; gap:8px;">
+                    <button id="shp-import-crs-confirm-btn" type="button" style="width:100%; min-height:44px; border:0; border-radius:8px; background:#2563eb; color:#fff; font-size:14px; font-weight:800;">불러오기</button>
+                    <button id="shp-import-crs-cancel-btn" type="button" style="width:100%; min-height:40px; border:0; background:transparent; color:#6b7280; font-size:13px; font-weight:700;">취소</button>
+                </div>
+            </div>
+        `;
+
+        const close = (value) => {
+            overlay.classList.remove('visible');
+            setTimeout(() => {
+                overlay.remove();
+                if (shpCrsSelectModal === overlay) shpCrsSelectModal = null;
+                resolve(value);
+            }, 160);
+        };
+
+        overlay.addEventListener('click', event => {
+            if (event.target === overlay) close(null);
+        });
+        overlay.querySelector('#shp-import-crs-confirm-btn').addEventListener('click', () => {
+            close(overlay.querySelector('#shp-import-crs-select')?.value || 'auto');
+        });
+        overlay.querySelector('#shp-import-crs-cancel-btn').addEventListener('click', () => close(null));
+
+        document.body.appendChild(overlay);
+        shpCrsSelectModal = overlay;
         setTimeout(() => overlay.classList.add('visible'), 10);
     });
 }
@@ -259,6 +402,68 @@ async function resolveMaybePromise(value) {
     return value;
 }
 
+function ensureShpCrsDefinitions() {
+    if (typeof proj4 === 'undefined' || !proj4.defs) return;
+    if (!proj4.defs('EPSG:5174')) {
+        proj4.defs('EPSG:5174', '+proj=tmerc +lat_0=38 +lon_0=127.0028902777778 +k=1 +x_0=200000 +y_0=500000 +ellps=bessel +towgs84=-115.80,474.99,674.11,1.16,-2.31,-1.63,6.43 +units=m +no_defs');
+    }
+    if (!proj4.defs('EPSG:5179')) {
+        proj4.defs('EPSG:5179', '+proj=tmerc +lat_0=38 +lon_0=127.5 +k=0.9996 +x_0=1000000 +y_0=2000000 +ellps=GRS80 +units=m +no_defs');
+    }
+    if (!proj4.defs('EPSG:5181')) {
+        proj4.defs('EPSG:5181', '+proj=tmerc +lat_0=38 +lon_0=127 +k=1 +x_0=200000 +y_0=500000 +ellps=GRS80 +units=m +no_defs');
+    }
+    if (!proj4.defs('EPSG:5186')) {
+        proj4.defs('EPSG:5186', '+proj=tmerc +lat_0=38 +lon_0=127 +k=1 +x_0=200000 +y_0=600000 +ellps=GRS80 +units=m +no_defs');
+    }
+}
+
+function transformGeometryCoordinates(geometry, sourceCrs) {
+    if (!geometry || sourceCrs === 'auto' || sourceCrs === 'EPSG:4326') return geometry;
+    ensureShpCrsDefinitions();
+    if (typeof proj4 === 'undefined') {
+        throw new Error('좌표 변환 라이브러리를 사용할 수 없습니다.');
+    }
+
+    const transformCoordinate = (coordinate) => {
+        if (!Array.isArray(coordinate) || coordinate.length < 2) return coordinate;
+        const x = Number(coordinate[0]);
+        const y = Number(coordinate[1]);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) return coordinate;
+        const [lng, lat] = proj4(sourceCrs, 'EPSG:4326', [x, y]);
+        return coordinate.length > 2 ? [lng, lat, ...coordinate.slice(2)] : [lng, lat];
+    };
+
+    const walk = (coordinates) => {
+        if (!Array.isArray(coordinates)) return coordinates;
+        if (typeof coordinates[0] === 'number') return transformCoordinate(coordinates);
+        return coordinates.map(walk);
+    };
+
+    if (geometry.type === 'GeometryCollection') {
+        return {
+            ...geometry,
+            geometries: (geometry.geometries || []).map(innerGeometry => transformGeometryCoordinates(innerGeometry, sourceCrs))
+        };
+    }
+
+    return {
+        ...geometry,
+        coordinates: walk(geometry.coordinates)
+    };
+}
+
+function transformFeatureCollectionCoordinates(featureCollection, sourceCrs) {
+    if (sourceCrs === 'auto' || sourceCrs === 'EPSG:4326') return featureCollection;
+    return {
+        ...featureCollection,
+        features: featureCollection.features.map(feature => ({
+            ...feature,
+            geometry: transformGeometryCoordinates(feature.geometry, sourceCrs)
+        }))
+    };
+}
+
 /**
  * SHX 인덱스를 이용해 SHP에서 유효한 마지막 레코드 끝 위치(byte)를 계산합니다.
  * 동작 원리:
@@ -384,6 +589,60 @@ async function parseShpZipWithDbfFallback(arrayBuffer, originalError) {
     return collections;
 }
 
+async function parseShpZipWithManualCrs(arrayBuffer, sourceCrs) {
+    const [JSZip, shp] = await Promise.all([getJSZipConstructor(), getShpParser()]);
+    if (!shp || typeof shp.parseShp !== "function" || typeof shp.combine !== "function") {
+        throw new Error('SHP 파서를 사용할 수 없습니다.');
+    }
+
+    const zip = await JSZip.loadAsync(arrayBuffer);
+    const allEntries = Object.values(zip.files).filter(entry => !entry.dir);
+    const shpEntries = allEntries.filter(entry => /\.shp$/i.test(entry.name));
+    if (shpEntries.length === 0) throw new Error('ZIP 안에서 .shp 파일을 찾을 수 없습니다.');
+
+    const findSiblingEntry = (baseName, ext) => {
+        const target = `${baseName}.${ext}`.toLowerCase();
+        return allEntries.find(entry => entry.name.toLowerCase() === target) || null;
+    };
+
+    const collections = [];
+    for (const shpEntry of shpEntries) {
+        const baseName = shpEntry.name.replace(/\.shp$/i, '');
+        const dbfEntry = findSiblingEntry(baseName, 'dbf');
+        const shxEntry = findSiblingEntry(baseName, 'shx');
+        let shpBuffer = await shpEntry.async('arraybuffer');
+
+        if (shxEntry) {
+            try {
+                const shxBuffer = await shxEntry.async('arraybuffer');
+                shpBuffer = trimShpPaddingByShx(shpBuffer, shxBuffer, shpEntry.name);
+            } catch { }
+        }
+
+        const geometryRows = await resolveMaybePromise(shp.parseShp(shpBuffer));
+        let propertyRows = [];
+        if (dbfEntry && typeof shp.parseDbf === 'function') {
+            try {
+                propertyRows = await resolveMaybePromise(shp.parseDbf(await dbfEntry.async('arraybuffer')));
+            } catch {
+                propertyRows = [];
+            }
+        }
+
+        const safeProperties = Array.isArray(propertyRows) && propertyRows.length > 0
+            ? propertyRows
+            : (Array.isArray(geometryRows) ? geometryRows.map(() => ({})) : []);
+        const combined = await resolveMaybePromise(shp.combine([geometryRows, safeProperties]));
+        if (combined?.type === "FeatureCollection" && Array.isArray(combined.features)) {
+            collections.push(transformFeatureCollectionCoordinates(combined, sourceCrs));
+        }
+    }
+
+    if (collections.length === 0) throw new Error('표시할 도형이 없습니다.');
+    if (collections.length === 1) return collections[0];
+    return collections;
+}
+
 /**
  * 선택한 파일(GeoJSON/GPX/SHP ZIP)을 읽어 현재 앱 데이터에 반영합니다.
  * 동작 원리: 파일 확장자로 파서를 결정한 뒤, 결과를 GeoJSON으로 통일해
@@ -416,11 +675,18 @@ export async function handleFileSelect(input) {
                 // Shapefile(.zip)은 바이너리(ArrayBuffer)로 읽어 파싱합니다.
                 const arrayBuffer = await file.arrayBuffer();
                 let geoJsonResult;
-                try {
-                    const shp = await getShpParser();
-                    geoJsonResult = await shp(arrayBuffer);
-                } catch (shpErr) {
-                    geoJsonResult = await parseShpZipWithDbfFallback(arrayBuffer, shpErr);
+                const sourceCrs = await showShpCrsSelectModal(file.name);
+                if (!sourceCrs) continue;
+
+                if (sourceCrs === 'auto') {
+                    try {
+                        const shp = await getShpParser();
+                        geoJsonResult = await shp(arrayBuffer);
+                    } catch (shpErr) {
+                        geoJsonResult = await parseShpZipWithDbfFallback(arrayBuffer, shpErr);
+                    }
+                } else {
+                    geoJsonResult = await parseShpZipWithManualCrs(arrayBuffer, sourceCrs);
                 }
 
                 json = normalizeShpGeoJsonResult(geoJsonResult);

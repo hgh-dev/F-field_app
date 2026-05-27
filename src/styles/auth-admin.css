@@ -308,7 +308,7 @@
         }
 
         .auth-primary-btn {
-            background: #2563eb;
+            background: #dc2626;
             color: #fff;
         }
 
@@ -631,14 +631,19 @@
             box-sizing: border-box;
         }
 
-        .settings-account-tier-badge.premium {
+        .settings-account-tier-badge.verified {
             background: #ecfdf5;
             color: #047857;
         }
 
+        .settings-account-tier-badge.premium {
+            background: #fdf2f8;
+            color: #db2777;
+        }
+
         .settings-account-tier-badge.admin {
-            background: #eff6ff;
-            color: #2563eb;
+            background: #111827;
+            color: #fff;
         }
 
         .account-actions-content {
@@ -828,6 +833,42 @@
             font: inherit;
             font-size: 13px;
             outline: none;
+        }
+
+        .admin-users-tier-tabs {
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+            padding: 0 0 3px;
+            margin-bottom: 0;
+        }
+
+        .admin-users-tier-tab {
+            flex: 0 0 auto;
+            min-height: 30px;
+            border: 1px solid #d1d5db;
+            border-radius: 999px;
+            background: #fff;
+            color: #4b5563;
+            font-size: 12px;
+            font-weight: 800;
+            padding: 6px 10px;
+            cursor: pointer;
+        }
+
+        .admin-users-tier-tab.active {
+            border-color: #111827;
+            background: #111827;
+            color: #fff;
+        }
+
+        .admin-users-tier-count {
+            color: #6b7280;
+            font-size: 11px;
+            font-weight: 800;
+            line-height: 1.35;
+            text-align: right;
+            margin: 0 1px 5px;
         }
 
         .admin-users-list {
@@ -1326,6 +1367,59 @@
             z-index: 990 !important;
             background: none !important;
             border: none !important;
+        }
+
+        .scale-zoom-control {
+            cursor: pointer;
+            outline: none;
+        }
+
+        .scale-zoom-menu {
+            display: none;
+            position: absolute;
+            left: 0;
+            bottom: calc(100% + 8px);
+            width: 84px;
+            max-height: min(58vh, 430px);
+            overflow-y: auto;
+            padding: 6px;
+            border: 1px solid rgba(17, 24, 39, 0.12);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.96);
+            box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18);
+            box-sizing: border-box;
+            z-index: 1200;
+        }
+
+        .scale-zoom-control.menu-open .scale-zoom-menu {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .scale-zoom-menu-item {
+            display: block;
+            align-items: center;
+            min-height: 28px;
+            border: 0;
+            border-radius: 6px;
+            background: transparent;
+            color: #111827;
+            font-size: 13px;
+            font-weight: 800;
+            text-align: left;
+            padding: 5px 7px;
+            cursor: pointer;
+        }
+
+        .scale-zoom-menu-item.active {
+            background: #e5e7eb;
+            color: #111827;
+        }
+
+        .scale-zoom-menu-item:active,
+        .scale-zoom-menu-item:hover {
+            background: #f3f4f6;
         }
 
         /* 기본 스케일 라인 스타일 초기화 */

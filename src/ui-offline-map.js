@@ -8,13 +8,17 @@
    ========================================================================== */
 import { VWORLD_API_KEY } from './config.js';
 import { AUTH_FEATURES, canUseFeature, getAuthState } from './auth.js';
-import { map, getOfflineMapUrls, isOfflineDownloadableMapLayer } from './map.js';
+import { map, getOfflineDownloadBounds, getOfflineMapUrls, isOfflineDownloadableMapLayer } from './map.js';
 import { getShortAddress } from './utils.js';
 import { showAppConfirm } from './app-dialog.js';
 
 const OFFLINE_MAP_PACKAGES_KEY = 'f-field-offline-map-packages-v1';
 const OFFLINE_MAP_CACHE_PREFIX = 'F-field-map-package-';
 const OFFLINE_MAP_FALLBACK_CACHE = 'F-field-map-v1';
+
+function isNetworkOnline() {
+    return typeof navigator === 'undefined' || navigator.onLine !== false;
+}
 
 function escapeHtml(value) {
     return String(value ?? '').replace(/[&<>"']/g, char => ({
@@ -56,6 +60,15 @@ export function updateOfflineButton() {
         btn.style.backgroundColor = '#ccc';
         return;
     }
+
+    if (!isNetworkOnline()) {
+        btn.disabled = true;
+        btn.style.backgroundColor = '#ccc';
+        btn.title = '인터넷 연결이 없을 때는 새 오프라인 지도를 다운로드할 수 없습니다.';
+        return;
+    }
+
+    btn.title = '';
 
     if (map.getZoom() < 15) {
         btn.disabled = true;
@@ -185,12 +198,17 @@ export function renderOfflineMapPackageList() {
 /**
  * [함수] downloadOfflineMap
  * [역할] 현재 데이터를 파일 형태로 내려받게 한다.
- * [원리] 현재 지도 범위를 패딩 확장해 타일 URL 목록을 만들고 Cache Storage에 청크 저장하며,
+ * [원리] 현재 중심의 15레벨 화면 범위로 타일 URL 목록을 만들고 Cache Storage에 청크 저장하며,
  *        진행률 모달·오류 처리·버튼 잠금/해제를 함께 관리해 다운로드 과정을 시각화한다.
  */
 export async function downloadOfflineMap() {
     if (!canUseFeature(AUTH_FEATURES.OFFLINE_MAP, getAuthState())) {
-        alert('오프라인 지도 기능은 verified 회원과 관리자 계정만 사용할 수 있습니다.');
+        alert('오프라인 지도 기능은 인증된 계정, 프리미엄 계정, 관리자 계정만 사용할 수 있습니다.');
+        return;
+    }
+
+    if (!isNetworkOnline()) {
+        alert('인터넷 연결이 없을 때는 새 오프라인 지도를 다운로드할 수 없습니다.\n이미 저장한 오프라인 지도는 목록에서 선택해 사용할 수 있습니다.');
         return;
     }
 
@@ -202,10 +220,8 @@ export async function downloadOfflineMap() {
 
     const minZoom = 15;
     const maxZoom = 18;
-    // 현재 화면 바운스(Bounds)에 약 20%의 여유영역(패딩)을 추가하여 
-    // 확대하거나 살짝 이동했을 때 주변부가 누락되는 현상을 방지합니다.
-    const expandedBounds = map.getBounds().pad(0.2);
-    const urls = getOfflineMapUrls(expandedBounds, minZoom, maxZoom);
+    const downloadBounds = getOfflineDownloadBounds(minZoom);
+    const urls = getOfflineMapUrls(downloadBounds, minZoom, maxZoom);
     const center = map.getCenter();
     const packageId = `offline-map-${Date.now()}`;
     const packageCacheName = getOfflinePackageCacheName(packageId);
@@ -329,3 +345,7 @@ export function moveToOfflineMapPackage(packageId, event = null) {
     map.setView([lat, lng], Math.max(15, Math.min(18, map.getZoom() || 15)));
 }
 
+if (typeof window !== 'undefined') {
+    window.addEventListener('online', updateOfflineButton);
+    window.addEventListener('offline', updateOfflineButton);
+}

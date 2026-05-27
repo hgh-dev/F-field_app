@@ -21,6 +21,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const featureActionGrants = new Map();
 let latestNoticeBadgeSettings = null;
 let latestAdminUsers = [];
+let adminUsersTierFilter = 'all';
 
 function grantFeatureActionAccess(feature) {
     featureActionGrants.set(feature, Date.now() + PREMIUM_ACTION_GRANT_MS);
@@ -126,8 +127,9 @@ export function updateAuthUI(state = getAuthState()) {
     const isLoggedIn = Boolean(state.user);
     const isAdmin = isAdminAccount(state);
     const hasPremium = canUseFeature(AUTH_FEATURES.PREMIUM_ACCESS, state);
+    const isPremiumTier = tier === 'premium';
     const accountStatusText = isLoggedIn
-        ? (isAdmin ? '관리자 계정' : (hasPremium ? '인증된 계정' : '일반 계정'))
+        ? (isAdmin ? '관리자 계정' : (isPremiumTier ? '프리미엄 계정' : (hasPremium ? '인증된 계정' : '일반 계정')))
         : '비회원';
 
     if (authButton) {
@@ -177,11 +179,12 @@ export function updateAuthUI(state = getAuthState()) {
     if (settingsAccountTierBadge) {
         const settingsTierLabel = tier === 'verified' ? 'VERIFIED' : tier.toUpperCase();
         settingsAccountTierBadge.textContent = settingsTierLabel;
-        settingsAccountTierBadge.classList.toggle('premium', hasPremium);
+        settingsAccountTierBadge.classList.toggle('premium', isPremiumTier);
+        settingsAccountTierBadge.classList.toggle('verified', tier === 'verified');
         settingsAccountTierBadge.classList.toggle('admin', isAdmin);
     }
     if (settingsAuthInfoRow) {
-        settingsAuthInfoRow.classList.toggle('visible', canUseFeature(AUTH_FEATURES.AUTH_INFO, state) && !isAdmin);
+        settingsAuthInfoRow.classList.toggle('visible', canUseFeature(AUTH_FEATURES.AUTH_INFO, state) && !isAdmin && !isPremiumTier);
     }
     if (settingsAdminMenuRow) {
         settingsAdminMenuRow.classList.toggle('visible', canUseFeature(AUTH_FEATURES.ADMIN_MENU, state));
@@ -599,7 +602,13 @@ function renderAdminUsers() {
     const listEl = document.getElementById('admin-users-list');
     if (!listEl) return;
     const query = document.getElementById('admin-users-search')?.value.trim().toLowerCase() || '';
-    const users = latestAdminUsers.filter(user => !query || String(user.email || '').toLowerCase().includes(query));
+    updateAdminUsersTierCount();
+    const users = latestAdminUsers.filter(user => {
+        const tier = String(user.tier || 'free').toLowerCase();
+        const matchesTier = adminUsersTierFilter === 'all' || tier === adminUsersTierFilter;
+        const matchesQuery = !query || String(user.email || '').toLowerCase().includes(query);
+        return matchesTier && matchesQuery;
+    });
 
     if (!users.length) {
         listEl.innerHTML = '<div class="verification-code-help">표시할 회원이 없습니다.</div>';
@@ -636,6 +645,38 @@ function renderAdminUsers() {
     });
 }
 
+function getAdminUsersTierCounts() {
+    return latestAdminUsers.reduce((counts, user) => {
+        const tier = String(user.tier || 'free').toLowerCase();
+        counts.all += 1;
+        if (Object.prototype.hasOwnProperty.call(counts, tier)) counts[tier] += 1;
+        return counts;
+    }, {
+        all: 0,
+        admin: 0,
+        verified: 0,
+        premium: 0,
+        free: 0
+    });
+}
+
+function updateAdminUsersTierCount() {
+    const countEl = document.getElementById('admin-users-tier-count');
+    if (!countEl) return;
+
+    const counts = getAdminUsersTierCounts();
+    countEl.textContent = `회원 수 : ${counts[adminUsersTierFilter] || 0}명`;
+}
+
+function setAdminUsersTierFilter(filter = 'all') {
+    const nextFilter = ['all', 'admin', 'verified', 'premium', 'free'].includes(filter) ? filter : 'all';
+    adminUsersTierFilter = nextFilter;
+    document.querySelectorAll('#admin-users-tier-tabs [data-tier-filter]').forEach(button => {
+        button.classList.toggle('active', button.dataset.tierFilter === nextFilter);
+    });
+    renderAdminUsers();
+}
+
 async function loadAdminUsers() {
     if (!canUseFeature(AUTH_FEATURES.ADMIN_USERS, getAuthState())) {
         const listEl = document.getElementById('admin-users-list');
@@ -662,6 +703,7 @@ function openAdminUsersModal() {
     if (!overlay) return;
     const searchInput = document.getElementById('admin-users-search');
     if (searchInput) searchInput.value = '';
+    setAdminUsersTierFilter('all');
     overlay.style.display = 'flex';
     setTimeout(() => overlay.classList.add('visible'), 10);
     loadAdminUsers();
@@ -924,6 +966,9 @@ export function initAuthUiEventListeners() {
     });
     document.getElementById('admin-users-refresh-btn')?.addEventListener('click', loadAdminUsers);
     document.getElementById('admin-users-search')?.addEventListener('input', renderAdminUsers);
+    document.querySelectorAll('#admin-users-tier-tabs [data-tier-filter]').forEach(button => {
+        button.addEventListener('click', () => setAdminUsersTierFilter(button.dataset.tierFilter));
+    });
     document.getElementById('delete-account-confirm-input')?.addEventListener('input', (event) => {
         const button = document.getElementById('delete-account-confirm-btn');
         if (button) button.disabled = event.target.value !== '탈퇴';

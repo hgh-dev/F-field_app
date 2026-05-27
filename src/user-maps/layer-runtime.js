@@ -7,6 +7,7 @@
    - 사용자지도가 지도에 표시되지 않거나 레이어 유형별 문제가 생기면 확인합니다.
    ========================================================================== */
 import { map, updateLayerOrder } from '../map.js';
+import { AppState } from '../state.js';
 import { DEFAULT_MAX_ZOOM } from './constants.js';
 import { parseWmsUrl } from './utils.js';
 import { ensureGeojsonSpatialMetadata } from './spatial-utils.js';
@@ -28,6 +29,7 @@ export function createUserMapLayerRuntime({
 }) {
     let userMapZoomSyncInitialized = false;
     let userMapViewportSyncQueued = false;
+    let userMapViewportSyncDelayTimer = null;
 
     async function createLayerForUserMap(item) {
         const userMaps = getUserMaps();
@@ -173,13 +175,26 @@ export function createUserMapLayerRuntime({
             .forEach(item => syncUserMapLayerZoomVisibility(item));
     }
 
-    function queueSyncAllUserMapViewport() {
+    function runQueuedUserMapViewportSync() {
         if (userMapViewportSyncQueued) return;
         userMapViewportSyncQueued = true;
         window.requestAnimationFrame(() => {
             userMapViewportSyncQueued = false;
             syncAllUserMapZoomVisibility();
         });
+    }
+
+    function queueSyncAllUserMapViewport() {
+        if (AppState.isVectorRenderDelayEnabled) {
+            clearTimeout(userMapViewportSyncDelayTimer);
+            userMapViewportSyncDelayTimer = setTimeout(() => {
+                userMapViewportSyncDelayTimer = null;
+                runQueuedUserMapViewportSync();
+            }, 500);
+            return;
+        }
+
+        runQueuedUserMapViewportSync();
     }
 
     function initUserMapZoomVisibilitySync() {

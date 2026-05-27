@@ -50,7 +50,70 @@ export const map = L.map('map', {
    ========================================================================== */
 
 // 축척 막대는 국내 사용 기준으로 metric만 노출합니다.
-L.control.scale({ imperial: false, metric: true }).addTo(map);
+const scaleControl = L.control.scale({ imperial: false, metric: true }).addTo(map);
+
+function initScaleZoomMenu() {
+    const container = scaleControl.getContainer?.();
+    if (!container) return;
+
+    container.classList.add('scale-zoom-control');
+    container.setAttribute('role', 'button');
+    container.setAttribute('tabindex', '0');
+    container.setAttribute('aria-label', '지도 스케일 선택');
+
+    const menu = document.createElement('div');
+    menu.className = 'scale-zoom-menu';
+    menu.setAttribute('role', 'menu');
+    menu.setAttribute('aria-label', '지도 스케일');
+    container.appendChild(menu);
+    L.DomEvent.disableClickPropagation(container);
+    L.DomEvent.disableScrollPropagation(container);
+    L.DomEvent.disableClickPropagation(menu);
+    L.DomEvent.disableScrollPropagation(menu);
+    ['wheel', 'touchstart', 'touchmove', 'pointerdown', 'pointermove', 'mousedown', 'mousemove'].forEach(eventName => {
+        menu.addEventListener(eventName, (event) => event.stopPropagation(), { passive: false });
+    });
+
+    const renderMenu = () => {
+        const currentZoom = Math.round(map.getZoom());
+        menu.innerHTML = '';
+        for (let zoom = 1; zoom <= 22; zoom += 1) {
+            const item = document.createElement('button');
+            item.type = 'button';
+            item.className = 'scale-zoom-menu-item';
+            item.dataset.zoom = String(zoom);
+            item.setAttribute('role', 'menuitem');
+            item.classList.toggle('active', zoom === currentZoom);
+            item.toggleAttribute('aria-current', zoom === currentZoom);
+            item.textContent = String(zoom);
+            item.addEventListener('click', (event) => {
+                event.stopPropagation();
+                map.setZoom(zoom);
+                container.classList.remove('menu-open');
+            });
+            menu.appendChild(item);
+        }
+    };
+
+    const toggleMenu = (event) => {
+        event.stopPropagation();
+        renderMenu();
+        container.classList.toggle('menu-open');
+    };
+
+    container.addEventListener('click', toggleMenu);
+    container.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        toggleMenu(event);
+    });
+    map.on('zoomend', renderMenu);
+    map.on('click', () => container.classList.remove('menu-open'));
+    document.addEventListener('click', () => container.classList.remove('menu-open'));
+    renderMenu();
+}
+
+initScaleZoomMenu();
 
 /* --------------------------------------------------------------------------
    2-1) 커스텀 Pane (z-index 계층)
@@ -92,8 +155,8 @@ export const vworldBase = L.tileLayer('https://api.vworld.kr/req/wmts/1.0.0/{key
     layer: 'Base',
     ext: 'png',
     attribution: 'VWorld',
-    maxNativeZoom: 19, // 서버가 제공하는 최대 줌 레벨
-    maxZoom: 22,       // 클라이언트에서 확대해서 보여줄 최대 레벨 (이미지가 깨질 수 있음)
+    maxNativeZoom: 18, // 19~22레벨에서는 18레벨 타일을 확대해 오프라인 패키지와 맞춥니다.
+    maxZoom: 22,
     opacity: getInitialMapLayerOpacity('baseBase'),
     crossOrigin: true
 });
@@ -104,7 +167,7 @@ export const vworldSatellite = L.tileLayer('https://api.vworld.kr/req/wmts/1.0.0
     layer: 'Satellite',
     ext: 'jpeg',
     attribution: 'VWorld',
-    maxNativeZoom: 19,
+    maxNativeZoom: 18,
     maxZoom: 22,
     opacity: getInitialMapLayerOpacity('baseSatellite'),
     crossOrigin: true
@@ -117,7 +180,7 @@ export const vworldHybrid = L.tileLayer('https://api.vworld.kr/req/wmts/1.0.0/{k
     ext: 'png',
     opacity: getInitialMapLayerOpacity('hybrid'),
     attribution: 'VWorld',
-    maxNativeZoom: 19,
+    maxNativeZoom: 18,
     maxZoom: 22,
     crossOrigin: true
 });
@@ -125,7 +188,7 @@ export const vworldHybrid = L.tileLayer('https://api.vworld.kr/req/wmts/1.0.0/{k
 // Esri 위성지도 (VWorld 대체 소스)
 export const esriSatelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
     attribution: 'Esri World Imagery',
-    maxNativeZoom: 19,
+    maxNativeZoom: 18,
     maxZoom: 22,
     opacity: getInitialMapLayerOpacity('baseEsri'),
     crossOrigin: true
@@ -728,6 +791,34 @@ export function isOfflineDownloadableMapLayer(layer) {
     return url.includes('api.vworld.kr') && url.includes('/req/wmts');
 }
 
+export function getOfflineDownloadBounds(baseZoom = 15) {
+    const center = map.getCenter();
+    const size = map.getSize();
+    const centerPoint = map.project(center, baseZoom);
+    const halfSize = size.divideBy(2);
+    const northWest = map.unproject(centerPoint.subtract(halfSize), baseZoom);
+    const southEast = map.unproject(centerPoint.add(halfSize), baseZoom);
+    return L.latLngBounds(northWest, southEast);
+}
+
+function getOfflineTileUrl(layer, x, y, z) {
+    const template = String(layer?._url || '');
+    if (!template) return '';
+
+    const options = layer.options || {};
+    const coords = L.point(x, y);
+    coords.z = z;
+    const data = {
+        ...options,
+        s: typeof layer._getSubdomain === 'function' ? layer._getSubdomain(coords) : '',
+        x,
+        y,
+        z
+    };
+
+    return L.Util.template(template, data);
+}
+
 export function getOfflineMapUrls(bounds, minZoom, maxZoom) {
     const urls = [];
     const minLat = bounds.getSouth();
@@ -761,12 +852,10 @@ export function getOfflineMapUrls(bounds, minZoom, maxZoom) {
 
         for (let x = minX; x <= maxX; x++) {
             for (let y = minY; y <= maxY; y++) {
-                const coords = L.point(x, y);
-                coords.z = z;
                 activeTileLayers.forEach(layer => {
                     try {
-                        // 레이어 템플릿과 좌표로 실제 요청 URL을 생성합니다.
-                        let url = layer.getTileUrl(coords);
+                        // Leaflet의 getTileUrl은 현재 레이어 줌 상태를 참조할 수 있어 다운로드 대상 줌을 직접 주입합니다.
+                        const url = getOfflineTileUrl(layer, x, y, z);
                         if (url) urls.push(url);
                     } catch (e) {
                         console.warn('Failed to generate tile URL for layer', e);

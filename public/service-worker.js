@@ -8,8 +8,9 @@
    - fetch 이벤트에서 요청 종류를 구분해 캐시/네트워크 전략을 선택하고, 새 워커는 메시지로 즉시 활성화할 수 있습니다.
    ========================================================================== */
 
-const STATIC_CACHE_NAME = 'F-field-v1.0.3';
+const STATIC_CACHE_NAME = 'F-field-v1.0.5';
 const MAP_CACHE_NAME = 'F-field-map-v1';
+const OFFLINE_MAP_PACKAGE_CACHE_PREFIX = 'F-field-map-package-';
 const MAP_CACHE_MAX_ITEMS = 15000;
 const MAP_CACHE_TRIM_WRITE_INTERVAL = 100;
 const MAP_CACHE_TRIM_TIME_INTERVAL_MS = 60 * 1000;
@@ -70,7 +71,7 @@ self.addEventListener('activate', (event) => {
     event.waitUntil(
         caches.keys().then((keyList) => {
             return Promise.all(keyList.map((key) => {
-                if (!cacheWhitelist.includes(key)) {
+                if (!cacheWhitelist.includes(key) && !key.startsWith(OFFLINE_MAP_PACKAGE_CACHE_PREFIX)) {
                     return caches.delete(key);
                 }
             }));
