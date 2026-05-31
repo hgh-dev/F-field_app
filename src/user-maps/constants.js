@@ -9,7 +9,7 @@
 export const USER_MAPS_KEY = 'f-field-user-maps-v1';
 export const USER_MAP_DATA_STORE = 'f-field-user-map-data-v1';
 export const DEFAULT_MAX_ZOOM = 22;
-export const SHP_VIEWPORT_BUFFER_RATIO = 0.35;
+export const SHP_VIEWPORT_BUFFER_RATIO = 0.1;
 export const DEFAULT_VECTOR_STYLE = {
     color: '#2563eb',
     weight: 2,
@@ -18,4 +18,3 @@ export const DEFAULT_VECTOR_STYLE = {
     fillOpacity: 0.18
 };
 export const USER_MAP_Z_INDEX_BASE = 380;
-

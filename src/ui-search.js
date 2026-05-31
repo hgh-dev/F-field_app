@@ -16,6 +16,7 @@ import { dmsToDecimal, getWgs84FromTm, parseNationalPointNumber } from './utils.
 // --- 검색 UI 상태 ---
 export let isSearchHistoryEnabled = true;
 export let searchTarget = { name: "" };
+const SEARCH_HISTORY_LIMIT = 20;
 
 /**
  * [함수] initSearchSettings
@@ -216,6 +217,47 @@ export function callVworldCoordApi(query, type) {
     });
 }
 
+function getSingleSearchRequest(query) {
+    const text = String(query || '').trim();
+    const hasNumber = /\d/.test(text);
+    const hasRoadName = /(대로|번길|로|길)\s*\d/.test(text) || /\d+\s*(대로|번길|로|길)/.test(text);
+    const hasLotNumber = /(^|\s)산\s*\d/.test(text) || /\d+\s*-\s*\d+/.test(text) || /(번지|필지)/.test(text);
+    const hasAddressArea = /(특별시|광역시|특별자치시|특별자치도|도|시|군|구|읍|면|동|리)/.test(text);
+
+    if (hasRoadName) {
+        return { api: 'address', coordType: 'ROAD' };
+    }
+
+    if (hasLotNumber || (hasNumber && hasAddressArea)) {
+        return { api: 'address', coordType: 'PARCEL' };
+    }
+
+    return { api: 'search', type: 'PLACE' };
+}
+
+async function callAddressSearchWithCoordFallback(query, coordType) {
+    const addressResults = uniqueSearchItems(await callVworldSearchApi(query, 'ADDRESS'));
+    if (addressResults.length > 0) return addressResults;
+    return uniqueSearchItems(await callVworldCoordApi(query, coordType));
+}
+
+function uniqueSearchItems(items) {
+    const seen = new Set();
+    const uniqueItems = [];
+    for (const item of items) {
+        if (!item?.point) continue;
+        const x = Number(item.point.x);
+        const y = Number(item.point.y);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+        const hash = `${x.toFixed(6)},${y.toFixed(6)}`;
+        if (!seen.has(hash)) {
+            seen.add(hash);
+            uniqueItems.push(item);
+        }
+    }
+    return uniqueItems;
+}
+
 /**
  * [함수] executeSearch
  * [역할] 사용자 선택에 따라 실제 동작(이동/저장/연결)을 수행한다.
@@ -288,44 +330,10 @@ export async function executeSearch(typeStr = 'address') {
     if (queryEl) queryEl.value = query;
 
     try {
-        const [addrResults, placeResults, roadResults, parcelResults] = await Promise.all([
-            callVworldSearchApi(query, 'ADDRESS'),
-            callVworldSearchApi(query, 'PLACE'),
-            callVworldCoordApi(query, 'ROAD'),
-            callVworldCoordApi(query, 'PARCEL')
-        ]);
-
-        const combined = [...addrResults, ...placeResults, ...roadResults, ...parcelResults];
-
-        const seen = new Set();
-        const uniqueItems = [];
-        for (const item of combined) {
-            const hash = `${Number(item.point.x).toFixed(6)},${Number(item.point.y).toFixed(6)}`;
-            if (!seen.has(hash)) {
-                seen.add(hash);
-                uniqueItems.push(item);
-            }
-        }
-
-        const typeOrder = { 'ADDRESS': 1, 'PARCEL': 2, 'ROAD': 3, 'PLACE': 4 };
-
-        uniqueItems.sort((a, b) => {
-            const orderA = typeOrder[a.searchType] || 99;
-            const orderB = typeOrder[b.searchType] || 99;
-
-            if (orderA !== orderB) {
-                return orderA - orderB;
-            }
-
-            const aParcel = a.address?.parcel || "";
-            const bParcel = b.address?.parcel || "";
-            const aRoad = a.address?.road || "";
-            const bRoad = b.address?.road || "";
-
-            const aMatch = aParcel.includes(query) || aRoad.includes(query) ? 1 : 0;
-            const bMatch = bParcel.includes(query) || bRoad.includes(query) ? 1 : 0;
-            return bMatch - aMatch;
-        });
+        const request = getSingleSearchRequest(query);
+        const uniqueItems = request.api === 'address'
+            ? await callAddressSearchWithCoordFallback(query, request.coordType)
+            : uniqueSearchItems(await callVworldSearchApi(query, request.type));
 
         if (uniqueItems.length > 0) {
             handleSearchResults(uniqueItems);
@@ -437,7 +445,9 @@ function createSearchResultItem(item) {
  * [원리] 기록 텍스트와 삭제 버튼을 각각 구성하고,
  *        재검색/삭제 흐름을 기존과 동일하게 이벤트로 연결한다.
  */
-function createHistoryItem(text, index) {
+function createHistoryItem(item, index) {
+    const historyItem = normalizeHistoryItem(item);
+    const text = historyItem.text;
     const li = document.createElement('li');
     li.className = 'history-item';
 
@@ -449,6 +459,15 @@ function createHistoryItem(text, index) {
         const tabId = activeTab ? activeTab.dataset.tab : 'address';
         const inputEl = document.getElementById(tabId === 'national' ? 'search-input-national' : 'search-input-address');
         if (inputEl) inputEl.value = text;
+        if (historyItem.point) {
+            moveToSearchResult({
+                point: historyItem.point,
+                title: historyItem.title || text,
+                address: historyItem.address || { road: "", parcel: "" },
+                searchType: historyItem.searchType || ''
+            });
+            return;
+        }
         executeSearch(tabId);
     };
 
@@ -501,8 +520,8 @@ export function closeSearchResult() {
  */
 function moveToSearchResult(result) {
     const point = result.point;
-    map.flyTo([point.y, point.x], 16, { duration: 1.5 });
-    window.showInfoPopup(point.y, point.x);
+    updateCurrentHistoryItem(result);
+    window.showInfoPopup(point.y, point.x, { zoom: 16 });
     window.fetchAndHighlightBoundary(point.x, point.y);
 
     const box = document.getElementById('search-container');
@@ -527,13 +546,75 @@ function getActiveHistoryKey() {
     return tabId === 'national' ? SEARCH_HISTORY_KEY + '_national' : SEARCH_HISTORY_KEY;
 }
 
+function normalizeHistoryItem(item) {
+    if (item && typeof item === 'object') {
+        const point = item.point;
+        const x = Number(point?.x);
+        const y = Number(point?.y);
+        return {
+            text: String(item.text || item.keyword || item.title || ''),
+            title: item.title || item.text || item.keyword || '',
+            point: Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null,
+            address: item.address || null,
+            searchType: item.searchType || '',
+            updatedAt: item.updatedAt || null
+        };
+    }
+    return {
+        text: String(item || ''),
+        title: String(item || ''),
+        point: null,
+        address: null,
+        searchType: '',
+        updatedAt: null
+    };
+}
+
+function normalizeHistoryList(list) {
+    if (!Array.isArray(list)) return [];
+    return list
+        .map(normalizeHistoryItem)
+        .filter(item => item.text)
+        .slice(0, SEARCH_HISTORY_LIMIT);
+}
+
+function getCurrentHistoryKeyword() {
+    const activeTab = document.querySelector('.search-tab-btn.active');
+    const tabId = activeTab ? activeTab.dataset.tab : 'address';
+    const inputEl = document.getElementById(tabId === 'national' ? 'search-input-national' : 'search-input-address');
+    return inputEl?.value?.trim() || '';
+}
+
+function createHistoryRecord(keyword, result = null) {
+    const record = normalizeHistoryItem(keyword);
+    const point = result?.point;
+    const x = Number(point?.x);
+    const y = Number(point?.y);
+    if (Number.isFinite(x) && Number.isFinite(y)) {
+        record.point = { x, y };
+        record.title = result.title || record.text;
+        record.address = result.address || null;
+        record.searchType = result.searchType || '';
+    }
+    record.updatedAt = new Date().toISOString();
+    return record;
+}
+
 /**
  * [함수] getHistory
  * [역할] 현재 조건에 맞는 값을 조회해 반환한다.
  * [원리] 현재 활성 탭/상태를 기준으로 조회 키를 계산하고,
  *        해당 키에 대응하는 값을 읽어 호출자에 반환한다.
  */
-export function getHistory() { const json = localStorage.getItem(getActiveHistoryKey()); return json ? JSON.parse(json) : []; }
+export function getHistory() {
+    const json = localStorage.getItem(getActiveHistoryKey());
+    try {
+        return normalizeHistoryList(json ? JSON.parse(json) : []);
+    } catch (error) {
+        console.warn('검색 기록을 읽지 못했습니다.', error);
+        return [];
+    }
+}
 
 /**
  * [함수] saveHistory
@@ -541,7 +622,7 @@ export function getHistory() { const json = localStorage.getItem(getActiveHistor
  * [원리] 현재 편집 대상과 입력값 유효성을 확인한 뒤,
  *        속성 반영 후 저장소 업데이트와 관련 UI 리렌더를 함께 실행한다.
  */
-export function saveHistory(list) { localStorage.setItem(getActiveHistoryKey(), JSON.stringify(list)); }
+export function saveHistory(list) { localStorage.setItem(getActiveHistoryKey(), JSON.stringify(normalizeHistoryList(list))); }
 
 /**
  * [함수] addToHistory
@@ -551,9 +632,22 @@ export function saveHistory(list) { localStorage.setItem(getActiveHistoryKey(), 
  */
 export function addToHistory(keyword) {
     let list = getHistory();
-    list = list.filter(item => item !== keyword);
-    list.unshift(keyword);
-    if (list.length > 10) list = list.slice(0, 10);
+    const text = String(keyword || '').trim();
+    if (!text) return;
+    list = list.filter(item => normalizeHistoryItem(item).text !== text);
+    list.unshift(createHistoryRecord(text));
+    if (list.length > SEARCH_HISTORY_LIMIT) list = list.slice(0, SEARCH_HISTORY_LIMIT);
+    saveHistory(list);
+}
+
+function updateCurrentHistoryItem(result) {
+    if (!isSearchHistoryEnabled) return;
+    const keyword = getCurrentHistoryKeyword();
+    if (!keyword || !result?.point) return;
+    let list = getHistory();
+    list = list.filter(item => normalizeHistoryItem(item).text !== keyword);
+    list.unshift(createHistoryRecord(keyword, result));
+    if (list.length > SEARCH_HISTORY_LIMIT) list = list.slice(0, SEARCH_HISTORY_LIMIT);
     saveHistory(list);
 }
 

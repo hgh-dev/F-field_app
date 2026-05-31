@@ -114,6 +114,7 @@ export function updateAuthUI(state = getAuthState()) {
     const settingsAccountEmail = document.getElementById('settings-account-email');
     const settingsAccountStatus = document.getElementById('settings-account-status');
     const settingsAccountTierBadge = document.getElementById('settings-account-tier-badge');
+    const settingsLoginHelp = document.getElementById('settings-login-help');
     const settingsAuthInfoRow = document.getElementById('settings-auth-info-row');
     const settingsAdminMenuRow = document.getElementById('settings-admin-menu-row');
     const settingsVerificationCodeRow = document.getElementById('settings-verification-code-row');
@@ -182,6 +183,9 @@ export function updateAuthUI(state = getAuthState()) {
         settingsAccountTierBadge.classList.toggle('premium', isPremiumTier);
         settingsAccountTierBadge.classList.toggle('verified', tier === 'verified');
         settingsAccountTierBadge.classList.toggle('admin', isAdmin);
+    }
+    if (settingsLoginHelp) {
+        settingsLoginHelp.classList.toggle('visible', !isLoggedIn);
     }
     if (settingsAuthInfoRow) {
         settingsAuthInfoRow.classList.toggle('visible', canUseFeature(AUTH_FEATURES.AUTH_INFO, state) && !isAdmin && !isPremiumTier);

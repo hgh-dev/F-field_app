@@ -614,6 +614,18 @@
             margin-top: 3px;
         }
 
+        .settings-login-help {
+            display: none;
+            padding: 8px 18px 12px;
+            color: #6b7280;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .settings-login-help.visible {
+            display: block;
+        }
+
         .settings-account-tier-badge {
             display: inline-flex;
             align-items: center;

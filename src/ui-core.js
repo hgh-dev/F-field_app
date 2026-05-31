@@ -319,8 +319,6 @@ export function openSettingsModal() {
     document.getElementsByName('coord-mode-select').forEach(r => { if (parseInt(r.value) === AppState.coordMode) r.checked = true; });
     document.getElementsByName('track-interval-select').forEach(r => { if (parseInt(r.value) === AppState.trackInterval) r.checked = true; });
     document.getElementsByName('snap-enabled-select').forEach(r => { if ((r.value === 'true') === AppState.isSnapEnabled) r.checked = true; });
-    document.getElementsByName('viewport-simplify-select').forEach(r => { if ((r.value === 'true') === AppState.isViewportSimplifyEnabled) r.checked = true; });
-    document.getElementsByName('vector-render-delay-select').forEach(r => { if ((r.value === 'true') === AppState.isVectorRenderDelayEnabled) r.checked = true; });
     const overlay = document.getElementById('settings-modal-overlay');
     overlay.style.display = 'flex';
     setTimeout(() => { overlay.classList.add('visible'); }, 10);

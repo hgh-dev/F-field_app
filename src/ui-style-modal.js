@@ -134,6 +134,20 @@ function getVisiblePolygonFillOpacity(pattern, opacity) {
     return normalizeOpacityValue(opacity, 0);
 }
 
+function getLayerStoredFillOpacity(layer) {
+    if (!(layer instanceof L.Polygon)) return 0;
+
+    const props = layer.feature?.properties || {};
+    const pattern = normalizeFillPattern(props.customFillPattern);
+    if (pattern === 'none') return 0;
+    if (Number.isFinite(Number(props.customFillOpacity))) {
+        return normalizeOpacityValue(props.customFillOpacity, 0.2);
+    }
+    if (props.customFill === false) return 0;
+    if (props.customFill === true) return 0.2;
+    return 0.2;
+}
+
 export function getLayerFillOpacity(layer) {
     if (!(layer instanceof L.Polygon)) return 0;
 
@@ -418,7 +432,7 @@ export function openStyleModal(id) {
         if (markerSec) markerSec.style.display = 'none';
         if (markerSizeSec) markerSizeSec.style.display = 'none';
         if (polySec) polySec.style.display = 'block';
-        tempFillOpacity = getLayerFillOpacity(layer);
+        tempFillOpacity = getLayerStoredFillOpacity(layer);
     } else {
         currentStyleType = 'line';
         currentStyleTab = 'line';
@@ -916,5 +930,4 @@ export function applyStyleSettings() {
     scheduleViewportVectorOptimization();
     closeStyleModal();
 }
-
 

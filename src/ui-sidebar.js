@@ -32,9 +32,14 @@ export function refreshMapAfterSidebarLayout() {
  */
 export function openSidebar() {
     if (AppState.currentDrawer || currentEditLayerId !== null) return;
+    const overlay = document.getElementById('sidebar-overlay');
+    if (isDockedSidebarViewport() && overlay?.classList.contains('visible')) {
+        closeSidebar();
+        return;
+    }
+
     syncSidebarUI();
     renderSurveyList();
-    const overlay = document.getElementById('sidebar-overlay');
     document.body.classList.toggle('sidebar-docked-open', isDockedSidebarViewport());
     overlay.style.display = 'block';
     setTimeout(() => { overlay.classList.add('visible'); }, 10);
@@ -328,4 +333,3 @@ export function switchSidebarTab(tabName) {
         renderProjectList();
     }
 }
-

@@ -26,6 +26,65 @@ export let currentBottomSheetLayerId = null;
  */
 export function setCurrentBottomSheetLayerId(id) { currentBottomSheetLayerId = id; }
 
+export function getBottomSheetVisibleHeight() {
+    const bottomSheet = document.getElementById('bottom-sheet');
+    if (!bottomSheet?.classList.contains('open')) return 0;
+    const rect = bottomSheet.getBoundingClientRect();
+    return Math.max(0, Math.min(window.innerHeight, rect.height || 0));
+}
+
+export function getBottomSheetAwareFitOptions(options = {}) {
+    const { basePadding: rawBasePadding, ...fitOptions } = options;
+    const basePadding = Number(rawBasePadding ?? 60);
+    const bottomSheetHeight = getBottomSheetVisibleHeight();
+    return {
+        ...fitOptions,
+        paddingTopLeft: [basePadding, basePadding],
+        paddingBottomRight: [basePadding, basePadding + bottomSheetHeight]
+    };
+}
+
+export function getBottomSheetAwareCenter(latlng, zoom = map.getZoom()) {
+    const point = L.latLng(latlng);
+    const bottomSheetHeight = getBottomSheetVisibleHeight();
+    if (!bottomSheetHeight) return point;
+    return map.unproject(map.project(point, zoom).add([0, bottomSheetHeight / 2]), zoom);
+}
+
+export function flyToWithBottomSheet(latlng, zoom = map.getZoom(), options = {}) {
+    const targetZoom = Number.isFinite(Number(zoom)) ? Number(zoom) : map.getZoom();
+    map.flyTo(getBottomSheetAwareCenter(latlng, targetZoom), targetZoom, options);
+}
+
+function centerBottomSheetTargetOnFullMap(layerId) {
+    const recordLayer = layerId !== null && layerId !== undefined
+        ? drawnItems.getLayers().find(layer => layer.feature?.properties?.id === layerId)
+        : null;
+
+    if (recordLayer instanceof L.Marker) {
+        map.flyTo(recordLayer.getLatLng(), Math.max(map.getZoom(), 17), { duration: 0.3 });
+        return;
+    }
+
+    if (recordLayer && typeof recordLayer.getBounds === 'function') {
+        const bounds = recordLayer.getBounds();
+        if (bounds?.isValid?.()) map.fitBounds(bounds, { padding: [60, 60], maxZoom: 19 });
+        return;
+    }
+
+    if (AppState.currentBoundaryLayer && typeof AppState.currentBoundaryLayer.getBounds === 'function') {
+        const bounds = AppState.currentBoundaryLayer.getBounds();
+        if (bounds?.isValid?.()) {
+            map.fitBounds(bounds, { padding: [60, 60], maxZoom: 19 });
+            return;
+        }
+    }
+
+    if (AppState.currentSearchMarker && typeof AppState.currentSearchMarker.getLatLng === 'function') {
+        map.flyTo(AppState.currentSearchMarker.getLatLng(), map.getZoom(), { duration: 0.3 });
+    }
+}
+
 /**
  * [함수] openBottomSheet
  * [역할] 관련 UI를 열고 상호작용 가능한 상태로 만든다.
@@ -44,9 +103,11 @@ export function openBottomSheet(title, bodyHtml) {
  * [원리] 대상 UI에서 visible 클래스를 먼저 제거해 닫힘 전환을 시작하고,
  *        지연 후 display를 none으로 바꿔 클릭 영역과 임시 상태를 정리한다.
  */
-export function closeBottomSheet() {
+export function closeBottomSheet(options = {}) {
     const bs = document.getElementById('bottom-sheet');
     if (!bs) return;
+    const shouldRecenter = options.recenter !== false && bs.classList.contains('open');
+    const closingLayerId = currentBottomSheetLayerId;
     bs.classList.remove('open');
     bs.classList.remove('full-open');
     const moreMenu = document.getElementById('bottom-sheet-more-menu');
@@ -54,6 +115,7 @@ export function closeBottomSheet() {
         moreMenu.style.display = 'none';
         moreMenu.classList.remove('visible');
     }
+    if (shouldRecenter) centerBottomSheetTargetOnFullMap(closingLayerId);
     currentBottomSheetLayerId = null;
 }
 
@@ -782,7 +844,7 @@ function createInfoPopupContent(parcelAddr, roadAddr, zipcode, infoText, lat, ln
  * [원리] 역지오코딩 JSONP 결과에서 지번/도로명/우편번호를 추출하고,
  *        현재 좌표 표시 모드에 맞는 텍스트를 구성해 바텀시트 콘텐츠로 조립한다.
  */
-export function showInfoPopup(lat, lng) {
+export function showInfoPopup(lat, lng, options = {}) {
     const callbackName = 'vworld_popup_' + Math.floor(Math.random() * 100000);
     window[callbackName] = function (data) {
         let parcelAddr = "주소 정보 없음";
@@ -830,6 +892,8 @@ export function showInfoPopup(lat, lng) {
             document.getElementById('bottom-sheet-more-btn').style.display = 'none';
         }
         openBottomSheet(parcelAddr, content);
+        const targetZoom = Number.isFinite(Number(options.zoom)) ? Number(options.zoom) : map.getZoom();
+        flyToWithBottomSheet([lat, lng], targetZoom, { animate: true, duration: 0.3 });
         delete window[callbackName];
         document.getElementById(callbackName)?.remove();
     };

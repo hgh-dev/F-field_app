@@ -73,19 +73,6 @@ export function openUserMapTileOpacitySettings(id, event) {
     });
 }
 
-export function setViewportSimplifyEnabled(value) {
-    const isEnabled = (value === 'true' || value === true);
-    AppState.isViewportSimplifyEnabled = isEnabled;
-    localStorage.setItem('setting_viewport_simplify', isEnabled.toString());
-    scheduleViewportVectorOptimization();
-}
-
-export function setVectorRenderDelayEnabled(value) {
-    const isEnabled = (value === 'true' || value === true);
-    AppState.isVectorRenderDelayEnabled = isEnabled;
-    localStorage.setItem('setting_vector_render_delay', isEnabled.toString());
-}
-
 export function copyCurrentAddress() {
     const text = document.getElementById('address-display').innerText;
     if (text && text !== "주소 확인 중...") copyText(text, false, "주소");

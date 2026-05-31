@@ -105,6 +105,9 @@ function renderSettingsChoiceModal(type) {
 }
 
 export function openSettingsDocument(url) {
+    const opened = window.open(url, '_blank');
+    if (opened) return;
+
     markSettingsReopenOnReturn();
     window.location.href = url;
 }

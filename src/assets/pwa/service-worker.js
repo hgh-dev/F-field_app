@@ -6,7 +6,7 @@
    [참고]
    - 캐시 이름, 오프라인 동작, 서비스 워커 업데이트 정책을 바꿀 때 확인합니다.
    ========================================================================== */
-const STATIC_CACHE_NAME = 'F-field-v1.0.5';
+const STATIC_CACHE_NAME = 'F-field-v1.0.6';
 const MAP_CACHE_NAME = 'F-field-map-v1';
 const OFFLINE_MAP_PACKAGE_CACHE_PREFIX = 'F-field-map-package-';
 const MAP_CACHE_MAX_ITEMS = 15000;

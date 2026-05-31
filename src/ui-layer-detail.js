@@ -15,7 +15,7 @@ import { saveToStorage } from './data.js';
 import { scheduleViewportVectorOptimization } from './ui-viewport.js';
 import { getLayerFillOpacity, syncFillPatternOverlays, syncSolidDotOverlays } from './ui-style-modal.js';
 import { createLayerPhotoSection } from './ui-photo.js';
-import { setCurrentBottomSheetLayerId, openBottomSheet, closeBottomSheet, syncBottomSheetHoleMenuForLayer } from './ui-bottomsheet.js';
+import { flyToWithBottomSheet, getBottomSheetAwareFitOptions, setCurrentBottomSheetLayerId, openBottomSheet, closeBottomSheet, syncBottomSheetHoleMenuForLayer } from './ui-bottomsheet.js';
 import { renderSurveyList } from './ui-project.js';
 
 /* --------------------------------------------------------------------------
@@ -144,14 +144,14 @@ export function updateLayerInfo(layer) {
         AppState.isLayerClicked = true;
         setTimeout(() => { AppState.isLayerClicked = false; }, 50);
         if (e && e.originalEvent) L.DomEvent.stopPropagation(e.originalEvent);
-        if (layer instanceof L.Marker) map.flyTo(layer.getLatLng(), Math.max(map.getZoom(), 17), { duration: 0.5 });
-        else map.fitBounds(layer.getBounds(), { padding: [60, 60], maxZoom: 19 });
         setCurrentBottomSheetLayerId(id);
         const moreBtn = document.getElementById('bottom-sheet-more-btn');
         if (moreBtn) moreBtn.style.display = 'flex';
         syncBottomSheetHoleMenuForLayer(layer);
         openBottomSheet(memo || '측량 기록', popupContent);
         document.getElementById('bottom-sheet').classList.add('full-open');
+        if (layer instanceof L.Marker) flyToWithBottomSheet(layer.getLatLng(), Math.max(map.getZoom(), 17), { duration: 0.5 });
+        else map.fitBounds(layer.getBounds(), getBottomSheetAwareFitOptions({ basePadding: 60, maxZoom: 19 }));
     });
 
 
@@ -162,6 +162,8 @@ export function updateLayerInfo(layer) {
         syncBottomSheetHoleMenuForLayer(layer);
         openBottomSheet(memo || '측량 기록', popupContent);
         document.getElementById('bottom-sheet').classList.add('full-open');
+        if (layer instanceof L.Marker) flyToWithBottomSheet(layer.getLatLng(), Math.max(map.getZoom(), 17), { duration: 0.5 });
+        else map.fitBounds(layer.getBounds(), getBottomSheetAwareFitOptions({ basePadding: 60, maxZoom: 19 }));
         return this;
     };
     layer.closePopup = function () { closeBottomSheet(); return this; };
@@ -182,4 +184,3 @@ export function toggleLayerVisibility(id) {
         scheduleViewportVectorOptimization();
     }
 }
-

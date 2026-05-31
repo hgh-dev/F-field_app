@@ -45,7 +45,7 @@ export function initMapInteractions() {
             map.removeLayer(AppState.currentSearchMarker);
             AppState.currentSearchMarker = null;
         }
-        closeBottomSheet();
+        closeBottomSheet({ recenter: false });
     });
 
     // 지도 더블클릭: 해당 지점의 정보 팝업/경계 조회를 실행합니다.

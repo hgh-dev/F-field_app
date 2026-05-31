@@ -10,21 +10,6 @@ import { drawnItems } from './draw.js';
 import { map } from './map.js';
 import { AppState } from './state.js';
 
-// 줌아웃일수록 선/면을 더 단순화해 렌더링 부담을 줄임
-/**
- * [함수] getSmoothFactorForZoom
- * [역할] 현재 조건에 맞는 값을 조회해 반환한다.
- * [원리] 현재 활성 탭/상태를 기준으로 조회 키를 계산하고,
- *        해당 키에 대응하는 값을 읽어 호출자에 반환한다.
- */
-function getSmoothFactorForZoom(zoom) {
-    if (zoom >= 15) return 1; // 15레벨 이상은 원본에 가깝게 유지
-    if (zoom === 14) return 2;
-    if (zoom === 13) return 4;
-    if (zoom <= 11) return 10;
-    return 7; // zoom 12
-}
-
 /**
  * [함수] isLineOrPolygonLayer
  * [역할] 입력 대상이 조건을 만족하는지 불리언으로 판별한다.
@@ -44,7 +29,7 @@ function isLineOrPolygonLayer(layer) {
 function optimizeVectorLayerForViewport(layer, viewBounds, zoom) {
     if (!isLineOrPolygonLayer(layer)) return;
 
-    const smoothFactor = AppState.isViewportSimplifyEnabled ? getSmoothFactorForZoom(zoom) : 1;
+    const smoothFactor = 1;
     if (layer.options.smoothFactor !== smoothFactor) {
         layer.options.smoothFactor = smoothFactor;
         if (typeof layer.redraw === 'function') layer.redraw();

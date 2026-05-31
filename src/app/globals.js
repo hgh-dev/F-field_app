@@ -31,8 +31,6 @@ import {
     openMapTileOpacitySettings,
     openUserMapTileOpacitySettings,
     proceedWithImport,
-    setVectorRenderDelayEnabled,
-    setViewportSimplifyEnabled,
     shareMyLocation,
     switchProject,
     toggleAllLayers,
@@ -126,8 +124,6 @@ export function registerGlobals() {
     window.setSnapEnabled = (value) => {
         setSnapEnabled(value);
     };
-    window.setViewportSimplifyEnabled = setViewportSimplifyEnabled;
-    window.setVectorRenderDelayEnabled = setVectorRenderDelayEnabled;
     window.copyCurrentAddress = copyCurrentAddress;
     window.copyCurrentCoords = copyCurrentCoords;
     window.shareMyLocation = shareMyLocation;
