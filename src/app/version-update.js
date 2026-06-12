@@ -46,8 +46,7 @@ function getAndroidStoreUrl(versionInfo = latestVersionInfo) {
 
 function openAndroidUpdatePage() {
     const storeUrl = getAndroidStoreUrl();
-    const fallbackUrl = encodeURIComponent(storeUrl);
-    window.location.href = `intent://details?id=app.ffield.mobile#Intent;scheme=market;package=com.android.vending;S.browser_fallback_url=${fallbackUrl};end`;
+    window.location.href = storeUrl;
 }
 
 /**

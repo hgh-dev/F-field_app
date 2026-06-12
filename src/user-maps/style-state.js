@@ -73,12 +73,16 @@ export function isFeatureCategoryVisible(item, feature) {
 }
 
 export function getCategorySelectionState(item, activeUserLayers) {
+    const isLayerSelected = activeUserLayers.has(item?.id) || item?.enabled;
     if (item?.styleMode !== 'categorized' || !item.categoryField) {
-        const checked = activeUserLayers.has(item?.id) || item?.enabled;
-        return { checked, indeterminate: false, total: 0, selected: checked ? 1 : 0 };
+        return { checked: isLayerSelected, indeterminate: false, total: 0, selected: isLayerSelected ? 1 : 0 };
     }
 
     const values = Array.isArray(item.categoryValues) ? item.categoryValues : [];
+    if (!isLayerSelected) {
+        return { checked: false, indeterminate: false, total: values.length, selected: 0 };
+    }
+
     const visibleValues = getVisibleCategoryValues(item);
     const selected = visibleValues.length;
     return {

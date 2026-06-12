@@ -601,7 +601,7 @@ export function renderUserMapList() {
         getCategorySelectionState: item => getCategorySelectionState(item, activeUserLayers),
         createUserMapStyleButton,
         getUserMapListMetaText,
-        getVisibleCategoryValues,
+        getVisibleCategoryValues: item => (activeUserLayers.has(item?.id) || item?.enabled) ? getVisibleCategoryValues(item) : [],
         getDefaultCategoryStyle,
         createShpStyleButton,
         getCategoryValueLabel
@@ -645,6 +645,7 @@ export function initUserMaps() {
     userMaps.filter(item => item.enabled).forEach(item => {
         activateUserMapLayer(item).catch(error => {
             console.error(error);
+            setAllCategoryValuesVisible(item, false);
             item.enabled = false;
             saveUserMapsToStorage();
             renderUserMapList();

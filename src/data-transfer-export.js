@@ -360,7 +360,7 @@ export async function exportCurrentProject() {
 };
 
 export async function backupAllProjects() {
-    if (!await showAppConfirm('모든 프로젝트 파일(.GeoJSON)이 하나의 압축파일(.ZIP)로 저장됩니다.', { title: '전체 백업' })) return;
+    if (!await showAppConfirm('모든 프로젝트 파일(.GeoJSON)이 하나의 압축파일(.ZIP)로 저장됩니다. 다시 불러올 때에는 압축을 해제한 후 GeoJSON 파일을 선택하세요.', { title: '데이터 백업' })) return;
 
     await saveToStorageCallback();
 

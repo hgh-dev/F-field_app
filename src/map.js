@@ -229,12 +229,13 @@ export const vworldContinuousLayer = L.tileLayer.wms("https://api.vworld.kr/req/
     transparent: true,
     opacity: getInitialMapLayerOpacity('cadastralContinuous'),
     version: '1.3.0',
+    minZoom: 18,
     maxZoom: 22,
     maxNativeZoom: 22,
     detectRetina: true,
     tileSize: 512,
     zoomOffset: 0,
-    className: 'cadastral-layer'
+    className: 'cadastral-layer cadastral-continuous-layer'
 });
 
 // 행정경계 통합 WMS (시도/시군구/읍면동/리)

@@ -17,6 +17,32 @@ import { dmsToDecimal, getWgs84FromTm, parseNationalPointNumber } from './utils.
 export let isSearchHistoryEnabled = true;
 export let searchTarget = { name: "" };
 const SEARCH_HISTORY_LIMIT = 20;
+// VWorld API response data is cached only for the current app session.
+const searchResultMemoryCache = new Map();
+
+function getSearchCacheKey(query, request) {
+    const text = String(query || '').trim();
+    if (!text || !request) return '';
+    return `${request.api}:${request.type || request.coordType || ''}:${text}`;
+}
+
+function rememberSearchResults(cacheKey, items) {
+    if (!cacheKey || !Array.isArray(items) || items.length === 0) return;
+    searchResultMemoryCache.delete(cacheKey);
+    searchResultMemoryCache.set(cacheKey, items);
+    while (searchResultMemoryCache.size > SEARCH_HISTORY_LIMIT) {
+        const oldestKey = searchResultMemoryCache.keys().next().value;
+        searchResultMemoryCache.delete(oldestKey);
+    }
+}
+
+function getRememberedSearchResults(cacheKey) {
+    if (!cacheKey || !searchResultMemoryCache.has(cacheKey)) return null;
+    const items = searchResultMemoryCache.get(cacheKey);
+    searchResultMemoryCache.delete(cacheKey);
+    searchResultMemoryCache.set(cacheKey, items);
+    return items;
+}
 
 /**
  * [함수] initSearchSettings
@@ -331,11 +357,16 @@ export async function executeSearch(typeStr = 'address') {
 
     try {
         const request = getSingleSearchRequest(query);
-        const uniqueItems = request.api === 'address'
-            ? await callAddressSearchWithCoordFallback(query, request.coordType)
-            : uniqueSearchItems(await callVworldSearchApi(query, request.type));
+        const cacheKey = getSearchCacheKey(query, request);
+        const cachedItems = getRememberedSearchResults(cacheKey);
+        const uniqueItems = cachedItems || (
+            request.api === 'address'
+                ? await callAddressSearchWithCoordFallback(query, request.coordType)
+                : uniqueSearchItems(await callVworldSearchApi(query, request.type))
+        );
 
         if (uniqueItems.length > 0) {
+            if (!cachedItems) rememberSearchResults(cacheKey, uniqueItems);
             handleSearchResults(uniqueItems);
         } else {
             alert("검색 결과가 없습니다.\n정확한 주소를 입력해보세요.");
@@ -459,15 +490,6 @@ function createHistoryItem(item, index) {
         const tabId = activeTab ? activeTab.dataset.tab : 'address';
         const inputEl = document.getElementById(tabId === 'national' ? 'search-input-national' : 'search-input-address');
         if (inputEl) inputEl.value = text;
-        if (historyItem.point) {
-            moveToSearchResult({
-                point: historyItem.point,
-                title: historyItem.title || text,
-                address: historyItem.address || { road: "", parcel: "" },
-                searchType: historyItem.searchType || ''
-            });
-            return;
-        }
         executeSearch(tabId);
     };
 
@@ -548,24 +570,13 @@ function getActiveHistoryKey() {
 
 function normalizeHistoryItem(item) {
     if (item && typeof item === 'object') {
-        const point = item.point;
-        const x = Number(point?.x);
-        const y = Number(point?.y);
         return {
             text: String(item.text || item.keyword || item.title || ''),
-            title: item.title || item.text || item.keyword || '',
-            point: Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null,
-            address: item.address || null,
-            searchType: item.searchType || '',
             updatedAt: item.updatedAt || null
         };
     }
     return {
         text: String(item || ''),
-        title: String(item || ''),
-        point: null,
-        address: null,
-        searchType: '',
         updatedAt: null
     };
 }
@@ -585,17 +596,8 @@ function getCurrentHistoryKeyword() {
     return inputEl?.value?.trim() || '';
 }
 
-function createHistoryRecord(keyword, result = null) {
+function createHistoryRecord(keyword) {
     const record = normalizeHistoryItem(keyword);
-    const point = result?.point;
-    const x = Number(point?.x);
-    const y = Number(point?.y);
-    if (Number.isFinite(x) && Number.isFinite(y)) {
-        record.point = { x, y };
-        record.title = result.title || record.text;
-        record.address = result.address || null;
-        record.searchType = result.searchType || '';
-    }
     record.updatedAt = new Date().toISOString();
     return record;
 }
@@ -609,7 +611,12 @@ function createHistoryRecord(keyword, result = null) {
 export function getHistory() {
     const json = localStorage.getItem(getActiveHistoryKey());
     try {
-        return normalizeHistoryList(json ? JSON.parse(json) : []);
+        const rawList = json ? JSON.parse(json) : [];
+        const normalizedList = normalizeHistoryList(rawList);
+        if (json && JSON.stringify(rawList) !== JSON.stringify(normalizedList)) {
+            saveHistory(normalizedList);
+        }
+        return normalizedList;
     } catch (error) {
         console.warn('검색 기록을 읽지 못했습니다.', error);
         return [];
@@ -646,7 +653,7 @@ function updateCurrentHistoryItem(result) {
     if (!keyword || !result?.point) return;
     let list = getHistory();
     list = list.filter(item => normalizeHistoryItem(item).text !== keyword);
-    list.unshift(createHistoryRecord(keyword, result));
+    list.unshift(createHistoryRecord(keyword));
     if (list.length > SEARCH_HISTORY_LIMIT) list = list.slice(0, SEARCH_HISTORY_LIMIT);
     saveHistory(list);
 }

@@ -12,7 +12,7 @@ import { drawnItems } from './draw.js';
 import { saveToStorage } from './data.js';
 import { closeAllDropdowns, switchSidebarTab } from './ui-core.js';
 import { showAppConfirm, showTextPrompt } from './app-dialog.js';
-import { createMarkerShapeSvg, getLineStyleDashArray, getLineStyleFromDashArray, getRecordName, ensureRecordNameAlias, normalizeFillPattern, normalizeMarkerStyle } from './utils.js';
+import { createMarkerShapeSvg, getLineStyleDashArray, getLineStyleFromDashArray, getRecordName, ensureRecordNameAlias, normalizeFillPattern, normalizeMarkerStyle, parseDashArray } from './utils.js';
 import {
     closeAddRecordToGroupModal,
     configureRecordGroupActions,
@@ -527,18 +527,13 @@ function getPreviewStrokeWidth(weight) {
 function getPreviewDashArray(styleId, dashArray, weight) {
     if (styleId === 'none' || dashArray === 'none') return null;
     if (styleId === 'solid-dot') return null;
-    const dot = 0.01;
-    const gap = Number(Math.max(4, getPreviewStrokeWidth(weight) * 2).toFixed(1));
-    const dottedGap = Number(Math.max(3, getPreviewStrokeWidth(weight) * 1.45).toFixed(1));
-    if (styleId === 'dotted') return `${dot} ${dottedGap}`;
-    if (styleId === 'dash-dot') return `${Number((dot * 4).toFixed(1))} ${gap} ${dot} ${gap}`;
-    if (styleId === 'dash-dot-dot') return `${Number((dot * 4).toFixed(1))} ${gap} ${dot} ${gap} ${dot} ${gap}`;
     const source = styleId ? getLineStyleDashArray(styleId, weight) : dashArray;
     if (!source || source === 'none') return null;
-    return String(source)
-        .split(',')
-        .map(value => Math.max(1, Math.round(Number(value.trim()) * 0.72)))
-        .filter(value => Number.isFinite(value))
+    return parseDashArray(source)
+        .map(value => {
+            if (value <= 0.1) return 0.01;
+            return Number(Math.max(1, value * 0.72).toFixed(1));
+        })
         .join(' ');
 }
 
@@ -579,7 +574,7 @@ function createLineLegendSvg(props, color) {
         ? ''
         : `<line x1="2" y1="25" x2="26" y2="3" stroke="${strokeColor}" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round"${dashAttr} />`;
     const dots = !isNoStroke && lineStyle === 'solid-dot'
-        ? createSolidDotMarkers([[8, 19.5], [14, 14], [20, 8.5]], strokeColor, Math.max(1.8, strokeWidth * 0.75))
+        ? createSolidDotMarkers([[8, 19.5], [14, 14], [20, 8.5]], strokeColor, Math.max(2.5, strokeWidth * 1.05))
         : '';
 
     return `<svg class="style-legend-svg" viewBox="0 0 28 28" aria-hidden="true">${line}${dots}</svg>`;
@@ -613,9 +608,9 @@ function createPolygonLegendSvg(props, displayColor) {
 
     const strokeMarkup = isNoStroke
         ? ''
-        : `<rect x="2" y="2" width="24" height="24" fill="none" stroke="${strokeColor}" stroke-width="${strokeWidth}"${dashAttr} />`;
+        : `<path d="M2 2 H26 V26 H2 Z" fill="none" stroke="${strokeColor}" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round"${dashAttr} />`;
     const solidDotMarkup = !isNoStroke && lineStyle === 'solid-dot'
-        ? createSolidDotMarkers([[8, 2], [16, 2], [26, 8], [26, 17], [17, 26], [8, 26], [2, 17], [2, 8]], strokeColor, Math.max(1.6, strokeWidth * 0.62))
+        ? createSolidDotMarkers([[8, 2], [16, 2], [26, 8], [26, 17], [17, 26], [8, 26], [2, 17], [2, 8]], strokeColor, Math.max(2.3, strokeWidth * 0.95))
         : '';
 
     return `<svg class="style-legend-svg" viewBox="0 0 28 28" aria-hidden="true">${fillMarkup}${strokeMarkup}${solidDotMarkup}</svg>`;

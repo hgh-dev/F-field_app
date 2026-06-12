@@ -33,13 +33,25 @@ export function getBottomSheetVisibleHeight() {
     return Math.max(0, Math.min(window.innerHeight, rect.height || 0));
 }
 
+function getTopProjectBadgeVisibleHeight() {
+    const badge = document.getElementById('map-active-project-badge');
+    if (!badge) return 0;
+
+    const style = window.getComputedStyle(badge);
+    if (style.display === 'none' || style.visibility === 'hidden') return 0;
+
+    const rect = badge.getBoundingClientRect();
+    return Math.max(0, Math.min(window.innerHeight, rect.bottom || 0));
+}
+
 export function getBottomSheetAwareFitOptions(options = {}) {
     const { basePadding: rawBasePadding, ...fitOptions } = options;
     const basePadding = Number(rawBasePadding ?? 60);
     const bottomSheetHeight = getBottomSheetVisibleHeight();
+    const topProjectBadgeHeight = bottomSheetHeight ? getTopProjectBadgeVisibleHeight() : 0;
     return {
         ...fitOptions,
-        paddingTopLeft: [basePadding, basePadding],
+        paddingTopLeft: [basePadding, basePadding + topProjectBadgeHeight],
         paddingBottomRight: [basePadding, basePadding + bottomSheetHeight]
     };
 }
@@ -48,7 +60,8 @@ export function getBottomSheetAwareCenter(latlng, zoom = map.getZoom()) {
     const point = L.latLng(latlng);
     const bottomSheetHeight = getBottomSheetVisibleHeight();
     if (!bottomSheetHeight) return point;
-    return map.unproject(map.project(point, zoom).add([0, bottomSheetHeight / 2]), zoom);
+    const topProjectBadgeHeight = getTopProjectBadgeVisibleHeight();
+    return map.unproject(map.project(point, zoom).add([0, (bottomSheetHeight - topProjectBadgeHeight) / 2]), zoom);
 }
 
 export function flyToWithBottomSheet(latlng, zoom = map.getZoom(), options = {}) {

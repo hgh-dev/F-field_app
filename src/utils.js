@@ -167,14 +167,20 @@ export function getLineStyleDashArray(styleId, weight = 3) {
         .join(', ');
 }
 
+export function parseDashArray(dashArray) {
+    if (!dashArray || dashArray === 'none') return [];
+    return String(dashArray)
+        .trim()
+        .split(/[\s,]+/)
+        .map(value => Number(value))
+        .filter(value => Number.isFinite(value) && value > 0);
+}
+
 export function getLineStyleFromDashArray(dashArray, fallback = 'solid') {
     if (dashArray === 'none') return 'none';
     if (!dashArray) return fallback;
 
-    const normalizedParts = String(dashArray)
-        .split(',')
-        .map(value => Number(value.trim()))
-        .filter(value => Number.isFinite(value) && value > 0);
+    const normalizedParts = parseDashArray(dashArray);
 
     if (normalizedParts.length === 4 && normalizedParts[0] >= 12 && normalizedParts[1] <= 2 && normalizedParts[3] <= 2) {
         return 'solid-dot';
