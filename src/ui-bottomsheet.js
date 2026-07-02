@@ -10,7 +10,7 @@ import { VWORLD_API_KEY, SVG_ICONS } from './config.js';
 import { AppState } from './state.js';
 import { map, updateLayerOrder } from './map.js';
 import { drawnItems, enableSingleLayerEdit } from './draw.js';
-import { getTimestampString, getRandomColor, createColoredMarkerIcon, copyText, getTmCoords, convertToDms, getRecordName, setRecordName, calculateProjectedAreaM2 } from './utils.js';
+import { getTimestampString, getRandomColor, createColoredMarkerIcon, copyText, formatCoordinate, getRecordName, setRecordName, calculateProjectedAreaM2 } from './utils.js';
 import { saveToStorage } from './data.js';
 import { updateLayerInfo, deleteLayerById, scheduleViewportVectorOptimization } from './ui-core.js';
 import { renderSurveyList } from './ui-project.js';
@@ -891,14 +891,10 @@ export function showInfoPopup(lat, lng, options = {}) {
         if (AppState.currentSearchMarker) map.removeLayer(AppState.currentSearchMarker);
         AppState.currentSearchMarker = L.marker([lat, lng], { icon: createColoredMarkerIcon('#FF0000') }).addTo(map);
 
-        let infoText = "";
-        if (AppState.coordMode === 2) {
-            infoText = "X:" + getTmCoords(lat, lng).x + " | " + "Y:" + getTmCoords(lat, lng).y;
-        } else if (AppState.coordMode === 1) {
-            infoText = "N " + lat.toFixed(4) + "°, " + "E " + lng.toFixed(4) + "°";
-        } else {
-            infoText = convertToDms(lat, 'lat') + " " + convertToDms(lng, 'lng');
-        }
+        const infoText = formatCoordinate(lat, lng, AppState.coordMode, {
+            separator: ', ',
+            tmSeparator: ' | '
+        });
 
         const content = createInfoPopupContent(parcelAddr, roadAddr, zipcode, infoText, lat, lng);
         if (document.getElementById('bottom-sheet-more-btn')) {

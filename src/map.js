@@ -12,15 +12,28 @@ import {
     applyDefaultMapLayerOpacities,
     configureMapLayerOpacityLayers,
     getInitialMapLayerOpacity,
+    getMapLayerEffect,
     getMapLayerOpacity,
     getMapLayerOpacityLabel,
+    clearSavedMapLayerStyles,
+    resetMapLayerStyle,
+    resetAllMapLayerStyles,
+    saveCurrentMapLayerStyles,
+    setMapLayerEffect,
     setMapLayerOpacity
 } from './map-layer-opacity.js';
 import { showVworldLegend } from './map-vworld-legend.js';
 
 export {
+    getInitialMapLayerOpacity,
     getMapLayerOpacity,
     getMapLayerOpacityLabel,
+    getMapLayerEffect,
+    clearSavedMapLayerStyles,
+    resetMapLayerStyle,
+    resetAllMapLayerStyles,
+    saveCurrentMapLayerStyles,
+    setMapLayerEffect,
     setMapLayerOpacity
 } from './map-layer-opacity.js';
 
@@ -532,6 +545,181 @@ const vworldKeyLayers = [
     vworldHikingTrailLayer
 ];
 
+const MAP_SETTINGS_SAVE_ENABLED_KEY = 'setting_map_settings_save_enabled';
+const MAP_LAYER_SELECTION_STORAGE_KEY = 'setting_map_layer_selections';
+const DEFAULT_MAP_LAYER_SELECTIONS = {
+    baseEnabled: true,
+    baseType: 'satellite',
+    cadastralEnabled: true,
+    cadastralType: 'continuous',
+    overlays: {
+        hybrid: true,
+        admin: false,
+        restriction: false,
+        steepSlope: false,
+        forest: false,
+        heritage: false,
+        citypark: false,
+        forestry: false,
+        envpreserve: false,
+        cityzone: false,
+        managezone: false,
+        farmzone: false,
+        baekdu: false,
+        wetland: false,
+        wildlife: false,
+        watersource: false,
+        naturepark: false,
+        cityroad: false,
+        cityTransport: false,
+        citySpace: false,
+        cityPublicCulture: false,
+        cityDisaster: false,
+        cityEnvironment: false,
+        landuse: false,
+        bizzone: false,
+        industrialBoundary: false,
+        industrialFacility: false,
+        industrialUsezone: false,
+        industrialBusiness: false,
+        roadClass: false,
+        flightProhibit: false,
+        flightRestrict: false,
+        forestSoil: false,
+        hikingTrail: false
+    }
+};
+const MAP_LAYER_OVERLAY_CONTROLS = [
+    ['hybrid', 'chk-hybrid'],
+    ['admin', 'chk-admin'],
+    ['restriction', 'chk-restriction'],
+    ['steepSlope', 'chk-steep-slope'],
+    ['forest', 'chk-forest'],
+    ['heritage', 'chk-heritage'],
+    ['citypark', 'chk-citypark'],
+    ['forestry', 'chk-forestry'],
+    ['envpreserve', 'chk-envpreserve'],
+    ['cityzone', 'chk-cityzone'],
+    ['managezone', 'chk-managezone'],
+    ['farmzone', 'chk-farmzone'],
+    ['baekdu', 'chk-baekdu'],
+    ['wetland', 'chk-wetland'],
+    ['wildlife', 'chk-wildlife'],
+    ['watersource', 'chk-watersource'],
+    ['naturepark', 'chk-naturepark'],
+    ['cityroad', 'chk-cityroad'],
+    ['cityTransport', 'chk-city-transport'],
+    ['citySpace', 'chk-city-space'],
+    ['cityPublicCulture', 'chk-city-public-culture'],
+    ['cityDisaster', 'chk-city-disaster'],
+    ['cityEnvironment', 'chk-city-environment'],
+    ['landuse', 'chk-landuse'],
+    ['bizzone', 'chk-bizzone'],
+    ['industrialBoundary', 'chk-industrial-boundary'],
+    ['industrialFacility', 'chk-industrial-facility'],
+    ['industrialUsezone', 'chk-industrial-usezone'],
+    ['industrialBusiness', 'chk-industrial-business'],
+    ['roadClass', 'chk-road-class'],
+    ['flightProhibit', 'chk-flight-prohibit'],
+    ['flightRestrict', 'chk-flight-restrict'],
+    ['forestSoil', 'chk-forest-soil'],
+    ['hikingTrail', 'chk-hiking-trail']
+];
+
+let isRestoringMapLayerSelections = false;
+
+function isMapSettingsSaveEnabled() {
+    return localStorage.getItem(MAP_SETTINGS_SAVE_ENABLED_KEY) === 'true';
+}
+
+function getSelectedRadioValue(name, fallback) {
+    return document.querySelector(`input[name="${name}"]:checked`)?.value || fallback;
+}
+
+function setRadioValue(name, value) {
+    const radio = document.querySelector(`input[name="${name}"][value="${value}"]`);
+    if (radio) radio.checked = true;
+}
+
+function getMapLayerSelectionState() {
+    const overlays = MAP_LAYER_OVERLAY_CONTROLS.reduce((result, [type, checkboxId]) => {
+        result[type] = document.getElementById(checkboxId)?.checked === true;
+        return result;
+    }, {});
+    return {
+        baseEnabled: document.getElementById('chk-base-layer')?.checked === true,
+        baseType: getSelectedRadioValue('baseMap', DEFAULT_MAP_LAYER_SELECTIONS.baseType),
+        cadastralEnabled: document.getElementById('chk-cadastral')?.checked === true,
+        cadastralType: getSelectedRadioValue('cadastralMap', DEFAULT_MAP_LAYER_SELECTIONS.cadastralType),
+        overlays
+    };
+}
+
+function loadSavedMapLayerSelections() {
+    try {
+        const raw = localStorage.getItem(MAP_LAYER_SELECTION_STORAGE_KEY);
+        return raw ? JSON.parse(raw) : null;
+    } catch (error) {
+        console.warn('[map] Failed to load saved map layer selections.', error);
+        return null;
+    }
+}
+
+function persistMapLayerSelectionsIfEnabled() {
+    if (isRestoringMapLayerSelections || !isMapSettingsSaveEnabled()) return;
+    saveCurrentMapLayerSelections();
+}
+
+function applyMapLayerSelections(selection = DEFAULT_MAP_LAYER_SELECTIONS) {
+    isRestoringMapLayerSelections = true;
+
+    const baseEnabled = selection.baseEnabled !== false;
+    const baseType = ['satellite', 'esri', 'base'].includes(selection.baseType)
+        ? selection.baseType
+        : DEFAULT_MAP_LAYER_SELECTIONS.baseType;
+    const baseCheckbox = document.getElementById('chk-base-layer');
+    if (baseCheckbox) baseCheckbox.checked = baseEnabled;
+    setRadioValue('baseMap', baseType);
+    toggleBaseLayer(baseEnabled);
+
+    const cadastralEnabled = selection.cadastralEnabled !== false;
+    const cadastralType = selection.cadastralType === 'lx' ? 'lx' : DEFAULT_MAP_LAYER_SELECTIONS.cadastralType;
+    const cadastralCheckbox = document.getElementById('chk-cadastral');
+    if (cadastralCheckbox) cadastralCheckbox.checked = cadastralEnabled;
+    setRadioValue('cadastralMap', cadastralType);
+    toggleOverlay('cadastral', cadastralEnabled);
+
+    MAP_LAYER_OVERLAY_CONTROLS.forEach(([type, checkboxId]) => {
+        const nextChecked = selection.overlays?.[type] === true;
+        const checkbox = document.getElementById(checkboxId);
+        if (checkbox) checkbox.checked = nextChecked;
+        toggleOverlay(type, nextChecked);
+    });
+
+    updateLayerOrder();
+    isRestoringMapLayerSelections = false;
+}
+
+export function saveCurrentMapLayerSelections() {
+    localStorage.setItem(MAP_LAYER_SELECTION_STORAGE_KEY, JSON.stringify(getMapLayerSelectionState()));
+}
+
+export function clearSavedMapLayerSelections() {
+    localStorage.removeItem(MAP_LAYER_SELECTION_STORAGE_KEY);
+}
+
+export function applySavedMapLayerSelections() {
+    if (!isMapSettingsSaveEnabled()) return;
+    const savedSelections = loadSavedMapLayerSelections();
+    if (!savedSelections || typeof savedSelections !== 'object') return;
+    applyMapLayerSelections(savedSelections);
+}
+
+export function resetMapLayerSelectionsToDefault() {
+    applyMapLayerSelections(DEFAULT_MAP_LAYER_SELECTIONS);
+    clearSavedMapLayerSelections();
+}
+
 export function applyVworldApiKeyToMapLayers(key = VWORLD_API_KEY) {
     const nextKey = String(key || '').trim();
     if (!nextKey) return;
@@ -559,6 +747,7 @@ map.addLayer(vworldHybrid);
 if (document.getElementById('chk-admin') && document.getElementById('chk-admin').checked) {
     toggleOverlay('admin', true);
 }
+applySavedMapLayerSelections();
 
 
 /* ==========================================================================
@@ -578,6 +767,7 @@ export function toggleBaseLayer(isChecked) {
         map.removeLayer(vworldBase);
         map.removeLayer(esriSatelliteLayer);
     }
+    persistMapLayerSelectionsIfEnabled();
 }
 
 /**
@@ -585,7 +775,10 @@ export function toggleBaseLayer(isChecked) {
  * 동작 원리: 먼저 후보 레이어를 전부 remove한 뒤 선택 레이어 1개만 add합니다.
  */
 export function changeBaseMap(type) {
-    if (!document.getElementById('chk-base-layer').checked) return;
+    if (!document.getElementById('chk-base-layer').checked) {
+        persistMapLayerSelectionsIfEnabled();
+        return;
+    }
 
     // 단일 선택 보장을 위해 먼저 후보를 모두 제거합니다.
     map.removeLayer(vworldSatellite);
@@ -602,6 +795,7 @@ export function changeBaseMap(type) {
 
     // 배경 변경 후 오버레이 계층이 깨지지 않게 순서를 다시 맞춥니다.
     updateLayerOrder();
+    persistMapLayerSelectionsIfEnabled();
 }
 
 /**
@@ -656,7 +850,10 @@ export function updateLayerOrder() {
  * 지적도 타입(LX/연속지적도)을 전환합니다.
  */
 export function changeCadastralMap(type) {
-    if (!document.getElementById('chk-cadastral').checked) return;
+    if (!document.getElementById('chk-cadastral').checked) {
+        persistMapLayerSelectionsIfEnabled();
+        return;
+    }
 
     if (type === 'lx') {
         map.addLayer(vworldLxLayer);
@@ -666,6 +863,7 @@ export function changeCadastralMap(type) {
         map.removeLayer(vworldLxLayer);
     }
     updateLayerOrder();
+    persistMapLayerSelectionsIfEnabled();
 }
 
 /**
@@ -688,6 +886,7 @@ export function toggleOverlay(type, isChecked) {
             map.removeLayer(vworldLxLayer);
             map.removeLayer(vworldContinuousLayer);
         }
+        persistMapLayerSelectionsIfEnabled();
         return;
     } else if (type === 'admin') {
         // 행정경계는 항상 최상단 유지가 중요해 add 시 즉시 bringToFront를 적용합니다.
@@ -697,6 +896,7 @@ export function toggleOverlay(type, isChecked) {
         } else {
             map.removeLayer(mergedAdminLayer);
         }
+        persistMapLayerSelectionsIfEnabled();
         return;
     } else if (type === 'restriction') {
         layer = vworldRestrictionLayer;
@@ -774,6 +974,7 @@ export function toggleOverlay(type, isChecked) {
 
     // VWorld WMS 타입은 공통 함수로 범례 표시/숨김을 동기화합니다.
     showVworldLegend(type, isChecked);
+    persistMapLayerSelectionsIfEnabled();
 }
 
 /* ==========================================================================

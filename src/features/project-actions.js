@@ -10,7 +10,20 @@ import { showAppConfirm } from '../app-dialog.js';
 import { SHARE_BASE_URL } from '../config.js';
 import { closeExportFormatModal, exportLayerWithFormat, fitCurrentProjectToMap, loadCurrentProjectFeatures, saveToStorage } from '../data.js';
 import { drawnItems } from '../draw.js';
-import { getMapLayerOpacity, map, setMapLayerOpacity } from '../map.js';
+import {
+    clearSavedMapLayerStyles,
+    clearSavedMapLayerSelections,
+    getInitialMapLayerOpacity,
+    getMapLayerEffect,
+    getMapLayerOpacity,
+    map,
+    resetAllMapLayerStyles,
+    resetMapLayerSelectionsToDefault,
+    saveCurrentMapLayerSelections,
+    saveCurrentMapLayerStyles,
+    setMapLayerEffect,
+    setMapLayerOpacity
+} from '../map.js';
 import { shareTextUrl } from '../native-bridge.js';
 import { AppState } from '../state.js';
 import { copyText } from '../utils.js';
@@ -57,8 +70,11 @@ export function openMapTileOpacitySettings(id, event) {
     openStyleModalForExternalLayer({
         id,
         type: 'tile',
-        style: { opacity: getMapLayerOpacity(id) },
-        onApply: ({ opacity }) => setMapLayerOpacity(id, opacity)
+        style: { opacity: getMapLayerOpacity(id), defaultOpacity: getInitialMapLayerOpacity(id), ...getMapLayerEffect(id) },
+        onApply: ({ opacity, invert, colorAdjust }) => {
+            setMapLayerOpacity(id, opacity);
+            return setMapLayerEffect(id, { invert, colorAdjust });
+        }
     });
 }
 
@@ -68,9 +84,27 @@ export function openUserMapTileOpacitySettings(id, event) {
     openStyleModalForExternalLayer({
         id,
         type: 'tile',
-        style: { opacity: getUserMapTileOpacity(id) },
+        style: { opacity: getUserMapTileOpacity(id), effectsEnabled: false },
         onApply: ({ opacity }) => setUserMapTileOpacity(id, opacity)
     });
+}
+
+export function setMapSettingsSaveEnabled(value) {
+    AppState.isMapSettingsSaveEnabled = value === true || value === 'true';
+    localStorage.setItem('setting_map_settings_save_enabled', AppState.isMapSettingsSaveEnabled ? 'true' : 'false');
+    if (AppState.isMapSettingsSaveEnabled) {
+        saveCurrentMapLayerStyles();
+        saveCurrentMapLayerSelections();
+    } else {
+        clearSavedMapLayerStyles();
+        clearSavedMapLayerSelections();
+    }
+}
+
+export async function resetMapSettingsToDefault() {
+    if (!await showAppConfirm('기본 지도와 주제도의 설정을 앱의 기본값으로 초기화하시겠습니까?', { title: '지도 설정 초기화' })) return;
+    resetAllMapLayerStyles();
+    resetMapLayerSelectionsToDefault();
 }
 
 export function copyCurrentAddress() {

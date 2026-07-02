@@ -31,6 +31,8 @@ import {
     openMapTileOpacitySettings,
     openUserMapTileOpacitySettings,
     proceedWithImport,
+    resetMapSettingsToDefault,
+    setMapSettingsSaveEnabled,
     shareMyLocation,
     switchProject,
     toggleAllLayers,
@@ -86,6 +88,7 @@ import {
     closeSearchModal,
     executeMapSearch,
     openSearchModal,
+    refreshRecordLayerDisplayMode,
     updateCoordDisplay
 } from '../ui.js';
 
@@ -112,11 +115,14 @@ export function registerGlobals() {
     window.openSettingsDocument = openSettingsDocument;
     window.openMapTileOpacitySettings = openMapTileOpacitySettings;
     window.openUserMapTileOpacitySettings = openUserMapTileOpacitySettings;
+    window.setMapSettingsSaveEnabled = setMapSettingsSaveEnabled;
+    window.resetMapSettingsToDefault = resetMapSettingsToDefault;
     window.openSettingsChoiceModal = openSettingsChoiceModal;
     window.closeSettingsChoiceModal = closeSettingsChoiceModal;
     window.clearAllData = clearAllData;
     window.setCoordMode = (mode) => {
         setCoordMode(mode, updateCoordDisplay);
+        refreshRecordLayerDisplayMode();
     };
     window.setTrackInterval = (value) => {
         setTrackInterval(value);

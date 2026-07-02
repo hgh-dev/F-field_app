@@ -1083,6 +1083,55 @@
             border-bottom: 0;
         }
 
+        .settings-app-download-card {
+            display: none;
+        }
+
+        .settings-app-download-card.visible {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin: 14px 18px 16px;
+            padding: 14px;
+            border: 1px solid #b8d9ff;
+            border-radius: 8px;
+            background: #f0f7ff;
+            box-shadow: 0 2px 8px rgba(22, 131, 233, 0.12);
+            cursor: pointer;
+            box-sizing: border-box;
+        }
+
+        .settings-app-download-copy {
+            min-width: 0;
+        }
+
+        .settings-app-download-title {
+            color: #095fae;
+            font-size: 15px;
+            font-weight: 800;
+            line-height: 1.35;
+        }
+
+        .settings-app-download-meta {
+            margin-top: 3px;
+            color: #4b6b8a;
+            font-size: 12px;
+            line-height: 1.45;
+            word-break: keep-all;
+        }
+
+        .settings-app-download-btn {
+            height: 38px;
+            border-radius: 6px;
+            background: #1683e9;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
         .settings-row-stacked {
             align-items: stretch;
             flex-direction: column;

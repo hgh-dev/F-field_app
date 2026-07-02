@@ -219,6 +219,17 @@
             display: flex;
         }
 
+        .coord-search-content {
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .coord-search-input-row {
+            display: flex;
+            gap: 5px;
+            align-items: stretch;
+        }
+
         .coord-input-container {
             display: flex;
             flex: 1;
@@ -247,6 +258,15 @@
             -moz-appearance: textfield;
             appearance: textfield;
             /* Firefox */
+        }
+
+        .coord-search-help {
+            margin-top: 0;
+            font-size: 11px;
+            line-height: 1.35;
+            color: #6b7280;
+            text-align: center;
+            word-break: keep-all;
         }
 
         #search-input-address,
@@ -470,4 +490,3 @@
             background-color: #e8f0fe !important;
             border: 2px solid #aecbfa !important;
         }
-

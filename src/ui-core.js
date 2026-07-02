@@ -10,7 +10,7 @@ import { SVG_ICONS } from './config.js';
 import { AppState } from './state.js';
 import { map } from './map.js';
 import { drawnItems, currentEditLayerId } from './draw.js';
-import { copyText, getTmCoords, convertToDms, getRecordName, setRecordName, ensureRecordNameAlias, calculateProjectedLengthMeters, calculateProjectedAreaM2 } from './utils.js';
+import { copyText, formatCoordinate, getRecordName, setRecordName, ensureRecordNameAlias, calculateProjectedLengthMeters, calculateProjectedAreaM2 } from './utils.js';
 import { saveToStorage, exportSingleLayer } from './data.js';
 import { showAppPrompt } from './app-dialog.js';
 import {
@@ -33,6 +33,7 @@ import {
     openStyleColorPicker,
     openStyleModal,
     openStyleModalForExternalLayer,
+    resetTileStyleSettings,
     selectFillOpacity,
     selectFillPattern,
     selectLineColorMode,
@@ -50,6 +51,8 @@ import {
     toggleLineStyleOptions,
     toggleMarkerEmojiOptions,
     toggleStylePalette,
+    toggleTileInvert,
+    updateTileColorAdjust,
     updateFillOpacityLabel,
     updateLineWeightLabel,
     updateMarkerSizeLabel,
@@ -137,11 +140,13 @@ import {
 } from './ui-context-menu.js';
 import {
     applyLayerVisibilityState,
+    refreshRecordLayerDisplayMode,
     toggleLayerVisibility,
     updateLayerInfo
 } from './ui-layer-detail.js';
 export {
     applyLayerVisibilityState,
+    refreshRecordLayerDisplayMode,
     toggleLayerVisibility,
     updateLayerInfo
 } from './ui-layer-detail.js';
@@ -319,6 +324,7 @@ export function openSettingsModal() {
     document.getElementsByName('coord-mode-select').forEach(r => { if (parseInt(r.value) === AppState.coordMode) r.checked = true; });
     document.getElementsByName('track-interval-select').forEach(r => { if (parseInt(r.value) === AppState.trackInterval) r.checked = true; });
     document.getElementsByName('snap-enabled-select').forEach(r => { if ((r.value === 'true') === AppState.isSnapEnabled) r.checked = true; });
+    document.getElementsByName('map-settings-save-select').forEach(r => { if ((r.value === 'true') === AppState.isMapSettingsSaveEnabled) r.checked = true; });
     const overlay = document.getElementById('settings-modal-overlay');
     overlay.style.display = 'flex';
     setTimeout(() => { overlay.classList.add('visible'); }, 10);
@@ -396,12 +402,7 @@ export function executeNavigation(type) {
 export function updateCoordDisplay() {
     let lat = AppState.lastGpsLat;
     let lng = AppState.lastGpsLng;
-    let text = "";
-    if (AppState.coordMode === 2) {
-        const tm = getTmCoords(lat, lng);
-        text = "X: " + tm.x + " | Y: " + tm.y;
-    } else if (AppState.coordMode === 1) text = "N " + lat.toFixed(4) + "° | E " + lng.toFixed(4) + "°";
-    else text = convertToDms(lat, 'lat') + " | " + convertToDms(lng, 'lng');
+    const text = formatCoordinate(lat, lng, AppState.coordMode);
     const el = document.getElementById('coord-display');
     if (el) el.innerText = text;
 }
@@ -747,6 +748,9 @@ function bindUiActionsToWindow() {
         selectFillOpacity,
         updateTileOpacityLabel,
         selectTileOpacity,
+        toggleTileInvert,
+        updateTileColorAdjust,
+        resetTileStyleSettings,
         selectFillPattern,
         toggleFillPatternOptions,
         syncSolidDotOverlays,

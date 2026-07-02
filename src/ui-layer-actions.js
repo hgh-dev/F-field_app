@@ -13,7 +13,7 @@ import { saveToStorage } from './data.js';
 import { shareTextUrl } from './native-bridge.js';
 import { showAppConfirm } from './app-dialog.js';
 import { AppState } from './state.js';
-import { createColoredMarkerIcon, copyText, convertToDms, getTmCoords } from './utils.js';
+import { createColoredMarkerIcon, copyText, formatCoordinate } from './utils.js';
 import { closeBottomSheet } from './ui-bottomsheet.js';
 import { renderSurveyList } from './ui-project.js';
 import { closeSidebar } from './ui-sidebar.js';
@@ -26,15 +26,10 @@ import { scheduleViewportVectorOptimization } from './ui-viewport.js';
  *        Web Share 지원 여부에 따라 시스템 공유 또는 클립보드 복사로 분기한다.
  */
 export function shareLocationText(address, lat, lng) {
-    let coordText = `${lat}, ${lng}`;
-    if (AppState.coordMode === 2) {
-        const tm = getTmCoords(lat, lng);
-        coordText = `X: ${tm.x}, Y: ${tm.y}`;
-    } else if (AppState.coordMode === 1) {
-        coordText = `N ${parseFloat(lat).toFixed(4)}° , E ${parseFloat(lng).toFixed(4)}°`;
-    } else {
-        coordText = `${convertToDms(lat, 'lat')}, ${convertToDms(lng, 'lng')}`;
-    }
+    const coordText = formatCoordinate(lat, lng, AppState.coordMode, {
+        separator: ', ',
+        tmSeparator: ', '
+    });
 
     const shareUrl = new URL(`?lat=${lat}&lng=${lng}`, SHARE_BASE_URL).toString();
     const shareData = {
@@ -98,4 +93,3 @@ export function updateLayerColor(id, newColor) {
     layer.feature.properties.customColor = newColor;
     saveToStorage();
 }
-

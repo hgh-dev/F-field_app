@@ -325,6 +325,23 @@ export function getTmCoords(lat, lng) {
     return { x: Math.round(xy[0]), y: Math.round(xy[1]) };
 }
 
+export function formatCoordinate(lat, lng, mode = 0, options = {}) {
+    const separator = options.separator ?? ' | ';
+    const tmSeparator = options.tmSeparator ?? separator;
+    const decimalPlaces = Number.isFinite(Number(options.decimalPlaces)) ? Number(options.decimalPlaces) : 4;
+
+    if (Number(mode) === 2) {
+        const tm = getTmCoords(lat, lng);
+        return `X: ${tm.x}${tmSeparator}Y: ${tm.y}`;
+    }
+
+    if (Number(mode) === 1) {
+        return `N ${Number(lat).toFixed(decimalPlaces)}°${separator}E ${Number(lng).toFixed(decimalPlaces)}°`;
+    }
+
+    return `${convertToDms(lat, 'lat')}${separator}${convertToDms(lng, 'lng')}`;
+}
+
 /**
  * TM(EPSG:5186) 좌표를 WGS84(lat,lng)로 변환합니다.
  */

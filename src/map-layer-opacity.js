@@ -93,6 +93,14 @@ const mapLayerOpacityLabels = {
 };
 
 let mapLayerOpacityLayers = {};
+const mapLayerEffects = {};
+
+const COLOR_ADJUST_CHANNELS = ['red', 'green', 'blue', 'yellow'];
+const COLOR_ADJUST_BIAS_SCALE = 0.35;
+const MAP_SETTINGS_SAVE_ENABLED_KEY = 'setting_map_settings_save_enabled';
+const MAP_LAYER_STYLE_STORAGE_KEY = 'setting_map_layer_styles';
+
+let isRestoringMapLayerStyles = false;
 
 export function configureMapLayerOpacityLayers(layers = {}) {
     mapLayerOpacityLayers = layers || {};
@@ -116,13 +124,133 @@ function getMapLayerByOpacityId(id) {
     return mapLayerOpacityLayers[id] || null;
 }
 
+function getMapLayerContainer(layer) {
+    return layer?.getContainer?.() || layer?._container || null;
+}
+
+function normalizeColorAdjust(value = {}) {
+    return COLOR_ADJUST_CHANNELS.reduce((result, channel) => {
+        const parsed = Number(value[channel]);
+        result[channel] = Number.isFinite(parsed) ? Math.min(100, Math.max(-100, Math.round(parsed))) : 0;
+        return result;
+    }, {});
+}
+
+function isMapSettingsSaveEnabled() {
+    return localStorage.getItem(MAP_SETTINGS_SAVE_ENABLED_KEY) === 'true';
+}
+
+function getMapLayerStyleState(id) {
+    return {
+        opacity: getMapLayerOpacity(id),
+        ...getMapLayerEffect(id)
+    };
+}
+
+function getAllMapLayerStyleState() {
+    return Object.keys(mapLayerOpacityDefaults).reduce((result, id) => {
+        result[id] = getMapLayerStyleState(id);
+        return result;
+    }, {});
+}
+
+function loadSavedMapLayerStyles() {
+    try {
+        const raw = localStorage.getItem(MAP_LAYER_STYLE_STORAGE_KEY);
+        return raw ? JSON.parse(raw) : {};
+    } catch (error) {
+        console.warn('[map-layer-opacity] Failed to load saved map layer styles.', error);
+        return {};
+    }
+}
+
+function persistMapLayerStylesIfEnabled() {
+    if (isRestoringMapLayerStyles || !isMapSettingsSaveEnabled()) return;
+    localStorage.setItem(MAP_LAYER_STYLE_STORAGE_KEY, JSON.stringify(getAllMapLayerStyleState()));
+}
+
+function hasColorAdjust(effect = {}) {
+    const colorAdjust = normalizeColorAdjust(effect.colorAdjust);
+    return COLOR_ADJUST_CHANNELS.some(channel => colorAdjust[channel] !== 0);
+}
+
+function getFilterIdForLayerId(id) {
+    return `ffield-map-color-filter-${String(id || 'layer').replace(/[^a-zA-Z0-9_-]/g, '-')}`;
+}
+
+function ensureMapColorFilter(id, colorAdjust = {}) {
+    const normalized = normalizeColorAdjust(colorAdjust);
+    const filterId = getFilterIdForLayerId(id);
+    let svg = document.getElementById('ffield-map-color-filter-root');
+    if (!svg) {
+        svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.id = 'ffield-map-color-filter-root';
+        svg.setAttribute('width', '0');
+        svg.setAttribute('height', '0');
+        svg.setAttribute('aria-hidden', 'true');
+        svg.style.position = 'absolute';
+        svg.style.width = '0';
+        svg.style.height = '0';
+        svg.style.overflow = 'hidden';
+        document.body.appendChild(svg);
+    }
+
+    let filter = document.getElementById(filterId);
+    if (!filter) {
+        filter = document.createElementNS('http://www.w3.org/2000/svg', 'filter');
+        filter.id = filterId;
+        filter.setAttribute('color-interpolation-filters', 'sRGB');
+        const matrix = document.createElementNS('http://www.w3.org/2000/svg', 'feColorMatrix');
+        matrix.setAttribute('type', 'matrix');
+        filter.appendChild(matrix);
+        svg.appendChild(filter);
+    }
+
+    const matrix = filter.querySelector('feColorMatrix');
+    const redBias = ((normalized.red + normalized.yellow) / 100) * COLOR_ADJUST_BIAS_SCALE;
+    const greenBias = ((normalized.green + normalized.yellow) / 100) * COLOR_ADJUST_BIAS_SCALE;
+    const blueBias = ((normalized.blue - normalized.yellow) / 100) * COLOR_ADJUST_BIAS_SCALE;
+
+    matrix.setAttribute('values', [
+        `1 0 0 0 ${redBias.toFixed(4)}`,
+        `0 1 0 0 ${greenBias.toFixed(4)}`,
+        `0 0 1 0 ${blueBias.toFixed(4)}`,
+        '0 0 0 1 0'
+    ].join(' '));
+
+    return filterId;
+}
+
+function getMapLayerEffectFilter(effect = {}) {
+    const filters = [];
+    if (effect.invert) filters.push('invert(1) hue-rotate(180deg)');
+    return filters.join(' ');
+}
+
+function applyMapLayerEffectToLayer(id, layer, effect = {}) {
+    const container = getMapLayerContainer(layer);
+    if (!container) {
+        layer?.once?.('add', () => applyMapLayerEffectToLayer(id, layer, effect));
+        return;
+    }
+    const filters = [];
+    if (hasColorAdjust(effect)) {
+        filters.push(`url(#${ensureMapColorFilter(id, effect.colorAdjust)})`);
+    }
+    const cssFilter = getMapLayerEffectFilter(effect);
+    if (cssFilter) filters.push(cssFilter);
+    container.style.filter = filters.join(' ');
+}
+
 export function applyDefaultMapLayerOpacities() {
     Object.keys(mapLayerOpacityDefaults).forEach(id => {
         const layer = getMapLayerByOpacityId(id);
         if (layer && typeof layer.setOpacity === 'function') {
             layer.setOpacity(getInitialMapLayerOpacity(id));
         }
+        applyMapLayerEffectToLayer(id, layer, getMapLayerEffect(id));
     });
+    applySavedMapLayerStyles();
 }
 
 export function getMapLayerOpacity(id) {
@@ -140,5 +268,64 @@ export function setMapLayerOpacity(id, value) {
     if (layer && typeof layer.setOpacity === 'function') {
         layer.setOpacity(opacity);
     }
+    persistMapLayerStylesIfEnabled();
     return opacity;
+}
+
+export function getMapLayerEffect(id) {
+    return {
+        invert: mapLayerEffects[id]?.invert === true,
+        colorAdjust: normalizeColorAdjust(mapLayerEffects[id]?.colorAdjust)
+    };
+}
+
+export function setMapLayerEffect(id, effect = {}) {
+    const nextEffect = {
+        invert: effect.invert === true,
+        colorAdjust: normalizeColorAdjust(effect.colorAdjust)
+    };
+    mapLayerEffects[id] = nextEffect;
+    applyMapLayerEffectToLayer(id, getMapLayerByOpacityId(id), nextEffect);
+    persistMapLayerStylesIfEnabled();
+    return getMapLayerEffect(id);
+}
+
+export function resetMapLayerStyle(id) {
+    const opacity = setMapLayerOpacity(id, getMapLayerOpacityDefault(id));
+    const effect = setMapLayerEffect(id, { invert: false, colorAdjust: normalizeColorAdjust() });
+    return { opacity, ...effect };
+}
+
+export function saveCurrentMapLayerStyles() {
+    localStorage.setItem(MAP_LAYER_STYLE_STORAGE_KEY, JSON.stringify(getAllMapLayerStyleState()));
+}
+
+export function clearSavedMapLayerStyles() {
+    localStorage.removeItem(MAP_LAYER_STYLE_STORAGE_KEY);
+}
+
+export function applySavedMapLayerStyles() {
+    if (!isMapSettingsSaveEnabled()) return;
+    const savedStyles = loadSavedMapLayerStyles();
+    isRestoringMapLayerStyles = true;
+    Object.keys(mapLayerOpacityDefaults).forEach(id => {
+        const savedStyle = savedStyles[id];
+        if (!savedStyle || typeof savedStyle !== 'object') return;
+        setMapLayerOpacity(id, savedStyle.opacity);
+        setMapLayerEffect(id, {
+            invert: savedStyle.invert,
+            colorAdjust: savedStyle.colorAdjust
+        });
+    });
+    isRestoringMapLayerStyles = false;
+}
+
+export function resetAllMapLayerStyles() {
+    isRestoringMapLayerStyles = true;
+    Object.keys(mapLayerOpacityDefaults).forEach(id => {
+        setMapLayerOpacity(id, getMapLayerOpacityDefault(id));
+        setMapLayerEffect(id, { invert: false, colorAdjust: normalizeColorAdjust() });
+    });
+    isRestoringMapLayerStyles = false;
+    clearSavedMapLayerStyles();
 }

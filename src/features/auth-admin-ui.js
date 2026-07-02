@@ -7,6 +7,8 @@
    - 로그인 UI, 관리자 사용자 목록, 인증 코드, 공지 배지 설정 문제가 생기면 확인합니다.
    ========================================================================== */
 import { AppState } from '../state.js';
+import { APP_PLAY_STORE_URL } from '../config.js';
+import { isNativeApp } from '../native-bridge.js';
 import { showAppAlert, showTextPrompt } from '../app-dialog.js';
 import { copyText } from '../utils.js';
 import {
@@ -22,6 +24,26 @@ const featureActionGrants = new Map();
 let latestNoticeBadgeSettings = null;
 let latestAdminUsers = [];
 let adminUsersTierFilter = 'all';
+
+function isAndroidWebBrowser() {
+    if (isNativeApp()) return false;
+
+    const platform = navigator.userAgentData?.platform || '';
+    if (platform) return platform.toLowerCase() === 'android';
+
+    const userAgent = navigator.userAgent || '';
+    return /Android/i.test(userAgent);
+}
+
+function syncAppDownloadRow() {
+    const row = document.getElementById('settings-app-download-row');
+    if (!row) return;
+    row.classList.toggle('visible', isAndroidWebBrowser());
+}
+
+function openAppDownloadPage() {
+    window.location.href = APP_PLAY_STORE_URL;
+}
 
 function grantFeatureActionAccess(feature) {
     featureActionGrants.set(feature, Date.now() + PREMIUM_ACTION_GRANT_MS);
@@ -928,6 +950,7 @@ export function initAuthUiEventListeners() {
     document.getElementById('settings-coordinate-info-row')?.addEventListener('click', () => {
         window.openSettingsDocument('./coordinate-system.html');
     });
+    document.getElementById('settings-app-download-row')?.addEventListener('click', openAppDownloadPage);
     document.getElementById('settings-admin-menu-row')?.addEventListener('click', openAdminMenuModal);
     document.getElementById('settings-verification-code-row')?.addEventListener('click', handleVerificationCodeInput);
     document.getElementById('settings-verification-code-create-row')?.addEventListener('click', openVerificationCodeCreateModal);
@@ -1026,6 +1049,8 @@ export function initAuthUiEventListeners() {
             setAuthMessage('회원탈퇴 처리 중 오류가 발생했습니다.', 'error');
         }
     });
+
+    syncAppDownloadRow();
 }
 
 export function initAuthResumeRefresh() {

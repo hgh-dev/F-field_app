@@ -26,6 +26,9 @@ let tempMarkerSize = 3;
 let tempFillOpacity = 0.2;
 let tempFillPattern = 'solid';
 let tempTileOpacity = 1;
+let tempTileDefaultOpacity = 1;
+let tempTileInvert = false;
+let tempTileColorAdjust = { red: 0, green: 0, blue: 0, yellow: 0 };
 let externalStyleTarget = null;
 let currentStyleTab = 'fill';
 let tempFillColor = '#3388ff';
@@ -115,6 +118,14 @@ function normalizeOpacityValue(value, fallback = 0.2) {
     const parsed = parseFloat(value);
     if (Number.isNaN(parsed)) return fallback;
     return Math.min(1, Math.max(0, Math.round(parsed * 20) / 20));
+}
+
+function normalizeTileColorAdjust(value = {}) {
+    return ['red', 'green', 'blue', 'yellow'].reduce((result, channel) => {
+        const parsed = Number(value[channel]);
+        result[channel] = Number.isFinite(parsed) ? Math.min(100, Math.max(-100, Math.round(parsed))) : 0;
+        return result;
+    }, {});
 }
 
 function normalizeLineWeight(value, fallback = 3) {
@@ -408,7 +419,9 @@ export function openStyleModal(id) {
     const fillPatternSec = document.getElementById('style-fill-pattern-section');
     const markerSizeSec = document.getElementById('style-marker-size-section');
     const tileOpacitySec = document.getElementById('style-tile-opacity-section');
+    const tileEffectSec = document.getElementById('style-tile-effect-section');
     if (tileOpacitySec) tileOpacitySec.style.display = 'none';
+    if (tileEffectSec) tileEffectSec.style.display = 'none';
 
     if (layer instanceof L.Marker) {
         currentStyleType = 'marker';
@@ -466,7 +479,7 @@ export function openStyleModalForExternalLayer({ id, type = 'polygon', style = {
     resetStyleColorPalettes();
     resetStyleMoreOptions();
 
-    externalStyleTarget = { id, type, onApply };
+    externalStyleTarget = { id, type, onApply, effectsEnabled: style.effectsEnabled !== false };
     currentStyleLayerId = id;
     currentStyleType = type === 'tile' ? 'tile' : (type === 'marker' ? 'marker' : (type === 'line' ? 'line' : 'polygon'));
 
@@ -486,6 +499,8 @@ export function openStyleModalForExternalLayer({ id, type = 'polygon', style = {
         : 3;
     tempFillOpacity = normalizeOpacityValue(style.customFillOpacity ?? style.fillOpacity, 0.2);
     tempFillPattern = normalizeFillPattern(style.customFillPattern);
+    tempTileInvert = style.invert === true;
+    tempTileColorAdjust = normalizeTileColorAdjust(style.colorAdjust);
 
     const overlay = document.getElementById('style-modal-overlay');
     const tabs = document.getElementById('style-polygon-tabs');
@@ -497,8 +512,10 @@ export function openStyleModalForExternalLayer({ id, type = 'polygon', style = {
     const polySec = document.getElementById('style-polygon-section');
     const markerSizeSec = document.getElementById('style-marker-size-section');
     const tileOpacitySec = document.getElementById('style-tile-opacity-section');
+    const tileEffectSec = document.getElementById('style-tile-effect-section');
 
     tempTileOpacity = normalizeOpacityValue(style.opacity, 1);
+    tempTileDefaultOpacity = normalizeOpacityValue(style.defaultOpacity, 1);
     currentStyleTab = currentStyleType === 'polygon' ? 'fill' : 'line';
     if (tabs) tabs.style.display = currentStyleType === 'polygon' ? 'flex' : 'none';
     if (fillColorSec) fillColorSec.style.display = currentStyleType === 'tile' ? 'none' : 'block';
@@ -509,6 +526,7 @@ export function openStyleModalForExternalLayer({ id, type = 'polygon', style = {
     if (markerSizeSec) markerSizeSec.style.display = currentStyleType === 'marker' ? 'block' : 'none';
     if (polySec) polySec.style.display = currentStyleType === 'polygon' ? 'block' : 'none';
     if (tileOpacitySec) tileOpacitySec.style.display = currentStyleType === 'tile' ? 'block' : 'none';
+    if (tileEffectSec) tileEffectSec.style.display = currentStyleType === 'tile' && externalStyleTarget.effectsEnabled ? 'block' : 'none';
 
     const colorPicker = document.getElementById('style-custom-color');
     if (colorPicker && tempStyleColor.startsWith('#')) {
@@ -564,6 +582,7 @@ function updateStyleModalUI() {
     const markerSec = document.getElementById('style-marker-section');
     const markerSizeSec = document.getElementById('style-marker-size-section');
     const tileOpacitySec = document.getElementById('style-tile-opacity-section');
+    const tileEffectSec = document.getElementById('style-tile-effect-section');
     const colorTitle = document.getElementById('style-color-title');
 
     if (colorTitle) colorTitle.innerText = isPolygon ? '면 색상 선택' : '색상 선택';
@@ -576,6 +595,7 @@ function updateStyleModalUI() {
     if (markerSec) markerSec.style.display = currentStyleType === 'marker' ? 'block' : 'none';
     if (markerSizeSec) markerSizeSec.style.display = currentStyleType === 'marker' ? 'block' : 'none';
     if (tileOpacitySec) tileOpacitySec.style.display = isTile ? 'block' : 'none';
+    if (tileEffectSec) tileEffectSec.style.display = isTile && externalStyleTarget?.effectsEnabled !== false ? 'block' : 'none';
 
     const activeFillColor = isPolygon ? tempFillColor : tempStyleColor;
     document.querySelectorAll('#style-color-palette .color-circle').forEach(btn => {
@@ -617,6 +637,14 @@ function updateStyleModalUI() {
     const tileOpacityLabel = document.getElementById('style-tile-opacity-label');
     if (tileOpacityInput) tileOpacityInput.value = tempTileOpacity;
     if (tileOpacityLabel) tileOpacityLabel.innerText = formatSliderValue(tempTileOpacity);
+    const tileInvertInput = document.getElementById('style-tile-invert');
+    if (tileInvertInput) tileInvertInput.checked = tempTileInvert;
+    Object.entries(tempTileColorAdjust).forEach(([channel, value]) => {
+        const input = document.getElementById(`style-tile-${channel}`);
+        const label = document.getElementById(`style-tile-${channel}-label`);
+        if (input) input.value = value;
+        if (label) label.innerText = String(value);
+    });
 
     const weightInput = document.getElementById('style-line-weight');
     const weightLabel = document.getElementById('style-line-weight-label');
@@ -773,6 +801,27 @@ export function selectTileOpacity(val) {
     updateStyleModalUI();
 }
 
+export function toggleTileInvert(checked) {
+    tempTileInvert = checked === true || checked === 'true';
+    updateStyleModalUI();
+}
+
+export function updateTileColorAdjust(channel, value) {
+    if (!['red', 'green', 'blue', 'yellow'].includes(channel)) return;
+    tempTileColorAdjust = normalizeTileColorAdjust({
+        ...tempTileColorAdjust,
+        [channel]: value
+    });
+    updateStyleModalUI();
+}
+
+export function resetTileStyleSettings() {
+    tempTileOpacity = tempTileDefaultOpacity;
+    tempTileInvert = false;
+    tempTileColorAdjust = normalizeTileColorAdjust();
+    updateStyleModalUI();
+}
+
 export function selectFillPattern(pattern) {
     tempFillPattern = normalizeFillPattern(pattern);
     if (tempFillPattern === 'none') tempFillOpacity = 0;
@@ -836,7 +885,11 @@ export function selectMarkerSize(val) {
  */
 export function applyStyleSettings() {
     if (externalStyleTarget && currentStyleType === 'tile') {
-        externalStyleTarget.onApply?.({ opacity: tempTileOpacity });
+        externalStyleTarget.onApply?.({
+            opacity: tempTileOpacity,
+            invert: tempTileInvert,
+            colorAdjust: tempTileColorAdjust
+        });
         closeStyleModal();
         return;
     }
@@ -930,4 +983,3 @@ export function applyStyleSettings() {
     scheduleViewportVectorOptimization();
     closeStyleModal();
 }
-

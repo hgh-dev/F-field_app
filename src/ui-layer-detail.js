@@ -10,12 +10,12 @@ import { SVG_ICONS } from './config.js';
 import { AppState } from './state.js';
 import { map } from './map.js';
 import { drawnItems, currentEditLayerId } from './draw.js';
-import { convertToDms, ensureRecordNameAlias, getRecordName, getTmCoords, calculateProjectedLengthMeters, calculateProjectedAreaM2 } from './utils.js';
+import { ensureRecordNameAlias, formatCoordinate, getRecordName, calculateProjectedLengthMeters, calculateProjectedAreaM2 } from './utils.js';
 import { saveToStorage } from './data.js';
 import { scheduleViewportVectorOptimization } from './ui-viewport.js';
 import { getLayerFillOpacity, syncFillPatternOverlays, syncSolidDotOverlays } from './ui-style-modal.js';
 import { createLayerPhotoSection } from './ui-photo.js';
-import { flyToWithBottomSheet, getBottomSheetAwareFitOptions, setCurrentBottomSheetLayerId, openBottomSheet, closeBottomSheet, syncBottomSheetHoleMenuForLayer } from './ui-bottomsheet.js';
+import { currentBottomSheetLayerId, flyToWithBottomSheet, getBottomSheetAwareFitOptions, setCurrentBottomSheetLayerId, openBottomSheet, closeBottomSheet, syncBottomSheetHoleMenuForLayer } from './ui-bottomsheet.js';
 import { renderSurveyList } from './ui-project.js';
 
 /* --------------------------------------------------------------------------
@@ -92,9 +92,10 @@ export function updateLayerInfo(layer) {
     let infoText = "";
     if (layer instanceof L.Marker) {
         const pos = layer.getLatLng();
-        if (AppState.coordMode === 2) infoText = "X:" + getTmCoords(pos.lat, pos.lng).x + ", Y:" + getTmCoords(pos.lat, pos.lng).y;
-        else if (AppState.coordMode === 1) infoText = "N " + pos.lat.toFixed(4) + "° , E " + pos.lng.toFixed(4) + "°";
-        else infoText = convertToDms(pos.lat, 'lat') + ", " + convertToDms(pos.lng, 'lng');
+        infoText = formatCoordinate(pos.lat, pos.lng, AppState.coordMode, {
+            separator: ', ',
+            tmSeparator: ', '
+        });
     } else if (layer instanceof L.Polyline && !(layer instanceof L.Polygon)) {
         infoText = "<b>거리:</b> " + calculateProjectedLengthMeters(layer.toGeoJSON()).toFixed(2) + " m";
     } else if (layer instanceof L.Polygon) {
@@ -138,35 +139,58 @@ export function updateLayerInfo(layer) {
 
     applyLayerVisibilityState(layer, layer.feature?.properties?.isHidden === true);
 
+    const openLayerBottomSheet = (options = {}) => {
+        setCurrentBottomSheetLayerId(id);
+        const moreBtn = document.getElementById('bottom-sheet-more-btn');
+        if (moreBtn) moreBtn.style.display = 'flex';
+        syncBottomSheetHoleMenuForLayer(layer);
+        openBottomSheet(memo || '측량 기록', popupContent);
+        document.getElementById('bottom-sheet')?.classList.add('full-open');
+
+        if (options.move === false) return;
+        if (layer instanceof L.Marker) flyToWithBottomSheet(layer.getLatLng(), Math.max(map.getZoom(), 17), { duration: 0.5 });
+        else map.fitBounds(layer.getBounds(), getBottomSheetAwareFitOptions({ basePadding: 60, maxZoom: 19 }));
+    };
+
+    layer.refreshBottomSheetContent = function () {
+        openLayerBottomSheet({ move: false });
+        return this;
+    };
+
     layer.off('click').on('click', function (e) {
         if (layer.feature?.properties?.isHidden === true) return;
         if (AppState.currentDrawer || currentEditLayerId !== null) return;
         AppState.isLayerClicked = true;
         setTimeout(() => { AppState.isLayerClicked = false; }, 50);
         if (e && e.originalEvent) L.DomEvent.stopPropagation(e.originalEvent);
-        setCurrentBottomSheetLayerId(id);
-        const moreBtn = document.getElementById('bottom-sheet-more-btn');
-        if (moreBtn) moreBtn.style.display = 'flex';
-        syncBottomSheetHoleMenuForLayer(layer);
-        openBottomSheet(memo || '측량 기록', popupContent);
-        document.getElementById('bottom-sheet').classList.add('full-open');
-        if (layer instanceof L.Marker) flyToWithBottomSheet(layer.getLatLng(), Math.max(map.getZoom(), 17), { duration: 0.5 });
-        else map.fitBounds(layer.getBounds(), getBottomSheetAwareFitOptions({ basePadding: 60, maxZoom: 19 }));
+        openLayerBottomSheet();
     });
 
 
     layer.openPopup = function () {
-        setCurrentBottomSheetLayerId(id);
-        const moreBtn = document.getElementById('bottom-sheet-more-btn');
-        if (moreBtn) moreBtn.style.display = 'flex';
-        syncBottomSheetHoleMenuForLayer(layer);
-        openBottomSheet(memo || '측량 기록', popupContent);
-        document.getElementById('bottom-sheet').classList.add('full-open');
-        if (layer instanceof L.Marker) flyToWithBottomSheet(layer.getLatLng(), Math.max(map.getZoom(), 17), { duration: 0.5 });
-        else map.fitBounds(layer.getBounds(), getBottomSheetAwareFitOptions({ basePadding: 60, maxZoom: 19 }));
+        openLayerBottomSheet();
         return this;
     };
     layer.closePopup = function () { closeBottomSheet(); return this; };
+}
+
+export function refreshRecordLayerDisplayMode() {
+    const activeLayerId = currentBottomSheetLayerId;
+    const bottomSheet = document.getElementById('bottom-sheet');
+    const shouldRefreshOpenSheet = bottomSheet?.classList.contains('open') && activeLayerId !== null && activeLayerId !== undefined;
+    let activeLayer = null;
+
+    drawnItems.getLayers().forEach(layer => {
+        if (!layer.feature?.properties) return;
+        updateLayerInfo(layer);
+        if (layer.feature.properties.id === activeLayerId) activeLayer = layer;
+    });
+
+    renderSurveyList();
+
+    if (shouldRefreshOpenSheet && activeLayer?.feature?.properties?.isHidden !== true) {
+        activeLayer.refreshBottomSheetContent?.();
+    }
 }
 /**
  * [함수] toggleLayerVisibility

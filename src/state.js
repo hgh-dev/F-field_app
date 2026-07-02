@@ -16,6 +16,8 @@ export const AppState = {
     isPolygonFill: false,
     // 측량/수정 중 스냅 사용 여부
     isSnapEnabled: localStorage.getItem('setting_snap_enabled') !== 'false',
+    // 기본 지도와 주제도 스타일 설정을 앱 재접속 후에도 저장할지 여부
+    isMapSettingsSaveEnabled: localStorage.getItem('setting_map_settings_save_enabled') === 'true',
     // 빠른 지도 이동 후 도형 렌더링을 마지막 이동 이후로 지연할지 여부
     isVectorRenderDelayEnabled: true,
 
