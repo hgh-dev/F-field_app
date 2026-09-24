@@ -23,23 +23,9 @@ import { setupMapFileDropImport } from './features/drag-import.js';
 import { handleDeepLink } from './features/deep-link.js';
 import { initMapInteractions } from './features/map-interactions.js';
 import {
+    initializeTrackRecordingRecovery,
     onTrackSuccess
 } from './features/tracking.js';
-import {
-    closeAccountActionsModal,
-    closeApiKeySettingsModal,
-    closeAdminMenuModal,
-    closeAdminUsersModal,
-    closeAuthInfoModal,
-    closeAuthModal,
-    closeDeleteAccountModal,
-    closeNoticeBadgeSettingsModal,
-    closeVerificationCodeCreateModal,
-    initAuthResumeRefresh,
-    initAuthUiEventListeners,
-    refreshNoticeBadgeSettings,
-    updateAuthUI
-} from './features/auth-admin-ui.js';
 
 /* ==========================================================================
    [모듈] 엔트리/오케스트레이션 모듈 (script.js)
@@ -58,37 +44,82 @@ import {
     updateLayerOrder
 } from './map.js';
 import {
+    configureDrawRuntime,
+    drawnItems,
+    getUniqueRecordName,
+    recordSvgRenderer,
     syncSnapToggleButtons
 } from './draw.js';
 
 
 
 import {
+    configureProjectDataRuntime,
     loadFromStorage,
     handleFileSelect,
-    closeExportFormatModal
+    closeExportFormatModal,
+    saveToStorage
 } from './data.js';
 
-import { initAuth } from './auth.js';
 import {
     initUserMaps
 } from './user-maps.js';
+import { configureBottomSheetRuntime } from './ui-bottomsheet.js';
+import { deleteLayerById } from './ui-layer-actions.js';
+import { configurePhotoRuntime } from './ui-photo.js';
+import { configureProjectRuntime } from './ui-project.js';
 
 import {
     closeBottomSheet, closeLocationActionModal, closeSettingsModal,
     closeNavModal, closeStyleModal, closeMoveProjectModal, closeSortModal,
-    closeProjectSortModal, closeAddRecordToGroupModal, closePhotoSelectMenu,
+    closeProjectSortModal, closeAddRecordToGroupModal, closeCreateRecordGroupModal, closePhotoSelectMenu,
     closePhotoModal, closeMemoModal,
     closeSearchModal,
-    initSleepSlider,
     initUiEventListeners, syncSidebarUI,
     openSettingsModal,
 
     renderSurveyList as uiRenderSurveyList,
     updateLayerInfo as uiUpdateLayerInfo,
+    renderProjectSelector,
+    openSidebar,
+    switchSidebarTab,
+    highlightButton,
+    resetButtonStyles,
+    syncFillPatternOverlays,
+    syncSolidDotOverlays,
     currentBottomSheetLayerId,
     setCurrentBottomSheetLayerId
 } from './ui.js';
+
+configureProjectDataRuntime({
+    drawnItems,
+    getUniqueRecordName,
+    recordSvgRenderer,
+    renderSurveyList: uiRenderSurveyList,
+    updateLayerInfo: uiUpdateLayerInfo,
+    renderProjectSelector,
+    openSidebar,
+    switchSidebarTab
+});
+
+configureDrawRuntime({
+    updateLayerInfo: uiUpdateLayerInfo,
+    renderSurveyList: uiRenderSurveyList,
+    switchSidebarTab,
+    highlightButton,
+    resetButtonStyles,
+    closeBottomSheet,
+    syncFillPatternOverlays,
+    syncSolidDotOverlays,
+    saveToStorage
+});
+
+configureBottomSheetRuntime({
+    updateLayerInfo: uiUpdateLayerInfo,
+    deleteLayerById
+});
+configurePhotoRuntime({ updateLayerInfo: uiUpdateLayerInfo });
+configureProjectRuntime({ switchSidebarTab });
 
 installGlobalAppDialogs();
 injectAuthAdminModals();
@@ -122,10 +153,30 @@ export { currentBottomSheetLayerId, setCurrentBottomSheetLayerId };
  * 앱 시작 초기화 루틴입니다.
  * 동작 원리: 이벤트 바인딩 -> 저장 데이터 로드 -> 지도/UI 동기화 순으로 진행합니다.
  */
-document.addEventListener('DOMContentLoaded', async () => {
+async function initializeApp() {
     if (Capacitor.isNativePlatform()) {
         document.body.classList.add('is-native-app');
     }
+
+    const [{ initAuth }, authUi] = await Promise.all([
+        import('./auth.js'),
+        import('./features/auth-admin-ui.js')
+    ]);
+    const {
+        closeAccountActionsModal,
+        closeApiKeySettingsModal,
+        closeAdminMenuModal,
+        closeAdminUsersModal,
+        closeAuthInfoModal,
+        closeAuthModal,
+        closeDeleteAccountModal,
+        closeNoticeBadgeSettingsModal,
+        closeVerificationCodeCreateModal,
+        initAuthResumeRefresh,
+        initAuthUiEventListeners,
+        refreshNoticeBadgeSettings,
+        updateAuthUI
+    } = authUi;
 
     initAndroidBackButtonExit({
         closeDeleteAccountModal,
@@ -139,6 +190,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         closeAuthModal,
         closeExportFormatModal,
         closeAddRecordToGroupModal,
+        closeCreateRecordGroupModal,
         closeMoveProjectModal,
         closeProjectSortModal,
         closeSortModal,
@@ -158,9 +210,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     syncSettingsChoiceValues();
     initUiEventListeners();
     setupMapFileDropImport({ map, handleFileSelect });
-    initSleepSlider();
     await initAuth(updateAuthUI);
     await loadFromStorage();
+    await initializeTrackRecordingRecovery();
     await handleDeepLink();
     updateLayerOrder();
     syncSidebarUI();
@@ -178,7 +230,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             }, null, { enableHighAccuracy: true });
         }
     }
-});
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeApp, { once: true });
+} else {
+    void initializeApp();
+}
 
 
 

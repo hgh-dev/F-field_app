@@ -38,17 +38,11 @@ export function initContextMenu() {
             프로젝트 이동
         </div>
         <div id="record-menu-add-group" class="more-menu-item" onclick="handleMenuAction('add-group')">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M7 4h13v10H7V4zm-3 3h2v8h11v2H4V7zm-3 3h2v8h11v2H1V10z"/>
-                <path d="M18 16v-3h-3v-2h3V8h2v3h3v2h-3v3h-2z"/>
-            </svg>
+            ${SVG_ICONS.file_group_add}
             그룹에 추가
         </div>
         <div id="record-menu-remove-group" class="more-menu-item" onclick="handleMenuAction('remove-group')">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M4 5h9v7H4V5zm-2 3h1v6h9v1H2V8zm-2 3h1v6h9v1H0v-7z"/>
-                <path d="M15 9v-3l7 4.5-7 4.5v-3h-5V9h5z"/>
-            </svg>
+            ${SVG_ICONS.file_group_remove}
             그룹에서 제외
         </div>
         <hr style="width:100%; margin:4px 0; border:none; border-top:1px solid #f0f0f0;">

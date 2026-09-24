@@ -6,8 +6,8 @@
    [참고]
    - 기능 로직은 넣지 않고, 설정값과 상수만 둡니다.
    ========================================================================== */
-export const APP_VERSION = "1.0.10"; // 현재 앱 버전
-export const APP_VERSION_CODE = 10010; // Android versionCode
+export const APP_VERSION = "1.2.1"; // 현재 앱 버전
+export const APP_VERSION_CODE = 10201; // Android versionCode
 export const SHARE_BASE_URL = "https://f-field.app/";
 export const APP_PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=app.ffield.mobile";
 
@@ -106,6 +106,16 @@ export const SVG_ICONS = {
    track: `<svg class="svg-inline" viewBox="0 0 24 24"><path d="M13.49 5.48c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm-3.6 13.9l1-4.4 2.1 2v6h2v-7.5l-2.1-2 .6-3c1.3 1.5 3.3 2.5 5.5 2.5v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1l-5.2 2.2v4.7h2v-3.4l1.8-.7-1.6 8.1-4.9-1-.4 2 7 1.4z"/></svg>`,
    // 폴더 이동 아이콘 (커스텀: 큰 화살표)
    folder_move: `<svg viewBox="0 0 24 24"><path d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h11v-2H4V8h16v4h2V8c0-1.1-.9-2-2-2z"/><path d="M14 13v-3l7 4.5-7 4.5v-3H9v-3h5z"/></svg>`,
+   // 그룹(폴더) 아이콘
+   folder: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4l2 2h8c1.1 0 2 .9 2 2v1H2V6c0-1.1.9-2 2-2h6z"/><path d="M2 10h20v8c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2v-8z"/></svg>`,
+   // 파일 그룹에 추가
+   file_group_add: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v5h-2V8h-3V5H6v14h7v2H6c-1.1 0-2-.9-2-2V5c0-1.1.9-2 2-2z"/><path d="M18 14v3h3v2h-3v3h-2v-3h-3v-2h3v-3h2z"/></svg>`,
+   // 파일 그룹에서 제외
+   file_group_remove: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v5h-2V8h-3V5H6v14h7v2H6c-1.1 0-2-.9-2-2V5c0-1.1.9-2 2-2z"/><path d="M14 17h8v2h-8z"/></svg>`,
+   // 파일 그룹 해제
+   file_group_ungroup: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h7l3 3v5h-2V7h-2V5H5v10h6v2H5c-1.1 0-2-.9-2-2V5c0-1.1.9-2 2-2z"/><path d="M11 8h7l3 3v8c0 1.1-.9 2-2 2h-8c-1.1 0-2-.9-2-2v-9c0-1.1.9-2 2-2zm0 2v9h8v-7h-2v-2h-6z"/><path d="M13 14h4v2h-4z"/></svg>`,
+   // 사용자지도/지도 레이어 아이콘
+   map_layer: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4l6 2.1L21 4v15l-6 2.1L9 19l-6 2V6l6-2zm1 2.4v10.8l4 1.4V7.8l-4-1.4zM5 7.4v10.8l3-1V6.4l-3 1zm11 .4v10.8l3-1V6.8l-3 1z"/></svg>`,
    // 카메라 아이콘
    camera: `<svg class="svg-inline" viewBox="0 0 24 24"><path d="M4 4h3l2-2h6l2 2h3c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2zm8 3c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zm0 8c-1.65 0-3-1.35-3-3s1.35-3 3-3 3 1.35 3 3-1.35 3-3 3z"/></svg>`,
    // 검색 돋보기 아이콘

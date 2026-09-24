@@ -8,19 +8,304 @@
    ========================================================================== */
 import { AppState } from './state.js';
 import { drawnItems } from './draw.js';
-import { resizeImage } from './utils.js';
+import { getRecordName, resizeImage } from './utils.js';
 import { saveToStorage } from './data.js';
-import { updateLayerInfo } from './ui-core.js';
 import { renderSurveyList } from './ui-project.js';
-import { isNativeApp, saveBase64FileNative } from './native-bridge.js';
+import { isNativeApp, pickNativePhotos, saveBase64FileNative } from './native-bridge.js';
 import { showAppConfirm } from './app-dialog.js';
+import { validateRuntimeDependencies } from './runtime-dependencies.js';
 
 export let currentPhotoList = [];
 export let currentPhotoIndex = 0;
 export let currentPhotoLayerId = null;
+let currentPhotoEntries = [];
+let updateLayerInfo;
+
+export function configurePhotoRuntime(dependencies) {
+    const validatedDependencies = validateRuntimeDependencies('photo', dependencies, {
+        updateLayerInfo: 'function'
+    });
+    ({ updateLayerInfo } = validatedDependencies);
+}
+
+const PHOTO_SWIPE_MIN_DISTANCE = 50;
+const PHOTO_SWIPE_DIRECTION_RATIO = 1.2;
+const PHOTO_SWIPE_ANIMATION_MS = 180;
+
+function ensurePhotoSwipeHandlers() {
+    const content = document.querySelector('.photo-modal-content');
+    if (!content || content.dataset.swipeBound === 'true') return;
+
+    let startX = null;
+    let startY = null;
+    let isAnimating = false;
+
+    const getPhotoImage = () => document.getElementById('photo-modal-img');
+
+    const animateToRest = () => {
+        const image = getPhotoImage();
+        if (!image) return;
+        image.style.transition = `transform ${PHOTO_SWIPE_ANIMATION_MS}ms ease-out, opacity ${PHOTO_SWIPE_ANIMATION_MS}ms ease-out`;
+        image.style.transform = 'translate3d(0, 0, 0)';
+        image.style.opacity = '1';
+    };
+
+    const resetSwipe = () => {
+        startX = null;
+        startY = null;
+    };
+
+    const completeSwipe = direction => {
+        const image = getPhotoImage();
+        if (!image || isAnimating) return;
+        isAnimating = true;
+
+        const exitX = direction === 'next' ? '-110%' : '110%';
+        const enterX = direction === 'next' ? '35%' : '-35%';
+        image.style.transition = `transform ${PHOTO_SWIPE_ANIMATION_MS}ms ease-in, opacity ${PHOTO_SWIPE_ANIMATION_MS}ms ease-in`;
+        image.style.transform = `translate3d(${exitX}, 0, 0)`;
+        image.style.opacity = '0';
+
+        setTimeout(() => {
+            if (direction === 'next') nextPhoto();
+            else prevPhoto();
+
+            image.style.transition = 'none';
+            image.style.transform = `translate3d(${enterX}, 0, 0)`;
+            image.style.opacity = '0';
+
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    animateToRest();
+                    setTimeout(() => { isAnimating = false; }, PHOTO_SWIPE_ANIMATION_MS);
+                });
+            });
+        }, PHOTO_SWIPE_ANIMATION_MS);
+    };
+
+    content.addEventListener('touchstart', event => {
+        if (isAnimating || event.touches.length !== 1) {
+            resetSwipe();
+            return;
+        }
+        startX = event.touches[0].clientX;
+        startY = event.touches[0].clientY;
+    }, { passive: true });
+
+    content.addEventListener('touchmove', event => {
+        if (startX === null || startY === null || event.touches.length !== 1) return;
+
+        const deltaX = event.touches[0].clientX - startX;
+        const deltaY = event.touches[0].clientY - startY;
+        if (Math.abs(deltaX) <= Math.abs(deltaY)) return;
+
+        event.preventDefault();
+        const image = getPhotoImage();
+        if (!image) return;
+        const fadeAmount = Math.min(Math.abs(deltaX) / Math.max(content.clientWidth, 1) * 0.35, 0.35);
+        image.style.transition = 'none';
+        image.style.transform = `translate3d(${deltaX}px, 0, 0)`;
+        image.style.opacity = String(1 - fadeAmount);
+    }, { passive: false });
+
+    content.addEventListener('touchend', event => {
+        if (startX === null || startY === null || event.changedTouches.length === 0) return;
+
+        const deltaX = event.changedTouches[0].clientX - startX;
+        const deltaY = event.changedTouches[0].clientY - startY;
+        resetSwipe();
+
+        const horizontalDistance = Math.abs(deltaX);
+        const verticalDistance = Math.abs(deltaY);
+        if (currentPhotoList.length <= 1
+            || horizontalDistance < PHOTO_SWIPE_MIN_DISTANCE
+            || horizontalDistance < verticalDistance * PHOTO_SWIPE_DIRECTION_RATIO) {
+            animateToRest();
+            return;
+        }
+
+        completeSwipe(deltaX < 0 ? 'next' : 'prev');
+    }, { passive: true });
+
+    content.addEventListener('touchcancel', () => {
+        resetSwipe();
+        animateToRest();
+    }, { passive: true });
+    content.dataset.swipeBound = 'true';
+}
 
 const PHOTO_INPUT_PERMISSION_GRACE_MS = 5 * 60 * 1000;
 let pendingPhotoInputPermission = null;
+
+function sanitizePhotoFileNamePart(value) {
+    const sanitized = String(value || '기록')
+        .replace(/[\\/:*?"<>|\u0000-\u001F]/g, '_')
+        .replace(/\s+/g, ' ')
+        .replace(/[. ]+$/g, '')
+        .trim();
+    return sanitized || '기록';
+}
+
+function getPhotoMimeType(photo) {
+    const match = String(photo || '').match(/^data:([^;,]+)/i);
+    return match?.[1]?.toLowerCase() || 'image/jpeg';
+}
+
+function getPhotoFileExtension(photo) {
+    const mimeType = getPhotoMimeType(photo);
+    if (mimeType === 'image/png') return 'png';
+    if (mimeType === 'image/webp') return 'webp';
+    if (mimeType === 'image/gif') return 'gif';
+    return 'jpg';
+}
+
+function createPhotoFileName(entry) {
+    const recordName = sanitizePhotoFileNamePart(entry?.recordName || '기록');
+    const photoNumber = Number(entry?.photoIndex) + 1;
+    const extension = getPhotoFileExtension(entry?.photo);
+    return `photo_${recordName}_${Number.isFinite(photoNumber) ? photoNumber : 1}.${extension}`;
+}
+
+function getProjectPhotoEntries() {
+    const entries = [];
+    drawnItems.getLayers().forEach(layer => {
+        const props = layer.feature?.properties || {};
+        const photos = Array.isArray(props.photos) ? props.photos : [];
+        const recordName = getRecordName(props, '기록') || '기록';
+        photos.forEach((photo, photoIndex) => {
+            entries.push({
+                photo,
+                photoIndex,
+                layerId: props.id,
+                recordName
+            });
+        });
+    });
+    return entries;
+}
+
+function getCurrentProjectName() {
+    const project = AppState.projects.find(item => String(item.id) === String(AppState.currentProjectId));
+    return project?.name || '프로젝트';
+}
+
+function renderProjectPhotoThumbnails() {
+    const container = document.getElementById('photo-modal-thumbnails');
+    if (!container) return;
+    container.innerHTML = '';
+    currentPhotoEntries.forEach((entry, index) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'photo-modal-thumbnail-btn';
+        button.dataset.photoIndex = String(index);
+        button.title = `${entry.recordName} · ${createPhotoFileName(entry)}`;
+        button.setAttribute('aria-label', `${entry.recordName} ${entry.photoIndex + 1}번째 사진`);
+
+        const image = document.createElement('img');
+        image.src = entry.photo;
+        image.alt = '';
+        button.appendChild(image);
+        button.onclick = () => {
+            currentPhotoIndex = index;
+            updateModalImage();
+        };
+        container.appendChild(button);
+    });
+}
+
+function getPhotoDownloadEntries(scope) {
+    const currentEntry = currentPhotoEntries[currentPhotoIndex];
+    if (!currentEntry) return [];
+    if (scope === 'current') return [currentEntry];
+    if (scope === 'record') {
+        return currentPhotoEntries.filter(entry => entry.layerId === currentEntry.layerId);
+    }
+    if (scope === 'project') return [...currentPhotoEntries];
+    return [];
+}
+
+function ensurePhotoDownloadMenu() {
+    let overlay = document.getElementById('photo-download-modal-overlay');
+    if (overlay) return overlay;
+
+    overlay = document.createElement('div');
+    overlay.id = 'photo-download-modal-overlay';
+    overlay.className = 'nav-modal-overlay';
+    overlay.style.zIndex = '10030';
+    overlay.style.alignItems = 'center';
+    overlay.style.justifyContent = 'center';
+    overlay.innerHTML = `
+        <div onclick="event.stopPropagation()" style="width:min(380px, calc(100vw - 32px)); background:#fff; border-radius:12px; padding:18px; box-sizing:border-box;">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px;">
+                <div style="font-size:17px; font-weight:800; color:#111827;">사진 저장</div>
+                <button type="button" id="photo-download-menu-close" style="width:34px; height:34px; border:0; background:#f3f4f6; border-radius:50%; color:#6b7280; font-size:20px; line-height:1;">&times;</button>
+            </div>
+            <div style="font-size:12px; color:#6b7280; line-height:1.45; margin-bottom:12px;">저장할 사진 범위를 선택하세요.</div>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+                <button type="button" class="photo-download-scope-btn" data-scope="current" style="width:100%; min-height:48px; border:1px solid #e5e7eb; border-radius:8px; background:#fff; padding:10px 12px; text-align:center; font-size:14px; font-weight:700; color:#111827; cursor:pointer;">현재 사진 저장</button>
+                <button type="button" class="photo-download-scope-btn" data-scope="record" style="width:100%; min-height:48px; border:1px solid #e5e7eb; border-radius:8px; background:#fff; padding:10px 12px; text-align:center; font-size:14px; font-weight:700; color:#111827; cursor:pointer;">기록 내 모든 사진 저장<span data-photo-count="record" style="margin-left:2px; color:#2563eb; font-size:12px;"></span></button>
+                <button type="button" class="photo-download-scope-btn" data-scope="project" style="width:100%; min-height:48px; border:1px solid #e5e7eb; border-radius:8px; background:#fff; padding:10px 12px; text-align:center; font-size:14px; font-weight:700; color:#111827; cursor:pointer;">프로젝트 내 모든 사진 저장<span data-photo-count="project" style="margin-left:2px; color:#2563eb; font-size:12px;"></span></button>
+            </div>
+        </div>`;
+    overlay.onclick = closePhotoDownloadMenu;
+    overlay.querySelector('#photo-download-menu-close').onclick = closePhotoDownloadMenu;
+    overlay.querySelectorAll('.photo-download-scope-btn').forEach(button => {
+        button.onclick = () => savePhotoEntries(getPhotoDownloadEntries(button.dataset.scope));
+    });
+    document.body.appendChild(overlay);
+    return overlay;
+}
+
+export function openPhotoDownloadMenu() {
+    if (currentPhotoEntries.length === 0) return;
+    const overlay = ensurePhotoDownloadMenu();
+    ['record', 'project'].forEach(scope => {
+        const count = getPhotoDownloadEntries(scope).length;
+        const countLabel = overlay.querySelector(`[data-photo-count="${scope}"]`);
+        if (countLabel) countLabel.textContent = `(${count}장)`;
+    });
+    overlay.style.display = 'flex';
+    requestAnimationFrame(() => overlay.classList.add('visible'));
+}
+
+export function closePhotoDownloadMenu() {
+    const overlay = document.getElementById('photo-download-modal-overlay');
+    if (!overlay) return;
+    overlay.classList.remove('visible');
+    setTimeout(() => {
+        if (!overlay.classList.contains('visible')) overlay.style.display = 'none';
+    }, 200);
+}
+
+async function savePhotoEntries(entries) {
+    if (!Array.isArray(entries) || entries.length === 0) return;
+    closePhotoDownloadMenu();
+
+    if (isNativeApp()) {
+        for (const entry of entries) {
+            try {
+                await saveBase64FileNative({
+                    dataUrl: entry.photo,
+                    fileName: createPhotoFileName(entry),
+                    mimeType: getPhotoMimeType(entry.photo)
+                });
+            } catch (err) {
+                if (err?.message !== 'Save canceled') alert('사진 저장 실패: ' + (err?.message || err));
+                return;
+            }
+        }
+        return;
+    }
+
+    entries.forEach(entry => {
+        const link = document.createElement('a');
+        link.download = createPhotoFileName(entry);
+        link.href = entry.photo;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    });
+}
 
 function authorizePendingPhotoInput(layerId) {
     pendingPhotoInputPermission = {
@@ -206,11 +491,24 @@ export function closePhotoSelectMenu() {
  * [원리] 이벤트 컨텍스트를 해석해 예외/가드 조건을 먼저 처리하고,
  *        조건에 맞는 작업 함수로 분기해 사용자 의도에 맞는 동작을 실행한다.
  */
-export function handlePhotoMenuAction(type) {
+export async function handlePhotoMenuAction(type) {
     if (!currentPhotoLayerId) return;
     const targetId = currentPhotoLayerId;
     authorizePendingPhotoInput(targetId);
     closePhotoSelectMenu();
+    if (type === 'gallery' && isNativeApp() && targetId === 'new-photo-point' && typeof window.processNativePendingPhotoItems === 'function') {
+        try {
+            const result = await pickNativePhotos({ maxCount: 5 });
+            const items = Array.isArray(result?.items) ? result.items : [];
+            if (items.length > 0) await window.processNativePendingPhotoItems(items);
+        } catch (error) {
+            if (error?.message !== 'Photo selection canceled') {
+                console.error(error);
+                alert(`사진을 선택하지 못했습니다.\n${error.message || error}`);
+            }
+        }
+        return;
+    }
     setTimeout(() => {
         if (type === 'camera') {
             const input = document.getElementById(`input-cam-${targetId}`);
@@ -301,8 +599,12 @@ export async function deletePhoto(layerId, index) {
 export function openPhotoModal(layerId, index) {
     const layer = drawnItems.getLayers().find(l => l.feature.properties.id === layerId);
     if (!layer || !layer.feature.properties.photos) return;
-    currentPhotoList = layer.feature.properties.photos;
-    currentPhotoIndex = index;
+    currentPhotoEntries = getProjectPhotoEntries();
+    currentPhotoList = currentPhotoEntries.map(entry => entry.photo);
+    const selectedIndex = currentPhotoEntries.findIndex(entry => entry.layerId === layerId && entry.photoIndex === index);
+    currentPhotoIndex = selectedIndex >= 0 ? selectedIndex : 0;
+    ensurePhotoSwipeHandlers();
+    renderProjectPhotoThumbnails();
     updateModalImage();
     const modal = document.getElementById('photo-modal');
     modal.style.display = 'flex';
@@ -317,20 +619,26 @@ export function openPhotoModal(layerId, index) {
  */
 export function updateModalImage() {
     const img = document.getElementById('photo-modal-img');
-    const prevBtn = document.getElementById('photo-prev-btn');
-    const nextBtn = document.getElementById('photo-next-btn');
     const counter = document.getElementById('photo-counter');
+    const fileName = document.getElementById('photo-modal-filename');
+    const projectName = document.getElementById('photo-modal-project-name');
+    const recordName = document.getElementById('photo-modal-record-name');
+    const currentEntry = currentPhotoEntries[currentPhotoIndex];
     if (currentPhotoList.length > 0) {
         img.src = currentPhotoList[currentPhotoIndex];
     }
-    if (currentPhotoList.length > 1) {
-        prevBtn.style.display = 'block';
-        nextBtn.style.display = 'block';
-    } else {
-        prevBtn.style.display = 'none';
-        nextBtn.style.display = 'none';
-    }
     counter.innerText = `${currentPhotoIndex + 1} / ${currentPhotoList.length}`;
+    if (fileName) {
+        fileName.textContent = createPhotoFileName(currentEntry);
+        fileName.title = fileName.textContent;
+    }
+    if (projectName) projectName.textContent = getCurrentProjectName();
+    if (recordName) recordName.textContent = currentEntry?.recordName || '기록';
+
+    const thumbnails = document.querySelectorAll('#photo-modal-thumbnails .photo-modal-thumbnail-btn');
+    thumbnails.forEach((thumbnail, index) => thumbnail.classList.toggle('active', index === currentPhotoIndex));
+    const activeThumbnail = document.querySelector('#photo-modal-thumbnails .photo-modal-thumbnail-btn.active');
+    activeThumbnail?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
 }
 
 /**
@@ -365,32 +673,8 @@ export function prevPhoto() {
  */
 export async function downloadCurrentPhoto() {
     if (currentPhotoList.length === 0) return;
-    const base64Str = currentPhotoList[currentPhotoIndex];
-    const now = new Date();
-    const timestamp = now.getFullYear().toString().slice(2) +
-        String(now.getMonth() + 1).padStart(2, '0') +
-        String(now.getDate()).padStart(2, '0') + '_' +
-        String(now.getHours()).padStart(2, '0') +
-        String(now.getMinutes()).padStart(2, '0') +
-        String(now.getSeconds()).padStart(2, '0');
-    const fileName = `photo_${timestamp}.jpg`;
-
-    if (isNativeApp()) {
-        try {
-            await saveBase64FileNative({ dataUrl: base64Str, fileName, mimeType: 'image/jpeg' });
-            return;
-        } catch (err) {
-            alert('사진 저장 실패: ' + (err?.message || err));
-            return;
-        }
-    }
-
-    const link = document.createElement('a');
-    link.download = fileName;
-    link.href = base64Str;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const currentEntry = currentPhotoEntries[currentPhotoIndex];
+    await savePhotoEntries(currentEntry ? [currentEntry] : []);
 }
 
 /**
@@ -400,11 +684,24 @@ export async function downloadCurrentPhoto() {
  *        지연 후 display를 none으로 바꿔 클릭 영역과 임시 상태를 정리한다.
  */
 export function closePhotoModal() {
+    closePhotoDownloadMenu();
     const modal = document.getElementById('photo-modal');
     if (!modal) return;
     modal.classList.remove('visible');
     setTimeout(() => {
+        if (modal.classList.contains('visible')) return;
         modal.style.display = 'none';
         document.getElementById('photo-modal-img').src = '';
+        const fileName = document.getElementById('photo-modal-filename');
+        if (fileName) fileName.textContent = '';
+        const thumbnails = document.getElementById('photo-modal-thumbnails');
+        if (thumbnails) thumbnails.innerHTML = '';
+        const projectName = document.getElementById('photo-modal-project-name');
+        const recordName = document.getElementById('photo-modal-record-name');
+        if (projectName) projectName.textContent = '';
+        if (recordName) recordName.textContent = '';
+        currentPhotoEntries = [];
+        currentPhotoList = [];
+        currentPhotoIndex = 0;
     }, 300);
 }

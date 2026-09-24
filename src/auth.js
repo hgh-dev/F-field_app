@@ -10,35 +10,29 @@ import { createClient } from '@supabase/supabase-js';
 import { Capacitor } from '@capacitor/core';
 import { App } from '@capacitor/app';
 import { APP_SETTINGS_CACHE_TTL_MS, setVworldApiKey } from './config.js';
+import {
+    AUTH_FEATURES,
+    authState,
+    canUseFeature,
+    getAuthState,
+    hasOfflineMapAccess,
+    hasPremiumAccess,
+    isAdminAccount,
+    normalizeAuthTier
+} from './auth-policy.js';
+
+export {
+    AUTH_FEATURES,
+    canUseFeature,
+    getAuthState,
+    hasOfflineMapAccess,
+    hasPremiumAccess,
+    isAdminAccount
+} from './auth-policy.js';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-export const AUTH_FEATURES = Object.freeze({
-    PREMIUM_ACCESS: 'premium_access',
-    TRACK_RECORDING: 'track_recording',
-    PHOTO_RECORDING: 'photo_recording',
-    OFFLINE_MAP: 'offline_map',
-    ADMIN_MENU: 'admin_menu',
-    ADMIN_USERS: 'admin_users',
-    VERIFICATION_CODE_CREATE: 'verification_code_create',
-    NOTICE_BADGE_MANAGE: 'notice_badge_manage',
-    API_KEY_MANAGE: 'api_key_manage',
-    AUTH_INFO: 'auth_info'
-});
-
 const PREMIUM_TIERS = new Set(['verified', 'premium', 'admin']);
-const FEATURE_TIERS = Object.freeze({
-    [AUTH_FEATURES.PREMIUM_ACCESS]: new Set(['verified', 'premium', 'admin']),
-    [AUTH_FEATURES.TRACK_RECORDING]: new Set(['verified', 'premium', 'admin']),
-    [AUTH_FEATURES.PHOTO_RECORDING]: new Set(['verified', 'premium', 'admin']),
-    [AUTH_FEATURES.OFFLINE_MAP]: new Set(['verified', 'premium', 'admin']),
-    [AUTH_FEATURES.ADMIN_MENU]: new Set(['admin']),
-    [AUTH_FEATURES.ADMIN_USERS]: new Set(['admin']),
-    [AUTH_FEATURES.VERIFICATION_CODE_CREATE]: new Set(['admin']),
-    [AUTH_FEATURES.NOTICE_BADGE_MANAGE]: new Set(['admin']),
-    [AUTH_FEATURES.API_KEY_MANAGE]: new Set(['admin']),
-    [AUTH_FEATURES.AUTH_INFO]: new Set(['verified', 'premium', 'admin'])
-});
 const APP_SETTINGS_CACHE_KEY = 'f-field-app-settings-cache';
 const OFFLINE_ENTITLEMENT_CACHE_KEY = 'f-field-offline-entitlement-cache';
 const OFFLINE_ENTITLEMENT_CACHE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
@@ -58,51 +52,20 @@ const AUTH_URL_PARAM_KEYS = new Set([
 
 const supabase = SUPABASE_URL && SUPABASE_ANON_KEY
     ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-        // TODO: PKCE 전환은 Supabase redirect 설정과 Android 딥링크 흐름을 함께 검증한 뒤 별도 적용합니다.
-        auth: { detectSessionInUrl: true }
+        // OAuth 인증코드를 앱에서 교환하므로 콜백 URL이 노출돼도 토큰을 바로 탈취할 수 없습니다.
+        auth: {
+            detectSessionInUrl: true,
+            flowType: 'pkce'
+        }
     })
     : null;
 
-const authState = {
-    initialized: false,
-    user: null,
-    tier: 'free',
-    offlineMapAccessFromCache: false,
-    error: null
-};
 let appUrlOpenListener = null;
 let authChangeHandler = null;
 let browserAuthUrlScrubListenersInstalled = false;
 
 export function isAuthConfigured() {
     return Boolean(supabase);
-}
-
-export function getAuthState() {
-    return { ...authState, isPremium: hasPremiumAccess() };
-}
-
-function normalizeAuthTier(tier) {
-    return String(tier || 'free').trim().toLowerCase() || 'free';
-}
-
-export function isAdminAccount(state = authState) {
-    return Boolean(state?.user && normalizeAuthTier(state.tier) === 'admin');
-}
-
-export function canUseFeature(feature, state = authState) {
-    const tier = normalizeAuthTier(state?.tier);
-    const allowedTiers = FEATURE_TIERS[feature];
-    if (state?.user && allowedTiers?.has(tier)) return true;
-    return Boolean(feature === AUTH_FEATURES.OFFLINE_MAP && state?.user && state?.offlineMapAccessFromCache);
-}
-
-export function hasPremiumAccess() {
-    return canUseFeature(AUTH_FEATURES.PREMIUM_ACCESS);
-}
-
-export function hasOfflineMapAccess() {
-    return canUseFeature(AUTH_FEATURES.OFFLINE_MAP);
 }
 
 function getCachedOfflineEntitlement(userId) {
@@ -198,10 +161,7 @@ async function refreshEntitlement(session) {
 function getGoogleRedirectUrl() {
     if (Capacitor.isNativePlatform()) return ANDROID_AUTH_REDIRECT_URL;
 
-    const isLocalhost = ['localhost', '127.0.0.1'].includes(window.location.hostname);
-    return isLocalhost
-        ? window.location.origin
-        : 'https://f-field.app/';
+    return `${window.location.origin}${window.location.pathname}`;
 }
 
 function getTokenParamsFromUrl(url) {
@@ -210,6 +170,7 @@ function getTokenParamsFromUrl(url) {
     const queryParams = parsed.searchParams;
 
     return {
+        code: queryParams.get('code') || hashParams.get('code'),
         accessToken: hashParams.get('access_token') || queryParams.get('access_token'),
         refreshToken: hashParams.get('refresh_token') || queryParams.get('refresh_token')
     };
@@ -287,13 +248,22 @@ function installBrowserAuthUrlScrubListeners() {
 async function handleNativeOAuthCallback(url) {
     if (!supabase || !url?.startsWith(ANDROID_AUTH_REDIRECT_URL)) return false;
 
-    const { accessToken, refreshToken } = getTokenParamsFromUrl(url);
-    if (!accessToken || !refreshToken) return false;
+    const { code, accessToken, refreshToken } = getTokenParamsFromUrl(url);
+    let data;
+    let error;
 
-    const { data, error } = await supabase.auth.setSession({
-        access_token: accessToken,
-        refresh_token: refreshToken
-    });
+    if (code) {
+        ({ data, error } = await supabase.auth.exchangeCodeForSession(code));
+    } else if (accessToken && refreshToken) {
+        // 업데이트 전 시작된 로그인 콜백도 한동안 처리할 수 있도록 기존 형식을 허용합니다.
+        ({ data, error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken
+        }));
+    } else {
+        return false;
+    }
+
     if (error) throw error;
 
     await refreshEntitlement(data.session);

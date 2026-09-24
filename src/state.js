@@ -88,24 +88,22 @@ export const AppState = {
        ---------------------------------------------------------------------- */
     // 트랙 점 추가 최소 거리(m): 너무 촘촘한 기록을 방지
     trackInterval: parseInt(localStorage.getItem('setting_track_interval')) || 10,
-    // 트랙 전용 geolocation.watchPosition 구독 ID
-    trackWatchId: null,
+    // 현재 트랙 위치 공급자의 구독 ID(웹 watchPosition 또는 향후 네이티브 구독)
+    trackLocationSubscription: null,
+    // 현재 트랙이 Android 네이티브 위치 서비스로 기록되는지 여부
+    isNativeTrackRecording: false,
     // 기록 중 임시로 그리는 polyline
     trackPolyline: null,
     // 직전 기록 좌표(거리 계산 기준점)
     lastTrackLatLng: null,
+    // 직전 기록 원본 좌표(위치 공급자와 지도 처리 사이의 거리 판정 기준)
+    lastTrackPoint: null,
 
     /* ----------------------------------------------------------------------
-       9) 절전모드/화면 꺼짐 방지 상태
+       9) 화면 꺼짐 방지 상태
        ---------------------------------------------------------------------- */
     // Screen Wake Lock 객체
     wakeLock: null,
-    // 절전모드 슬라이더 드래그 관련 상태
-    sleepSliderThumb: null,
-    isDraggingSleepSlider: false,
-    sleepStartX: 0,
-    sleepCurrentX: 0,
-    sleepMaxDragX: 0,
     // 레이어 클릭 직후 map click 핸들러 오작동을 막는 이벤트 가드 플래그
     isLayerClicked: false,
     // 사진 포인트 생성 전 임시로 보관하는 전처리 이미지 배열

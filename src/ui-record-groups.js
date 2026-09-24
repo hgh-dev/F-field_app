@@ -6,15 +6,23 @@
    [참고]
    - 기록 그룹 기능이나 그룹 목록 표시가 이상할 때 확인합니다.
    ========================================================================== */
+import { L } from './vendor-globals.js';
 import { SVG_ICONS } from './config.js';
 import { AppState } from './state.js';
+import { updateLayerOrder } from './map.js';
 import { drawnItems } from './draw.js';
 import { saveToStorage } from './data.js';
 import { closeAllDropdowns } from './ui-dropdown.js';
 import { showAppConfirm, showTextPrompt } from './app-dialog.js';
+import { getRecordName } from './utils.js';
+import { scheduleViewportVectorOptimization } from './ui-viewport.js';
 
-export const RECORD_GROUP_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h13v10H7V4zm-3 3h2v8h11v2H4V7zm-3 3h2v8h11v2H1V10z"/></svg>';
+export const RECORD_GROUP_ICON = SVG_ICONS.folder;
 export const RECORD_GROUP_TOGGLE_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l10-7z"/></svg>';
+const MOVE_FRONT_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><line x1="5" y1="18" x2="19" y2="18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="9" y1="13" x2="9" y2="5.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><polyline points="6.8,7.7 9,5.5 11.2,7.7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><line x1="15" y1="13" x2="15" y2="5.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><polyline points="12.8,7.7 15,5.5 17.2,7.7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const MOVE_FORWARD_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><line x1="5" y1="18" x2="19" y2="18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="12" y1="13" x2="12" y2="5.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><polyline points="9.8,7.7 12,5.5 14.2,7.7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const MOVE_BACKWARD_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><line x1="5" y1="6" x2="19" y2="6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="12" y1="10.5" x2="12" y2="18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><polyline points="9.8,15.8 12,18 14.2,15.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const MOVE_BACK_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><line x1="5" y1="6" x2="19" y2="6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="9" y1="10.5" x2="9" y2="18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><polyline points="6.8,15.8 9,18 11.2,15.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><line x1="15" y1="10.5" x2="15" y2="18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><polyline points="12.8,15.8 15,18 17.2,15.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 let currentRecordGroupMenuId = null;
 let renderSurveyListCallback = () => {};
@@ -63,8 +71,8 @@ function getDefaultRecordGroupName() {
     return `그룹${index}`;
 }
 
-function getSelectedRecordLayers() {
-    return drawnItems.getLayers().filter(layer => layer.feature?.properties && !layer.feature.properties.isHidden);
+function getRecordLayers() {
+    return drawnItems.getLayers().filter(layer => layer.feature?.properties);
 }
 
 function getLayersForRecordGroup(groupId) {
@@ -94,6 +102,11 @@ function setRecordLayerInteractivity(layer, isInteractive) {
     if (layer._path) layer._path.style.pointerEvents = pointerEvents;
 }
 
+function setRecordPathDisplay(layer, isVisible) {
+    if (layer instanceof L.Marker) return;
+    if (layer._path) layer._path.style.display = isVisible ? '' : 'none';
+}
+
 function applyRecordLayerVisibility(layer, isHidden) {
     if (!layer?.feature?.properties) return;
     layer.feature.properties.isHidden = isHidden;
@@ -102,6 +115,7 @@ function applyRecordLayerVisibility(layer, isHidden) {
             layer.setOpacity(0);
         } else {
             layer.setStyle({ opacity: 0, fillOpacity: 0, stroke: false });
+            setRecordPathDisplay(layer, false);
         }
         layer.closePopup();
         setRecordLayerInteractivity(layer, false);
@@ -116,25 +130,194 @@ function applyRecordLayerVisibility(layer, isHidden) {
             fillOpacity: getRecordLayerFillOpacity(layer),
             stroke: layer.feature.properties.customDashArray !== 'none'
         });
+        setRecordPathDisplay(layer, true);
     }
     setRecordLayerInteractivity(layer, true);
 }
 
-export async function groupSelectedLayers() {
-    closeAllDropdowns();
-    const selectedLayers = getSelectedRecordLayers();
-    if (selectedLayers.length === 0) {
-        alert('선택된 기록이 없습니다.');
-        return;
+function getLayerDisplayOrder(layer, fallbackIndex = 0) {
+    const value = Number(layer.feature?.properties?.displayOrder);
+    return Number.isFinite(value) ? value : fallbackIndex;
+}
+
+function getDisplayOrderedRecordLayers() {
+    return drawnItems.getLayers().sort((a, b) => {
+        const indexA = drawnItems.getLayers().indexOf(a);
+        const indexB = drawnItems.getLayers().indexOf(b);
+        const orderA = getLayerDisplayOrder(a, indexA);
+        const orderB = getLayerDisplayOrder(b, indexB);
+        if (orderA !== orderB) return orderA - orderB;
+        return (a.feature?.properties?.id || 0) - (b.feature?.properties?.id || 0);
+    });
+}
+
+function reorderRecordLayers(nextLayers) {
+    nextLayers.forEach((layer, index) => {
+        if (!layer.feature) layer.feature = { type: 'Feature', properties: {} };
+        if (!layer.feature.properties) layer.feature.properties = {};
+        layer.feature.properties.displayOrder = index;
+    });
+    nextLayers.forEach(layer => drawnItems.removeLayer(layer));
+    nextLayers.forEach(layer => drawnItems.addLayer(layer));
+    updateLayerOrder();
+    saveToStorage();
+    renderSurveyListCallback();
+    scheduleViewportVectorOptimization();
+}
+
+function getDisplayOrderBlocks() {
+    const layers = getDisplayOrderedRecordLayers();
+    const groupBlocks = new Map();
+    const blocks = [];
+
+    layers.forEach(layer => {
+        const groupId = layer.feature?.properties?.groupId;
+        if (!groupId) {
+            blocks.push({ type: 'record', id: layer.feature?.properties?.id, layers: [layer] });
+            return;
+        }
+
+        let block = groupBlocks.get(groupId);
+        if (!block) {
+            block = { type: 'group', id: groupId, layers: [] };
+            groupBlocks.set(groupId, block);
+            blocks.push(block);
+        }
+        block.layers.push(layer);
+    });
+
+    return blocks;
+}
+
+function moveRecordGroupById(groupId, position) {
+    const blocks = getDisplayOrderBlocks();
+    if (blocks.length < 2) return;
+
+    const currentIndex = blocks.findIndex(block => block.type === 'group' && block.id === groupId);
+    if (currentIndex < 0) return;
+
+    let targetIndex = currentIndex;
+    if (position === 'front') {
+        targetIndex = blocks.length - 1;
+    } else if (position === 'forward') {
+        targetIndex = Math.min(currentIndex + 1, blocks.length - 1);
+    } else if (position === 'back') {
+        targetIndex = 0;
+    } else if (position === 'backward') {
+        targetIndex = Math.max(currentIndex - 1, 0);
     }
 
-    const groups = getRecordGroups();
-    const defaultName = getDefaultRecordGroupName();
-    const name = await showTextPrompt('그룹명을 입력하세요:', defaultName);
-    if (name === null) return;
-    const trimmedName = name.trim();
+    if (targetIndex === currentIndex) return;
+
+    const nextBlocks = [...blocks];
+    const [targetBlock] = nextBlocks.splice(currentIndex, 1);
+    nextBlocks.splice(targetIndex, 0, targetBlock);
+    reorderRecordLayers(nextBlocks.flatMap(block => block.layers));
+}
+
+function ensureCreateRecordGroupModal() {
+    let overlay = document.getElementById('record-group-create-modal-overlay');
+    if (overlay) return overlay;
+
+    overlay = document.createElement('div');
+    overlay.id = 'record-group-create-modal-overlay';
+    overlay.className = 'nav-modal-overlay center-modal-overlay';
+    overlay.style.display = 'none';
+    overlay.innerHTML = `
+        <div class="nav-modal-content center-modal-content tall" data-record-group-create-content>
+            <div class="nav-modal-header" style="font-size:18px; font-weight:bold; margin-bottom:10px; text-align:center;">그룹 만들기</div>
+            <label for="record-group-create-name" style="display:block; font-size:13px; font-weight:700; color:#374151; margin-bottom:6px;">그룹명</label>
+            <input id="record-group-create-name" type="text" autocomplete="off"
+                style="width:100%; box-sizing:border-box; padding:12px; border:1px solid #d1d5db; border-radius:10px; font-size:15px; margin-bottom:14px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px;">
+                <div style="font-size:13px; font-weight:700; color:#374151;">그룹으로 추가할 기록</div>
+                <div id="record-group-create-count" style="font-size:12px; color:#6b7280;">0개 선택</div>
+            </div>
+            <p id="record-group-create-empty" style="display:none; text-align:center; color:#666; font-size:13px; margin:16px 0 20px;">추가할 기록이 없습니다.</p>
+            <div id="record-group-create-list" style="display:flex; flex-direction:column; gap:8px; margin-bottom:16px; max-height:280px; overflow-y:auto;"></div>
+            <button id="record-group-create-submit" type="button"
+                style="width:100%; padding:14px; background:#3b82f6; border:none; border-radius:12px; font-size:15px; font-weight:bold; color:white; margin-bottom:8px;">그룹 만들기</button>
+            <button id="record-group-create-cancel" type="button"
+                style="width:100%; padding:14px; background:#f5f5f5; border:none; border-radius:12px; font-size:15px; font-weight:bold; color:#666;">취소</button>
+        </div>
+    `;
+
+    overlay.addEventListener('click', event => {
+        if (event.target === overlay) closeCreateRecordGroupModal();
+    });
+    overlay.querySelector('[data-record-group-create-content]')?.addEventListener('click', event => {
+        event.stopPropagation();
+    });
+    overlay.querySelector('#record-group-create-cancel')?.addEventListener('click', closeCreateRecordGroupModal);
+    overlay.querySelector('#record-group-create-submit')?.addEventListener('click', createRecordGroupFromModal);
+    overlay.querySelector('#record-group-create-list')?.addEventListener('change', updateCreateRecordGroupSelectionCount);
+
+    document.body.appendChild(overlay);
+    return overlay;
+}
+
+function createRecordGroupRow(layer) {
+    const props = layer.feature?.properties || {};
+    const id = props.id;
+    const currentGroup = props.groupId ? getRecordGroup(props.groupId) : null;
+    const row = document.createElement('label');
+    row.className = 'record-group-select-item';
+    row.style.cursor = 'pointer';
+    row.style.alignItems = 'center';
+    row.style.gap = '10px';
+    row.innerHTML = `
+        <input type="checkbox" class="record-group-create-checkbox" value="${escapeHtml(id)}"
+            style="width:18px; height:18px; flex:0 0 auto;">
+        <span class="record-group-select-name" style="min-width:0;">
+            <span style="display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(getRecordName(props, '기록'))}</span>
+            ${currentGroup ? `<span style="display:block; font-size:12px; color:#6b7280; margin-top:2px;">현재 그룹: ${escapeHtml(currentGroup.name || '그룹')}</span>` : ''}
+        </span>
+    `;
+    return row;
+}
+
+function renderCreateRecordGroupList() {
+    const overlay = ensureCreateRecordGroupModal();
+    const list = overlay.querySelector('#record-group-create-list');
+    const empty = overlay.querySelector('#record-group-create-empty');
+    const submit = overlay.querySelector('#record-group-create-submit');
+    if (!list || !empty || !submit) return;
+
+    const layers = getRecordLayers();
+    list.innerHTML = '';
+    layers.forEach(layer => list.appendChild(createRecordGroupRow(layer)));
+    empty.style.display = layers.length === 0 ? 'block' : 'none';
+    list.style.display = layers.length === 0 ? 'none' : 'flex';
+    submit.disabled = false;
+    submit.style.opacity = '1';
+    updateCreateRecordGroupSelectionCount();
+}
+
+function updateCreateRecordGroupSelectionCount() {
+    const overlay = document.getElementById('record-group-create-modal-overlay');
+    const count = overlay?.querySelectorAll('.record-group-create-checkbox:checked').length || 0;
+    const label = overlay?.querySelector('#record-group-create-count');
+    if (label) label.textContent = `${count}개 선택`;
+}
+
+export function closeCreateRecordGroupModal() {
+    const overlay = document.getElementById('record-group-create-modal-overlay');
+    if (!overlay) return;
+    overlay.classList.remove('visible');
+    setTimeout(() => {
+        if (!overlay.classList.contains('visible')) overlay.style.display = 'none';
+    }, 200);
+}
+
+function createRecordGroupFromModal() {
+    const overlay = document.getElementById('record-group-create-modal-overlay');
+    if (!overlay) return;
+
+    const input = overlay.querySelector('#record-group-create-name');
+    const trimmedName = input?.value?.trim() || '';
     if (!trimmedName) {
         alert('그룹명을 입력하세요.');
+        input?.focus();
         return;
     }
 
@@ -144,13 +327,33 @@ export async function groupSelectedLayers() {
         collapsed: false,
         createdAt: new Date().toISOString()
     };
-    groups.push(group);
-    selectedLayers.forEach(layer => {
-        layer.feature.properties.groupId = group.id;
+    getRecordGroups().push(group);
+
+    const selectedIds = new Set(Array.from(overlay.querySelectorAll('.record-group-create-checkbox:checked')).map(input => input.value));
+    getRecordLayers().forEach(layer => {
+        const id = String(layer.feature?.properties?.id ?? '');
+        if (selectedIds.has(id)) {
+            layer.feature.properties.groupId = group.id;
+        }
     });
 
+    closeCreateRecordGroupModal();
     saveToStorage();
     renderSurveyListCallback();
+}
+
+export function groupSelectedLayers() {
+    closeAllDropdowns();
+    const overlay = ensureCreateRecordGroupModal();
+    const input = overlay.querySelector('#record-group-create-name');
+    if (input) input.value = getDefaultRecordGroupName();
+    renderCreateRecordGroupList();
+    overlay.style.display = 'flex';
+    requestAnimationFrame(() => overlay.classList.add('visible'));
+    requestAnimationFrame(() => {
+        input?.focus();
+        input?.select();
+    });
 }
 
 export function toggleRecordGroup(groupId, event) {
@@ -183,12 +386,23 @@ function ensureRecordGroupMenu() {
             ${SVG_ICONS.edit} 수정
         </div>
         <div class="more-menu-item" onclick="handleRecordGroupMenuAction('ungroup')">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M4 5h9v7H4V5zm-2 3h1v6h9v1H2V8zm-2 3h1v6h9v1H0v-7z"/>
-                <path d="M15 9v-3l7 4.5-7 4.5v-3h-5V9h5z"/>
-            </svg>
+            ${SVG_ICONS.file_group_ungroup}
             그룹 해제
         </div>
+        <hr style="width:100%; margin:4px 0; border:none; border-top:1px solid #f0f0f0;">
+        <div class="more-menu-item" onclick="handleRecordGroupMenuAction('front')">
+            ${MOVE_FRONT_ICON} 맨앞으로
+        </div>
+        <div class="more-menu-item" onclick="handleRecordGroupMenuAction('forward')">
+            ${MOVE_FORWARD_ICON} 앞으로
+        </div>
+        <div class="more-menu-item" onclick="handleRecordGroupMenuAction('backward')">
+            ${MOVE_BACKWARD_ICON} 뒤로
+        </div>
+        <div class="more-menu-item" onclick="handleRecordGroupMenuAction('back')">
+            ${MOVE_BACK_ICON} 맨뒤로
+        </div>
+        <hr style="width:100%; margin:4px 0; border:none; border-top:1px solid #f0f0f0;">
         <div class="more-menu-item danger" onclick="handleRecordGroupMenuAction('delete')">
             ${SVG_ICONS.trash} 삭제
         </div>
@@ -217,7 +431,7 @@ export function openRecordGroupMenu(event, groupId) {
     const rect = event.currentTarget.getBoundingClientRect();
     menu.style.display = 'flex';
     menu.style.visibility = 'hidden';
-    const menuHeight = menu.offsetHeight || 140;
+    const menuHeight = menu.offsetHeight || 320;
     const top = Math.max(8, Math.min(rect.bottom + 5, window.innerHeight - menuHeight - 18));
     menu.style.top = `${top}px`;
     menu.style.right = `${window.innerWidth - rect.right}px`;
@@ -245,7 +459,19 @@ export function openAddRecordToGroupModal(id) {
 
     const groups = getRecordGroups();
     list.innerHTML = '';
-    empty.style.display = groups.length === 0 ? 'block' : 'none';
+    empty.style.display = 'none';
+    const createButton = document.createElement('button');
+    createButton.type = 'button';
+    createButton.className = 'record-group-select-item';
+    createButton.innerHTML = `
+        <span class="record-group-select-icon">
+            ${SVG_ICONS.file_group_add}
+        </span>
+        <span class="record-group-select-name">새 그룹 만들기</span>
+    `;
+    createButton.onclick = () => createGroupAndAddRecord(id);
+    list.appendChild(createButton);
+
     groups.forEach(group => {
         const button = document.createElement('button');
         button.type = 'button';
@@ -282,6 +508,29 @@ function addRecordToGroup(id, groupId) {
     renderSurveyListCallback();
 }
 
+async function createGroupAndAddRecord(id) {
+    const layer = drawnItems.getLayers().find(item => item.feature?.properties?.id === id);
+    if (!layer) return;
+    const name = await showTextPrompt('그룹명을 입력하세요:', getDefaultRecordGroupName());
+    if (name === null) return;
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+        alert('그룹명을 입력하세요.');
+        return;
+    }
+    const group = {
+        id: makeRecordGroupId(),
+        name: trimmedName,
+        collapsed: false,
+        createdAt: new Date().toISOString()
+    };
+    getRecordGroups().push(group);
+    layer.feature.properties.groupId = group.id;
+    closeAddRecordToGroupModal();
+    saveToStorage();
+    renderSurveyListCallback();
+}
+
 export function removeRecordFromGroup(id) {
     const layer = drawnItems.getLayers().find(item => item.feature?.properties?.id === id);
     if (!layer?.feature?.properties?.groupId) return;
@@ -310,6 +559,8 @@ export function handleRecordGroupMenuAction(action) {
         ungroupRecordGroup(groupId);
     } else if (action === 'delete') {
         deleteRecordGroup(groupId);
+    } else if (['front', 'forward', 'backward', 'back'].includes(action)) {
+        moveRecordGroupById(groupId, action);
     }
 }
 

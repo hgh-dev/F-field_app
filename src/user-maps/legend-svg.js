@@ -87,7 +87,7 @@ export function createPolygonLegendSvg(style) {
     const fillColor = normalizePreviewColor(style.fillColor || style.customFillColor || style.customColor || DEFAULT_VECTOR_STYLE.fillColor);
     const strokeColor = normalizePreviewColor(style.color || style.customStrokeColor || style.customColor || DEFAULT_VECTOR_STYLE.color);
     const fillPattern = normalizeFillPattern(style.customFillPattern);
-    const fillOpacity = normalizePreviewOpacity(style.fillOpacity ?? style.customFillOpacity ?? DEFAULT_VECTOR_STYLE.fillOpacity, 0);
+    const fillOpacity = normalizePreviewOpacity(style.customFillOpacity ?? style.fillOpacity ?? DEFAULT_VECTOR_STYLE.fillOpacity, 0);
     const lineStyle = style.customLineStyle || getLineStyleFromDashArray(style.customDashArray || style.dashArray);
     const isNoStroke = lineStyle === 'none' || style.customDashArray === 'none' || style.stroke === false;
     const strokeWidth = getPreviewStrokeWidth(style.weight || style.customWeight);

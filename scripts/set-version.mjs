@@ -88,6 +88,12 @@ replaceRequired(
 );
 
 replaceRequired(
+    'public/open-source-licenses.html',
+    /F-Field \d+\.\d+\.\d+ 빌드/,
+    `F-Field ${nextVersion} 빌드`
+);
+
+replaceRequired(
     'android/app/build.gradle',
     /versionCode \d+/,
     `versionCode ${nextVersionCode}`

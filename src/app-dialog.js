@@ -7,6 +7,38 @@
    - 화면에 뜨는 공통 팝업의 동작을 바꾸려면 이 파일을 확인합니다.
    ========================================================================== */
 let activeDialog = null;
+let dialogViewportListenersInstalled = false;
+let dialogViewportAnimationFrame = 0;
+
+function syncDialogViewport() {
+    const overlay = document.getElementById('app-dialog-overlay');
+    if (!overlay) return;
+
+    const viewport = window.visualViewport;
+    const viewportTop = viewport?.offsetTop ?? 0;
+    const viewportLeft = viewport?.offsetLeft ?? 0;
+    const viewportWidth = viewport?.width ?? window.innerWidth;
+    const viewportHeight = viewport?.height ?? window.innerHeight;
+
+    overlay.style.setProperty('--app-dialog-viewport-top', `${viewportTop}px`);
+    overlay.style.setProperty('--app-dialog-viewport-left', `${viewportLeft}px`);
+    overlay.style.setProperty('--app-dialog-viewport-width', `${viewportWidth}px`);
+    overlay.style.setProperty('--app-dialog-viewport-height', `${viewportHeight}px`);
+}
+
+function scheduleDialogViewportSync() {
+    cancelAnimationFrame(dialogViewportAnimationFrame);
+    dialogViewportAnimationFrame = requestAnimationFrame(syncDialogViewport);
+}
+
+function installDialogViewportListeners() {
+    if (dialogViewportListenersInstalled) return;
+    dialogViewportListenersInstalled = true;
+
+    window.addEventListener('resize', scheduleDialogViewportSync, { passive: true });
+    window.visualViewport?.addEventListener('resize', scheduleDialogViewportSync, { passive: true });
+    window.visualViewport?.addEventListener('scroll', scheduleDialogViewportSync, { passive: true });
+}
 
 function ensureDialog() {
     let overlay = document.getElementById('app-dialog-overlay');
@@ -24,11 +56,9 @@ function ensureDialog() {
         </div>
     `;
     document.body.appendChild(overlay);
+    installDialogViewportListeners();
+    syncDialogViewport();
     return overlay;
-}
-
-function normalizeMessage(message) {
-    return String(message ?? '').replace(/\n/g, '<br>');
 }
 
 function closeDialog(result) {
@@ -63,7 +93,10 @@ function openDialog({
     if (activeDialog) closeDialog(type === 'confirm' ? false : null);
 
     titleEl.textContent = title;
-    messageEl.innerHTML = normalizeMessage(message);
+    // 메시지에는 파일명, 프로젝트명, 네트워크 오류처럼 외부에서 온 값이 포함될 수 있습니다.
+    // HTML로 해석하지 않고 텍스트로 표시해 저장형/반사형 XSS를 차단합니다.
+    messageEl.textContent = String(message ?? '');
+    messageEl.style.whiteSpace = 'pre-line';
     inputEl.style.display = type === 'prompt' ? 'block' : 'none';
     inputEl.type = inputType || 'text';
     inputEl.inputMode = inputMode || '';
@@ -97,12 +130,16 @@ function openDialog({
 
     return new Promise((resolve) => {
         activeDialog = { overlay, resolve, previousFocus: document.activeElement };
+        syncDialogViewport();
         overlay.style.display = 'flex';
         requestAnimationFrame(() => {
             overlay.classList.add('visible');
             if (type === 'prompt') {
                 inputEl.focus();
                 inputEl.select();
+                // Android/iOS 키보드 애니메이션 도중에도 남은 화면 크기를 다시 반영합니다.
+                setTimeout(scheduleDialogViewportSync, 80);
+                setTimeout(scheduleDialogViewportSync, 280);
             } else {
                 okBtn.focus();
             }

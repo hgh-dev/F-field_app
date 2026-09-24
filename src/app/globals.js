@@ -8,11 +8,12 @@
    ========================================================================== */
 import { closeSettingsChoiceModal, openSettingsChoiceModal, openSettingsDocument, setCoordMode, setTrackInterval } from './settings-choice.js';
 import { checkAppVersion, forceAppUpdate } from './version-update.js';
+import { ensureFeatureAccess } from '../auth-access.js';
 import {
-    closeAdminMenuModal,
-    ensureFeatureAccess
-} from '../features/auth-admin-ui.js';
-import { processPendingPhotoFiles as processPendingPhotoFilesFeature, startPhotoPoint as startPhotoPointFeature } from '../features/photo-recording.js';
+    processNativePendingPhotoItems as processNativePendingPhotoItemsFeature,
+    processPendingPhotoFiles as processPendingPhotoFilesFeature,
+    startPhotoPoint as startPhotoPointFeature
+} from '../features/photo-recording.js';
 import {
     addTrackPhotoPoint as addTrackPhotoPointFeature,
     cancelTrackRecording,
@@ -69,17 +70,25 @@ import {
 } from '../map.js';
 import {
     addUserMapFromUrl,
+    createUserMapGroup,
     deleteUserMap,
     editUserMap,
     fitUserMapToBounds,
     getUserMapSnapLayers,
     hasActiveUserBaseMap,
     moveUserMapLayer,
+    openAddUserMapToGroupModal,
+    openUserMapGroupMenu,
+    openUserMapSectionMenu,
     openUserMapCategoryStyleSettings,
     openUserMapStyleSettings,
+    removeUserMapFromGroup,
     removeActiveUserBaseMap,
     reorderUserMapLayers,
     selectUserMap,
+    handleUserMapGroupMenuAction,
+    toggleUserMapGroup,
+    toggleUserMapGroupVisibility,
     toggleUserMapCategoryRows,
     toggleUserMapCategoryValue,
     toggleUserMapLayer
@@ -103,11 +112,13 @@ export function registerGlobals() {
     window.addTrackPhotoPoint = (event) => addTrackPhotoPointFeature(event, { ensureFeatureAccess });
     window.startPhotoPoint = () => startPhotoPointFeature({ ensureFeatureAccess });
     window.processPendingPhotoFiles = (input) => processPendingPhotoFilesFeature(input, { ensureFeatureAccess });
+    window.processNativePendingPhotoItems = (items) => processNativePendingPhotoItemsFeature(items, { ensureFeatureAccess });
     window.saveCurrentPoint = saveCurrentPoint;
     window.saveCurrentBoundary = saveCurrentBoundary;
     window.openSearchModal = openSearchModal;
     window.closeSearchModal = closeSearchModal;
-    window.closeAdminMenuModal = closeAdminMenuModal;
+    window.closeAdminMenuModal = (...args) => import('../features/auth-admin-ui.js')
+        .then(module => module.closeAdminMenuModal(...args));
     window.executeMapSearch = executeMapSearch;
     window.triggerFileInput = triggerFileInput;
     window.closeImportWarningModal = closeImportWarningModal;
@@ -144,6 +155,14 @@ export function registerGlobals() {
     window.changeBaseMap = changeBaseMap;
     window.bringRecordLayersToFront = bringRecordLayersToFront;
     window.addUserMapFromUrl = addUserMapFromUrl;
+    window.createUserMapGroup = createUserMapGroup;
+    window.openUserMapSectionMenu = openUserMapSectionMenu;
+    window.openUserMapGroupMenu = openUserMapGroupMenu;
+    window.handleUserMapGroupMenuAction = handleUserMapGroupMenuAction;
+    window.openAddUserMapToGroupModal = openAddUserMapToGroupModal;
+    window.removeUserMapFromGroup = removeUserMapFromGroup;
+    window.toggleUserMapGroup = toggleUserMapGroup;
+    window.toggleUserMapGroupVisibility = toggleUserMapGroupVisibility;
     window.selectUserMap = selectUserMap;
     window.toggleUserMapLayer = toggleUserMapLayer;
     window.openUserMapStyleSettings = openUserMapStyleSettings;

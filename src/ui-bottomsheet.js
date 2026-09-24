@@ -6,17 +6,31 @@
    [참고]
    - 기록 상세 화면이나 바텀시트 표시 문제가 생기면 확인합니다.
    ========================================================================== */
+import { L, turf } from './vendor-globals.js';
 import { VWORLD_API_KEY, SVG_ICONS } from './config.js';
 import { AppState } from './state.js';
 import { map, updateLayerOrder } from './map.js';
-import { drawnItems, enableSingleLayerEdit } from './draw.js';
+import { drawnItems, enableSingleLayerEdit, getUniqueRecordName } from './draw.js';
 import { getTimestampString, getRandomColor, createColoredMarkerIcon, copyText, formatCoordinate, getRecordName, setRecordName, calculateProjectedAreaM2 } from './utils.js';
 import { saveToStorage } from './data.js';
-import { updateLayerInfo, deleteLayerById, scheduleViewportVectorOptimization } from './ui-core.js';
+import { scheduleViewportVectorOptimization } from './ui-viewport.js';
 import { renderSurveyList } from './ui-project.js';
 import { showAppConfirm } from './app-dialog.js';
+import { escapeHtml, escapeJsString } from './user-maps/utils.js';
+import { validateRuntimeDependencies } from './runtime-dependencies.js';
 
 export let currentBottomSheetLayerId = null;
+let suppressBottomSheetMapMoveCloseUntil = 0;
+let updateLayerInfo;
+let deleteLayerById;
+
+export function configureBottomSheetRuntime(dependencies) {
+    const validatedDependencies = validateRuntimeDependencies('bottom-sheet', dependencies, {
+        updateLayerInfo: 'function',
+        deleteLayerById: 'function'
+    });
+    ({ updateLayerInfo, deleteLayerById } = validatedDependencies);
+}
 
 /**
  * [함수] setCurrentBottomSheetLayerId
@@ -25,6 +39,20 @@ export let currentBottomSheetLayerId = null;
  *        후속 UI 로직이 같은 기준 상태를 참조하도록 만든다.
  */
 export function setCurrentBottomSheetLayerId(id) { currentBottomSheetLayerId = id; }
+
+export function suppressBottomSheetCloseOnMapMove(durationMs = 900) {
+    suppressBottomSheetMapMoveCloseUntil = Math.max(
+        suppressBottomSheetMapMoveCloseUntil,
+        Date.now() + durationMs
+    );
+}
+
+export function closeBottomSheetOnExternalMapMove() {
+    const bottomSheet = document.getElementById('bottom-sheet');
+    if (!bottomSheet?.classList.contains('open')) return;
+    if (Date.now() < suppressBottomSheetMapMoveCloseUntil) return;
+    closeBottomSheet({ recenter: false });
+}
 
 export function getBottomSheetVisibleHeight() {
     const bottomSheet = document.getElementById('bottom-sheet');
@@ -66,6 +94,7 @@ export function getBottomSheetAwareCenter(latlng, zoom = map.getZoom()) {
 
 export function flyToWithBottomSheet(latlng, zoom = map.getZoom(), options = {}) {
     const targetZoom = Number.isFinite(Number(zoom)) ? Number(zoom) : map.getZoom();
+    suppressBottomSheetCloseOnMapMove();
     map.flyTo(getBottomSheetAwareCenter(latlng, targetZoom), targetZoom, options);
 }
 
@@ -338,14 +367,24 @@ export function moveLayerById(layerId, position) {
     const layers = getDisplayOrderedLayers();
     if (layers.length < 2) return;
 
-    const currentIndex = layers.findIndex(layer => layer.feature?.properties?.id === layerId);
+    const currentLayer = layers.find(layer => layer.feature?.properties?.id === layerId);
+    if (!currentLayer) return;
+
+    const groupId = currentLayer.feature?.properties?.groupId;
+    const movableLayers = groupId
+        ? layers.filter(layer => layer.feature?.properties?.groupId === groupId)
+        : layers;
+
+    if (movableLayers.length < 2) return;
+
+    const currentIndex = movableLayers.findIndex(layer => layer.feature?.properties?.id === layerId);
     if (currentIndex < 0) return;
 
     let targetIndex = currentIndex;
     if (position === 'front') {
-        targetIndex = layers.length - 1;
+        targetIndex = movableLayers.length - 1;
     } else if (position === 'forward') {
-        targetIndex = Math.min(currentIndex + 1, layers.length - 1);
+        targetIndex = Math.min(currentIndex + 1, movableLayers.length - 1);
     } else if (position === 'back') {
         targetIndex = 0;
     } else if (position === 'backward') {
@@ -354,9 +393,21 @@ export function moveLayerById(layerId, position) {
 
     if (targetIndex === currentIndex) return;
 
-    const nextLayers = [...layers];
-    const [targetLayer] = nextLayers.splice(currentIndex, 1);
-    nextLayers.splice(targetIndex, 0, targetLayer);
+    const nextMovableLayers = [...movableLayers];
+    const [targetLayer] = nextMovableLayers.splice(currentIndex, 1);
+    nextMovableLayers.splice(targetIndex, 0, targetLayer);
+
+    if (!groupId) {
+        reorderDrawnLayers(nextMovableLayers);
+        return;
+    }
+
+    let groupLayerIndex = 0;
+    const nextLayers = layers.map(layer => (
+        layer.feature?.properties?.groupId === groupId
+            ? nextMovableLayers[groupLayerIndex++]
+            : layer
+    ));
     reorderDrawnLayers(nextLayers);
 }
 
@@ -663,7 +714,7 @@ export async function handleBottomSheetHoleFill() {
                 customLineStyle: parentProps.customLineStyle || null,
                 customDashArray: customDashArray,
                 ...(customFill === undefined ? {} : { customFill: customFill })
-            }, fillMemo)
+            }, getUniqueRecordName(fillMemo))
         };
 
         const fillOpacity = customFill === false
@@ -743,16 +794,18 @@ export function handleBottomSheetSendBackward() {
  * [원리] 지번과 도로명 주소 블록을 조건부로 조합해 반환한다.
  */
 function createAddressInfoSection(parcelAddr, roadAddr) {
+    const safeParcelAddr = escapeHtml(parcelAddr);
+    const safeRoadAddr = escapeHtml(roadAddr);
     return `<div style="display:flex; justify-content:space-between; align-items:center;">
                 <div style="display:flex; align-items:center; gap:5px;">
-                    <b onclick="copyText(this.innerText, false, '지번 주소')" style="color:#3B82F6; font-size: 16px; line-height: 1.2; word-break: keep-all; cursor: pointer;">${parcelAddr}</b>
+                    <b onclick="copyText(this.innerText, false, '지번 주소')" style="color:#3B82F6; font-size: 16px; line-height: 1.2; word-break: keep-all; cursor: pointer;">${safeParcelAddr}</b>
                 </div>
             </div>
             <hr style="margin: 12px 0; border: none; border-top: 1px solid #f0f0f0;">
             ${roadAddr ? `
             <div style="display:flex; align-items:baseline; font-size: 14px; color: #555; margin-bottom: 8px;">
                 <span class="badge-road" style="flex-shrink:0; width:33px; display:inline-block; text-align:center;">도로명</span>
-                <span onclick="copyText(this.innerText, false, '도로명 주소')" style="margin-left: 5px; line-height: 1.5; word-break: keep-all; cursor: pointer;">${roadAddr}</span>
+                <span onclick="copyText(this.innerText, false, '도로명 주소')" style="margin-left: 5px; line-height: 1.5; word-break: keep-all; cursor: pointer;">${safeRoadAddr}</span>
             </div>` : ''}`;
 }
 
@@ -778,7 +831,7 @@ function createZipcodeInfoSection(zipcode) {
 
     return `<div style="display:flex; align-items:baseline; font-size: 14px; color: #555; margin-bottom: 30px;">
                 <span style="background:#f3f4f6; color:#4b5563; padding:2px 4px; border-radius:3px; font-size:10px; width:33px; display:inline-block; text-align:center; flex-shrink:0;">우편</span>
-                <span onclick="copyText(this.innerText, false, '우편번호')" style="margin-left: 5px; line-height: 1.5; cursor: pointer;">${zipcode}</span>
+                <span onclick="copyText(this.innerText, false, '우편번호')" style="margin-left: 5px; line-height: 1.5; cursor: pointer;">${escapeHtml(zipcode)}</span>
             </div>`;
 }
 
@@ -788,20 +841,21 @@ function createZipcodeInfoSection(zipcode) {
  * [원리] 위치 저장/영역 저장/공유/검색/길찾기 버튼을 기존 순서와 인라인 이벤트로 조합해 반환한다.
  */
 function createPrimaryActionButtonsSection(parcelAddr, lat, lng) {
+    const safeAddressArg = escapeHtml(escapeJsString(parcelAddr));
     return `<div style="display:flex; gap:5px; justify-content:center;">
-                <button class="popup-btn" style="flex:1; background:#fff; color:#555; border:1px solid #ddd; display:flex; align-items:center; justify-content:center; gap:4px;" onclick="saveCurrentPoint(${lat}, ${lng}, '${parcelAddr}')">
+                <button class="popup-btn" style="flex:1; background:#fff; color:#555; border:1px solid #ddd; display:flex; align-items:center; justify-content:center; gap:4px;" onclick="saveCurrentPoint(${lat}, ${lng}, '${safeAddressArg}')">
                     <div style="width:16px; height:16px;">${SVG_ICONS.marker}</div>
                 </button>
-                <button class="popup-btn" style="flex:1; background:#fff; color:#555; border:1px solid #ddd; display:flex; align-items:center; justify-content:center; gap:4px;" onclick="saveCurrentBoundary('${parcelAddr}')">
+                <button class="popup-btn" style="flex:1; background:#fff; color:#555; border:1px solid #ddd; display:flex; align-items:center; justify-content:center; gap:4px;" onclick="saveCurrentBoundary('${safeAddressArg}')">
                     <div style="width:16px; height:16px;">${SVG_ICONS.polygon}</div>
                 </button>
-                <button class="popup-btn" style="flex:1; background:#fff; color:#555; border:1px solid #ddd; display:flex; align-items:center; justify-content:center; gap:4px;" onclick="shareLocationText('${parcelAddr}', '${lat}', '${lng}')">
+                <button class="popup-btn" style="flex:1; background:#fff; color:#555; border:1px solid #ddd; display:flex; align-items:center; justify-content:center; gap:4px;" onclick="shareLocationText('${safeAddressArg}', '${lat}', '${lng}')">
                     <svg viewBox="0 0 24 24" style="width:16px; height:16px; fill:currentColor;"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.66 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/></svg>
                 </button>
-                <button class="popup-btn" style="flex:1; background:#fff; color:#555; border:1px solid #ddd; display:flex; align-items:center; justify-content:center; gap:4px;" onclick="openSearchModal('${parcelAddr}')">
+                <button class="popup-btn" style="flex:1; background:#fff; color:#555; border:1px solid #ddd; display:flex; align-items:center; justify-content:center; gap:4px;" onclick="openSearchModal('${safeAddressArg}')">
                     <div style="width:16px; height:16px;">${SVG_ICONS.search}</div>
                 </button>
-                <button class="popup-btn" style="flex:1; background:#fff; color:#555; border:1px solid #ddd; display:flex; align-items:center; justify-content:center; gap:4px;" onclick="openNavModal('${parcelAddr}', ${lat}, ${lng})">
+                <button class="popup-btn" style="flex:1; background:#fff; color:#555; border:1px solid #ddd; display:flex; align-items:center; justify-content:center; gap:4px;" onclick="openNavModal('${safeAddressArg}', ${lat}, ${lng})">
                     <div style="width:16px; height:16px;">${SVG_ICONS.car}</div>
                 </button>
             </div>`;
@@ -813,10 +867,11 @@ function createPrimaryActionButtonsSection(parcelAddr, lat, lng) {
  * [원리] 토지e음 조회 버튼과 K-GeoP 조회 버튼을 기존 인라인 이벤트 그대로 묶어 반환한다.
  */
 function createSecondaryActionButtonsSection(parcelAddr, lat, lng) {
+    const safeAddressArg = escapeHtml(escapeJsString(parcelAddr));
     return `<div style="display:flex; gap:5px; justify-content:center;">
                 <button id="btn-landeum-popup" class="popup-btn disabled" style="flex:1;" onclick="fetchAndHighlightBoundary(${lng}, ${lat})">토지e음 조회</button>
                 <button class="popup-btn" style="flex:1; background:#007bff; color:#fff; border:1px solid #007bff;" onclick="
-                    copyText('${parcelAddr}', true);
+                    copyText('${safeAddressArg}', true);
                     setTimeout(() => {
                         alert('주소가 복사되었습니다.\\nK-GeoP 검색창에 붙여넣기 하세요.');
                         window.open('https://kgeop.go.kr/info/infoMap.do?initMode=L', '_blank');

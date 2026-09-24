@@ -9,6 +9,8 @@ public class MainActivity extends BridgeActivity {
     protected void onCreate(Bundle savedInstanceState) {
         EdgeToEdge.enable(this);
         registerPlugin(NativeFileSaverPlugin.class);
+        registerPlugin(NativePhotoPickerPlugin.class);
+        registerPlugin(NativeTrackPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

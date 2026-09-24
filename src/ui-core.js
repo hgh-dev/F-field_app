@@ -6,13 +6,10 @@
    [참고]
    - 새 UI 로직을 길게 추가하기보다 가능하면 전용 ui-*.js 파일에 두고 여기서는 연결합니다.
    ========================================================================== */
-import { SVG_ICONS } from './config.js';
-import { AppState } from './state.js';
 import { map } from './map.js';
-import { drawnItems, currentEditLayerId } from './draw.js';
-import { copyText, formatCoordinate, getRecordName, setRecordName, ensureRecordNameAlias, calculateProjectedLengthMeters, calculateProjectedAreaM2 } from './utils.js';
-import { saveToStorage, exportSingleLayer } from './data.js';
-import { showAppPrompt } from './app-dialog.js';
+import { drawnItems } from './draw.js';
+import { copyText } from './utils.js';
+import { exportSingleLayer } from './data.js';
 import {
     closeSidebar,
     isDockedSidebarViewport,
@@ -104,6 +101,7 @@ import {
     openSortModal,
     closeSortModal,
     applySortSetting,
+    syncRecordSortOrderLabels,
     openProjectSortModal,
     closeProjectSortModal,
     applyProjectSortSetting,
@@ -116,6 +114,7 @@ import {
     isLayerInRecordGroup,
     openAddRecordToGroupModal,
     closeAddRecordToGroupModal,
+    closeCreateRecordGroupModal,
     removeRecordFromGroup
 } from './ui-project.js';
 import {
@@ -128,6 +127,8 @@ import {
     openPhotoModal,
     nextPhoto,
     prevPhoto,
+    openPhotoDownloadMenu,
+    closePhotoDownloadMenu,
     downloadCurrentPhoto,
     closePhotoModal
 } from './ui-photo.js';
@@ -144,6 +145,21 @@ import {
     toggleLayerVisibility,
     updateLayerInfo
 } from './ui-layer-detail.js';
+import {
+    closeLocationActionModal,
+    closeNavModal,
+    closeSettingsModal,
+    executeNavigation,
+    openLocationActionModal,
+    openNavModal,
+    openSettingsModal
+} from './ui-app-modals.js';
+import {
+    closeMemoModal,
+    editLayerDescription,
+    editLayerMemo,
+    saveMemoAction
+} from './ui-memo.js';
 export {
     applyLayerVisibilityState,
     refreshRecordLayerDisplayMode,
@@ -195,323 +211,10 @@ export {
     updateTileOpacityLabel
 } from './ui-style-modal.js';
 
-export let currentMemoLayerId = null;
-export let navTarget = { name: '', lat: 0, lng: 0 };
+export * from './ui-app-modals.js';
+export * from './ui-memo.js';
+export * from './ui-sleep.js';
 let isUiRuntimeInitialized = false;
-
-/* --------------------------------------------------------------------------
-   2. 접근 제어 UI (Access Control)
-   -------------------------------------------------------------------------- */
-/* --------------------------------------------------------------------------
-   3. 모달 및 팝업 제어 (Modal & Popup)
-   -------------------------------------------------------------------------- */
-/* 3-1. 메모/위치/설정/내비게이션 모달 */
-
-/**
- * [함수] editLayerDescription
- * [역할] 기존 데이터 편집 흐름을 시작하거나 변경값을 반영한다.
- * [원리] 대상 엔티티를 조회해 기존 값을 입력 UI에 채운 뒤,
- *        사용자 확정값을 속성에 반영하고 저장/리렌더 흐름으로 후처리한다.
- */
-export function editLayerDescription(id) {
-    const layer = drawnItems.getLayers().find(l => l.feature.properties.id === id);
-    if (!layer) return;
-    currentMemoLayerId = id;
-    const existing = layer.feature.properties.description || "";
-    document.getElementById('memo-input-textarea').value = existing;
-    const overlay = document.getElementById('memo-modal-overlay');
-    const container = document.getElementById('memo-modal-container');
-    overlay.style.display = 'flex';
-    container.style.display = 'flex';
-    setTimeout(() => {
-        overlay.classList.add('visible');
-        container.classList.add('visible');
-        document.getElementById('memo-input-textarea').focus();
-    }, 10);
-}
-
-/**
- * [함수] closeMemoModal
- * [역할] 관련 UI를 닫고 임시 상태를 정리한다.
- * [원리] 대상 UI에서 visible 클래스를 먼저 제거해 닫힘 전환을 시작하고,
- *        지연 후 display를 none으로 바꿔 클릭 영역과 임시 상태를 정리한다.
- */
-export function closeMemoModal() {
-    const overlay = document.getElementById('memo-modal-overlay');
-    const container = document.getElementById('memo-modal-container');
-    overlay.classList.remove('visible');
-    container.classList.remove('visible');
-    setTimeout(() => {
-        overlay.style.display = 'none';
-        container.style.display = 'none';
-    }, 200);
-    currentMemoLayerId = null;
-}
-
-/**
- * [함수] saveMemoAction
- * [역할] 변경된 내용을 저장소 또는 상태에 기록한다.
- * [원리] 현재 편집 대상과 입력값 유효성을 확인한 뒤,
- *        속성 반영 후 저장소 업데이트와 관련 UI 리렌더를 함께 실행한다.
- */
-export function saveMemoAction() {
-    if (currentMemoLayerId === null) return;
-    const layer = drawnItems.getLayers().find(l => l.feature.properties.id === currentMemoLayerId);
-    if (!layer) { closeMemoModal(); return; }
-    const input = document.getElementById('memo-input-textarea').value;
-    layer.feature.properties.description = input;
-    updateLayerInfo(layer);
-    saveToStorage();
-    renderSurveyList();
-    layer.fire('click');
-    closeMemoModal();
-}
-
-/**
- * [함수] editLayerMemo
- * [역할] 기존 데이터 편집 흐름을 시작하거나 변경값을 반영한다.
- * [원리] 대상 엔티티를 조회해 기존 값을 입력 UI에 채운 뒤,
- *        사용자 확정값을 속성에 반영하고 저장/리렌더 흐름으로 후처리한다.
- */
-export async function editLayerMemo(id) {
-    const layer = drawnItems.getLayers().find(l => l.feature.properties.id === id);
-    if (!layer) return;
-    const existing = getRecordName(layer.feature.properties, "");
-    const input = await showAppPrompt("기록명을 입력하세요:", existing);
-    if (input === null || input.trim() === "") return;
-    setRecordName(layer.feature.properties, input.trim());
-    updateLayerInfo(layer);
-    saveToStorage();
-    renderSurveyList();
-    layer.fire('click');
-}
-
-
-/**
- * [함수] openLocationActionModal
- * [역할] 관련 UI를 열고 상호작용 가능한 상태로 만든다.
- * [원리] 대상 DOM/레이어 존재 여부를 확인한 뒤 display 값을 열고,
- *        requestAnimationFrame 또는 setTimeout으로 visible 클래스를 붙여 전환 애니메이션을 시작한다.
- */
-export function openLocationActionModal() {
-    if (AppState.currentDrawer || currentEditLayerId !== null) return;
-    const overlay = document.getElementById('location-action-modal-overlay');
-    overlay.style.display = 'flex';
-    setTimeout(() => { overlay.classList.add('visible'); }, 10);
-}
-
-/**
- * [함수] closeLocationActionModal
- * [역할] 관련 UI를 닫고 임시 상태를 정리한다.
- * [원리] 대상 UI에서 visible 클래스를 먼저 제거해 닫힘 전환을 시작하고,
- *        지연 후 display를 none으로 바꿔 클릭 영역과 임시 상태를 정리한다.
- */
-export function closeLocationActionModal() {
-    const overlay = document.getElementById('location-action-modal-overlay');
-    overlay.classList.remove('visible');
-    setTimeout(() => { overlay.style.display = 'none'; }, 300);
-}
-
-/**
- * [함수] openSettingsModal
- * [역할] 관련 UI를 열고 상호작용 가능한 상태로 만든다.
- * [원리] 대상 DOM/레이어 존재 여부를 확인한 뒤 display 값을 열고,
- *        requestAnimationFrame 또는 setTimeout으로 visible 클래스를 붙여 전환 애니메이션을 시작한다.
- */
-export function openSettingsModal() {
-    closeSidebar();
-    window.checkAppVersion?.();
-    document.getElementsByName('coord-mode-select').forEach(r => { if (parseInt(r.value) === AppState.coordMode) r.checked = true; });
-    document.getElementsByName('track-interval-select').forEach(r => { if (parseInt(r.value) === AppState.trackInterval) r.checked = true; });
-    document.getElementsByName('snap-enabled-select').forEach(r => { if ((r.value === 'true') === AppState.isSnapEnabled) r.checked = true; });
-    document.getElementsByName('map-settings-save-select').forEach(r => { if ((r.value === 'true') === AppState.isMapSettingsSaveEnabled) r.checked = true; });
-    const overlay = document.getElementById('settings-modal-overlay');
-    overlay.style.display = 'flex';
-    setTimeout(() => { overlay.classList.add('visible'); }, 10);
-}
-
-/**
- * [함수] closeSettingsModal
- * [역할] 관련 UI를 닫고 임시 상태를 정리한다.
- * [원리] 대상 UI에서 visible 클래스를 먼저 제거해 닫힘 전환을 시작하고,
- *        지연 후 display를 none으로 바꿔 클릭 영역과 임시 상태를 정리한다.
- */
-export function closeSettingsModal() {
-    const overlay = document.getElementById('settings-modal-overlay');
-    overlay.classList.remove('visible');
-    setTimeout(() => { overlay.style.display = 'none'; }, 300);
-}
-
-/**
- * [함수] openNavModal
- * [역할] 관련 UI를 열고 상호작용 가능한 상태로 만든다.
- * [원리] 대상 DOM/레이어 존재 여부를 확인한 뒤 display 값을 열고,
- *        requestAnimationFrame 또는 setTimeout으로 visible 클래스를 붙여 전환 애니메이션을 시작한다.
- */
-export function openNavModal(name, lat, lng) {
-    navTarget = { name: name || "목적지", lat: lat, lng: lng };
-    const overlay = document.getElementById('nav-modal-overlay');
-    overlay.style.display = 'flex';
-    setTimeout(() => { overlay.classList.add('visible'); }, 10);
-}
-
-/**
- * [함수] closeNavModal
- * [역할] 관련 UI를 닫고 임시 상태를 정리한다.
- * [원리] 대상 UI에서 visible 클래스를 먼저 제거해 닫힘 전환을 시작하고,
- *        지연 후 display를 none으로 바꿔 클릭 영역과 임시 상태를 정리한다.
- */
-export function closeNavModal() {
-    const overlay = document.getElementById('nav-modal-overlay');
-    overlay.classList.remove('visible');
-    setTimeout(() => { overlay.style.display = 'none'; }, 300);
-}
-
-/**
- * [함수] executeNavigation
- * [역할] 사용자 선택에 따라 실제 동작(이동/저장/연결)을 수행한다.
- * [원리] 사용자 선택값을 실제 실행 경로(URL/이동/저장 작업)로 변환하고,
- *        완료 후 모달 닫기·화면 갱신 등 후속 UI 정리까지 한 흐름으로 처리한다.
- */
-export function executeNavigation(type) {
-    const { name, lat, lng } = navTarget;
-    let url = "";
-    if (type === 'tmap') url = `tmap://route?goalname=${encodeURIComponent(name)}&goalx=${lng}&goaly=${lat}`;
-    else if (type === 'naver') url = `nmap://navigation?dlat=${lat}&dlng=${lng}&dname=${encodeURIComponent(name)}&appname=F-Field`;
-    else if (type === 'kakao') url = `kakaomap://route?ep=${lat},${lng}&by=CAR`;
-    window.location.href = url;
-    setTimeout(closeNavModal, 500);
-}
-
-/* --------------------------------------------------------------------------
-   4. 피드백 및 시각 요소 (Feedback & Visuals)
-   -------------------------------------------------------------------------- */
-/* 4-1. 버튼 스타일 제어 */
-
-/* --------------------------------------------------------------------------
-   5. 기타 UI 요소 (Utility UI)
-   -------------------------------------------------------------------------- */
-/* 5-1. 전체화면, 좌표 표시 및 절전 모드 */
-
-/**
- * [함수] updateCoordDisplay
- * [역할] 상태값 또는 표시값을 최신 값으로 갱신한다.
- * [원리] 현재 상태값을 화면 표현값으로 재계산한 뒤,
- *        DOM 텍스트·버튼 상태·레이어 스타일에 즉시 반영해 표시를 최신으로 유지한다.
- */
-export function updateCoordDisplay() {
-    let lat = AppState.lastGpsLat;
-    let lng = AppState.lastGpsLng;
-    const text = formatCoordinate(lat, lng, AppState.coordMode);
-    const el = document.getElementById('coord-display');
-    if (el) el.innerText = text;
-}
-
-/**
- * [함수] initSleepSlider
- * [역할] 초기 이벤트와 기본 상태를 설정한다.
- * [원리] 초기 1회 실행 구간에서 기본값과 이벤트 연결을 세팅하고,
- *        중복 등록/중복 실행을 방지하는 가드 조건으로 안정성을 확보한다.
- */
-export function initSleepSlider() {
-    const sliderThumb = document.getElementById('sleep-slider-thumb');
-    if (!sliderThumb) return;
-    sliderThumb.addEventListener('touchstart', onSleepSliderTouchStart, { passive: false });
-    document.addEventListener('touchmove', onSleepSliderTouchMove, { passive: false });
-    document.addEventListener('touchend', onSleepSliderTouchEnd);
-}
-
-/**
- * [함수] onSleepSliderTouchStart
- * [역할] 해당 기능의 UI 상태와 데이터 흐름을 제어한다.
- * [원리] 입력 인자와 현재 상태를 먼저 검증한 뒤 안전한 분기 경로를 고르고,
- *        필요한 UI 갱신·저장·후속 호출을 순차 실행해 상태 일관성을 유지한다.
- */
-function onSleepSliderTouchStart(e) {
-    const overlay = document.getElementById('sleep-mode-overlay');
-    if (!overlay || overlay.style.display === 'none') return;
-    const sliderThumb = document.getElementById('sleep-slider-thumb');
-    AppState.isDraggingSleepSlider = true;
-    AppState.sleepStartX = e.touches[0].clientX;
-    sliderThumb.classList.add('dragging');
-    AppState.sleepMaxDragX = sliderThumb.parentElement.offsetWidth - 60;
-}
-
-/**
- * [함수] onSleepSliderTouchMove
- * [역할] 해당 기능의 UI 상태와 데이터 흐름을 제어한다.
- * [원리] 입력 인자와 현재 상태를 먼저 검증한 뒤 안전한 분기 경로를 고르고,
- *        필요한 UI 갱신·저장·후속 호출을 순차 실행해 상태 일관성을 유지한다.
- */
-function onSleepSliderTouchMove(e) {
-    if (!AppState.isDraggingSleepSlider) return;
-    e.preventDefault();
-    const sliderThumb = document.getElementById('sleep-slider-thumb');
-    AppState.sleepCurrentX = e.touches[0].clientX - AppState.sleepStartX;
-    if (AppState.sleepCurrentX < 0) AppState.sleepCurrentX = 0;
-    if (AppState.sleepCurrentX > AppState.sleepMaxDragX) AppState.sleepCurrentX = AppState.sleepMaxDragX;
-    sliderThumb.style.transform = `translateX(${AppState.sleepCurrentX}px)`;
-}
-
-/**
- * [함수] onSleepSliderTouchEnd
- * [역할] 해당 기능의 UI 상태와 데이터 흐름을 제어한다.
- * [원리] 입력 인자와 현재 상태를 먼저 검증한 뒤 안전한 분기 경로를 고르고,
- *        필요한 UI 갱신·저장·후속 호출을 순차 실행해 상태 일관성을 유지한다.
- */
-function onSleepSliderTouchEnd(e) {
-    if (!AppState.isDraggingSleepSlider) return;
-    AppState.isDraggingSleepSlider = false;
-    const sliderThumb = document.getElementById('sleep-slider-thumb');
-    sliderThumb.classList.remove('dragging');
-    if (AppState.sleepCurrentX >= AppState.sleepMaxDragX * 0.85) {
-        unlockSleepMode();
-    } else {
-        sliderThumb.style.transform = `translateX(0px)`;
-    }
-}
-
-/**
- * [함수] startSleepMode
- * [역할] 해당 기능의 UI 상태와 데이터 흐름을 제어한다.
- * [원리] 입력 인자와 현재 상태를 먼저 검증한 뒤 안전한 분기 경로를 고르고,
- *        필요한 UI 갱신·저장·후속 호출을 순차 실행해 상태 일관성을 유지한다.
- */
-export function startSleepMode() {
-    const overlay = document.getElementById('sleep-mode-overlay');
-    if (overlay) {
-        overlay.style.display = 'flex';
-        const sliderThumb = document.getElementById('sleep-slider-thumb');
-        if (sliderThumb) sliderThumb.style.transform = `translateX(0px)`;
-    }
-    if (document.documentElement.requestFullscreen) {
-        document.documentElement.requestFullscreen().catch(err => {
-            console.log(`전체화면 요청 실패: ${err.message}`);
-        });
-    }
-}
-
-/**
- * [함수] unlockSleepMode
- * [역할] 해당 기능의 UI 상태와 데이터 흐름을 제어한다.
- * [원리] 입력 인자와 현재 상태를 먼저 검증한 뒤 안전한 분기 경로를 고르고,
- *        필요한 UI 갱신·저장·후속 호출을 순차 실행해 상태 일관성을 유지한다.
- */
-export function unlockSleepMode() {
-    const overlay = document.getElementById('sleep-mode-overlay');
-    if (overlay) {
-        overlay.style.display = 'none';
-        const sliderThumb = document.getElementById('sleep-slider-thumb');
-        if (sliderThumb) sliderThumb.style.transform = `translateX(0px)`;
-    }
-    if (document.fullscreenElement) {
-        document.exitFullscreen().catch(err => {
-            console.log(`전체화면 해제 실패: ${err.message}`);
-        });
-    }
-}
-
-/* 5-2. 컨텍스트 메뉴 및 드롭다운 */
 
 /* --------------------------------------------------------------------------
    6. 이벤트 리스너 (DOM Events)
@@ -697,8 +400,6 @@ function bindUiActionsToWindow() {
         openMoveProjectModal,
         openMoveSelectionModal,
         closeMoveProjectModal,
-        startSleepMode,
-        unlockSleepMode,
         toggleAccordion,
         toggleMoreMenu,
         toggleProjectMenu,
@@ -710,6 +411,8 @@ function bindUiActionsToWindow() {
         openPhotoModal,
         nextPhoto,
         prevPhoto,
+        openPhotoDownloadMenu,
+        closePhotoDownloadMenu,
         downloadCurrentPhoto,
         closePhotoModal,
         openNavModal,
@@ -764,6 +467,7 @@ function bindUiActionsToWindow() {
         openSortModal,
         closeSortModal,
         applySortSetting,
+        syncRecordSortOrderLabels,
         openProjectSortModal,
         closeProjectSortModal,
         applyProjectSortSetting,
@@ -773,6 +477,7 @@ function bindUiActionsToWindow() {
         openRecordGroupMenu,
         handleRecordGroupMenuAction,
         closeAddRecordToGroupModal,
+        closeCreateRecordGroupModal,
         toggleRecordFab,
         closeRecordFab,
     });

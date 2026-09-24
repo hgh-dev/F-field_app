@@ -8,17 +8,10 @@
    ========================================================================== */
 import { DEFAULT_MAX_ZOOM } from './constants.js';
 import { escapeHtml, inferUserMapType, isTileUserMapType, normalizeUrl, parseWmsUrl } from './utils.js';
+import { SHP_CRS_OPTIONS } from '../shp-crs.js';
 
 let activeUserMapModal = null;
-
-const SHP_CRS_OPTIONS = [
-    { value: 'auto', label: '자동 선택(.prj)' },
-    { value: 'EPSG:4326', label: 'WGS84 경위도(EPSG:4326)' },
-    { value: 'EPSG:5179', label: 'Korea 2000 통합좌표계(EPSG:5179)' },
-    { value: 'EPSG:5186', label: 'Korea 2000 중부원점 2010(EPSG:5186)' },
-    { value: 'EPSG:5181', label: 'Korea 2000 중부원점(EPSG:5181)' },
-    { value: 'EPSG:5174', label: 'Korean 1985 중부원점(EPSG:5174)' }
-];
+let activeUserMapModalSessionId = 0;
 
 function createZoomSelectOptions(selectedValue) {
     const selected = Number(selectedValue);
@@ -46,6 +39,39 @@ function createShpSimplifySelectOptions(selectedValue = 'off') {
     `).join('');
 }
 
+function getRepresentativeFieldSummary(geojson) {
+    const fields = new Set();
+    (geojson?.features || []).forEach(feature => {
+        Object.keys(feature?.properties || {}).forEach(field => {
+            if (field !== '__bbox') fields.add(field);
+        });
+    });
+    return [...fields].map(field => {
+        const values = new Map();
+        (geojson?.features || []).forEach(feature => {
+            const rawValue = feature?.properties?.[field];
+            const value = rawValue === null || rawValue === undefined || rawValue === '' ? '__EMPTY__' : String(rawValue);
+            values.set(value, (values.get(value) || 0) + 1);
+        });
+        return {
+            field,
+            values: [...values.entries()]
+                .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'ko'))
+                .map(([value, count]) => ({ value, count }))
+        };
+    }).sort((a, b) => a.field.localeCompare(b.field, 'ko'));
+}
+
+function getRepresentativeValueLabel(value) {
+    return value === '__EMPTY__' ? '(값 없음)' : value;
+}
+
+function closeRepresentativeFieldModal() {
+    const overlay = document.getElementById('user-map-representative-field-modal-overlay');
+    if (!overlay) return;
+    overlay.classList.remove('visible');
+    setTimeout(() => overlay.remove(), 160);
+}
 
 function ensureUserMapModal() {
     let overlay = document.getElementById('user-map-modal-overlay');
@@ -95,6 +121,16 @@ function ensureUserMapModal() {
                     </select>
                     <span style="display:block; margin-top:6px; font-size:11px; line-height:1.45; color:#6b7280;">자동 선택은 ZIP 안의 .prj 파일을 기준으로 좌표계를 변환합니다. .prj가 없거나 위치가 맞지 않으면 원본 SHP의 좌표계를 직접 선택하세요.</span>
                 </label>
+                <div id="user-map-representative-field-row" style="display:none; margin-bottom:12px;">
+                    <span style="display:block; font-size:12px; font-weight:700; color:#4b5563; margin-bottom:6px;">대표 필드</span>
+                    <input id="user-map-representative-field-input" type="hidden" value="">
+                    <button id="user-map-representative-field-btn" type="button"
+                        style="width:100%; min-height:44px; border:1px solid #d1d5db; border-radius:8px; padding:0 12px; font-size:15px; background:#fff; box-sizing:border-box; display:flex; align-items:center; justify-content:space-between; gap:10px; text-align:left; color:#111827;">
+                        <span id="user-map-representative-field-label" style="min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">자동 선택</span>
+                        <span aria-hidden="true" style="color:#9ca3af; font-size:18px; transform:rotate(90deg);">›</span>
+                    </button>
+                    <span style="display:block; margin-top:6px; font-size:11px; line-height:1.45; color:#6b7280;">도형을 선택했을 때 사용자지도 바텀시트 제목에 표시할 속성을 선택하세요.</span>
+                </div>
                 <label id="user-map-wms-layer-row" style="display:none; margin-bottom:12px;">
                     <span style="display:block; font-size:12px; font-weight:700; color:#4b5563; margin-bottom:6px;">WMS layers</span>
                     <input id="user-map-wms-layers-input" type="text" autocomplete="off" style="width:100%; min-height:44px; border:1px solid #d1d5db; border-radius:8px; padding:0 12px; font-size:15px; box-sizing:border-box; -webkit-user-select:text; user-select:text; -webkit-touch-callout:default;">
@@ -134,11 +170,13 @@ function ensureUserMapModal() {
 
 
 function closeUserMapModal(value) {
+    closeRepresentativeFieldModal();
     if (!activeUserMapModal) return;
     const { overlay, resolve } = activeUserMapModal;
     overlay.classList.remove('visible');
     overlay.style.display = 'none';
     activeUserMapModal = null;
+    activeUserMapModalSessionId += 1;
     resolve(value);
 }
 
@@ -156,6 +194,10 @@ export function showUserMapModal(existing = null, deps = {}) {
     const fileInput = overlay.querySelector('#user-map-file-input');
     const shpCrsRow = overlay.querySelector('#user-map-shp-crs-row');
     const shpCrsInput = overlay.querySelector('#user-map-shp-crs-input');
+    const representativeFieldRow = overlay.querySelector('#user-map-representative-field-row');
+    const representativeFieldInput = overlay.querySelector('#user-map-representative-field-input');
+    const representativeFieldButton = overlay.querySelector('#user-map-representative-field-btn');
+    const representativeFieldLabel = overlay.querySelector('#user-map-representative-field-label');
     const shpSimplifyRow = overlay.querySelector('#user-map-shp-simplify-row');
     const shpSimplifyInput = overlay.querySelector('#user-map-shp-simplify-input');
     const wmsRow = overlay.querySelector('#user-map-wms-layer-row');
@@ -168,6 +210,7 @@ export function showUserMapModal(existing = null, deps = {}) {
     const closeBtn = overlay.querySelector('#user-map-modal-close');
 
     if (activeUserMapModal) closeUserMapModal(null);
+    const modalSessionId = ++activeUserMapModalSessionId;
 
     title.textContent = existing ? '사용자 지도 수정' : '사용자 지도 불러오기';
     nameInput.value = existing?.name || '';
@@ -178,6 +221,10 @@ export function showUserMapModal(existing = null, deps = {}) {
         shpCrsInput.innerHTML = createShpCrsSelectOptions(existing?.sourceCrs || 'auto');
         shpCrsInput.value = existing?.sourceCrs || 'auto';
     }
+    if (representativeFieldInput) {
+        representativeFieldInput.value = existing?.representativeField || '';
+    }
+    if (representativeFieldLabel) representativeFieldLabel.textContent = existing?.representativeField || '자동 선택';
     if (shpSimplifyInput) {
         shpSimplifyInput.innerHTML = createShpSimplifySelectOptions(existing?.simplifyLevel || 'off');
         shpSimplifyInput.value = existing?.simplifyLevel || 'off';
@@ -186,12 +233,137 @@ export function showUserMapModal(existing = null, deps = {}) {
     minZoomInput.value = existing?.minZoom ?? 12;
     maxNativeZoomInput.value = existing?.maxNativeZoom ?? (isTileUserMapType(typeInput.value) ? 18 : 22);
 
+    let parsedFileCache = null;
+    let propertyFieldLoadToken = 0;
+    let representativeFieldSummary = [];
+
+    const setRepresentativeFieldSummary = (summary, selectedValue = representativeFieldInput?.value || '') => {
+        if (!representativeFieldInput) return;
+        representativeFieldSummary = Array.isArray(summary) ? summary : [];
+        const hasSelectedField = representativeFieldSummary.some(entry => entry.field === selectedValue);
+        representativeFieldInput.value = hasSelectedField ? selectedValue : '';
+        if (representativeFieldLabel) representativeFieldLabel.textContent = hasSelectedField ? selectedValue : '자동 선택';
+        if (representativeFieldButton) representativeFieldButton.disabled = representativeFieldSummary.length === 0;
+    };
+
+    const loadRepresentativeFieldsFromGeojson = (geojson, selectedValue) => {
+        setRepresentativeFieldSummary(getRepresentativeFieldSummary(geojson), selectedValue);
+    };
+
+    const openRepresentativeFieldModal = () => {
+        if (representativeFieldSummary.length === 0) {
+            alert('대표 필드를 선택하려면 SHP 파일을 먼저 선택하세요.');
+            return;
+        }
+        closeRepresentativeFieldModal();
+        const selectedField = representativeFieldInput?.value || '';
+        const fieldOverlay = document.createElement('div');
+        fieldOverlay.id = 'user-map-representative-field-modal-overlay';
+        fieldOverlay.className = 'nav-modal-overlay visible';
+        fieldOverlay.style.zIndex = '10036';
+        fieldOverlay.style.display = 'flex';
+        fieldOverlay.style.alignItems = 'center';
+        fieldOverlay.style.justifyContent = 'center';
+
+        const createFieldButton = ({ field, values }) => {
+            const preview = values.slice(0, 8).map(({ value, count }) => `${escapeHtml(getRepresentativeValueLabel(value))} (${count})`).join(', ');
+            const extra = values.length > 8 ? ` 외 ${values.length - 8}개` : '';
+            const isSelected = field === selectedField;
+            return `
+                <button type="button" class="user-map-category-field-btn" data-field="${escapeHtml(field)}"
+                    style="width:100%; border:1px solid ${isSelected ? '#2563eb' : '#e5e7eb'}; border-radius:8px; background:${isSelected ? '#eff6ff' : '#fff'}; padding:10px 12px; margin-bottom:8px; text-align:left; cursor:pointer; box-sizing:border-box;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+                        <span style="font-size:13px; font-weight:800; color:#111827; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(field)}</span>
+                        <span style="font-size:11px; color:#2563eb; flex-shrink:0;">${values.length}개 값</span>
+                    </div>
+                    <div style="font-size:11px; color:#6b7280; line-height:1.45; margin-top:5px;">${preview}${extra}</div>
+                </button>`;
+        };
+
+        fieldOverlay.innerHTML = `
+            <div onclick="event.stopPropagation()" style="width:min(460px, calc(100vw - 32px)); max-height:calc(100vh - 56px); overflow:auto; background:#fff; border-radius:12px; padding:18px; box-sizing:border-box;">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px;">
+                    <div>
+                        <div style="font-size:17px; font-weight:800; color:#111827;">대표 필드</div>
+                        <div style="font-size:12px; color:#6b7280; margin-top:3px; max-width:330px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(nameInput.value.trim() || existing?.name || '사용자 지도')}</div>
+                    </div>
+                    <button type="button" id="user-map-representative-field-close" style="width:34px; height:34px; border:0; background:#f3f4f6; border-radius:50%; color:#6b7280; font-size:20px; line-height:1;">&times;</button>
+                </div>
+                <div style="font-size:12px; color:#6b7280; line-height:1.45; margin-bottom:12px;">도형을 선택했을 때 바텀시트 제목으로 사용할 속성을 선택하세요.</div>
+                <div id="user-map-representative-field-list">
+                    <button type="button" class="user-map-category-field-btn" data-field=""
+                        style="width:100%; border:1px solid ${selectedField ? '#e5e7eb' : '#2563eb'}; border-radius:8px; background:${selectedField ? '#fff' : '#eff6ff'}; padding:10px 12px; margin-bottom:8px; text-align:left; cursor:pointer; box-sizing:border-box;">
+                        <div style="font-size:13px; font-weight:800; color:#111827;">자동 선택</div>
+                        <div style="font-size:11px; color:#6b7280; line-height:1.45; margin-top:5px;">이름, 명칭, 지번 등 적합한 속성을 자동으로 선택합니다.</div>
+                    </button>
+                    ${representativeFieldSummary.map(createFieldButton).join('')}
+                </div>
+            </div>`;
+
+        fieldOverlay.onclick = closeRepresentativeFieldModal;
+        fieldOverlay.querySelector('#user-map-representative-field-close').onclick = closeRepresentativeFieldModal;
+        fieldOverlay.querySelectorAll('.user-map-category-field-btn').forEach(button => {
+            button.onclick = () => {
+                const fieldName = button.dataset.field || '';
+                representativeFieldInput.value = fieldName;
+                if (representativeFieldLabel) representativeFieldLabel.textContent = fieldName || '자동 선택';
+                closeRepresentativeFieldModal();
+            };
+        });
+        document.body.appendChild(fieldOverlay);
+    };
+
+    if (representativeFieldButton) representativeFieldButton.onclick = openRepresentativeFieldModal;
+
+    const parseSelectedShpFile = async () => {
+        const file = fileInput.files?.[0];
+        if (!file || typeof deps.parseLocalShpFile !== 'function') return null;
+        const sourceCrs = shpCrsInput?.value || 'auto';
+        const selectedField = representativeFieldInput?.value || existing?.representativeField || '';
+        const token = ++propertyFieldLoadToken;
+        if (representativeFieldButton) representativeFieldButton.disabled = true;
+        if (representativeFieldLabel) representativeFieldLabel.textContent = '속성 필드 확인 중...';
+        try {
+            const geojson = await deps.parseLocalShpFile(file, sourceCrs);
+            if (token !== propertyFieldLoadToken || modalSessionId !== activeUserMapModalSessionId) return null;
+            parsedFileCache = { file, sourceCrs, geojson };
+            loadRepresentativeFieldsFromGeojson(geojson, selectedField);
+            return geojson;
+        } catch (error) {
+            if (token !== propertyFieldLoadToken || modalSessionId !== activeUserMapModalSessionId) return null;
+            parsedFileCache = null;
+            setRepresentativeFieldSummary([], '');
+            console.error(error);
+            alert(`SHP 속성 필드를 읽지 못했습니다.\n${error.message || error}`);
+            return null;
+        }
+    };
+
+    const loadExistingRepresentativeFields = async () => {
+        if (!existing?.geojsonKey || typeof deps.getUserMapDataStore !== 'function') {
+            setRepresentativeFieldSummary([], existing?.representativeField || '');
+            return;
+        }
+        const token = ++propertyFieldLoadToken;
+        if (representativeFieldButton) representativeFieldButton.disabled = true;
+        try {
+            const geojson = await deps.getUserMapDataStore().getItem(existing.geojsonKey);
+            if (token !== propertyFieldLoadToken || modalSessionId !== activeUserMapModalSessionId) return;
+            loadRepresentativeFieldsFromGeojson(geojson, existing?.representativeField || '');
+        } catch (error) {
+            if (token !== propertyFieldLoadToken || modalSessionId !== activeUserMapModalSessionId) return;
+            console.error(error);
+            setRepresentativeFieldSummary([], existing?.representativeField || '');
+        }
+    };
+
     const syncWmsRow = () => {
         const isLocalShp = typeInput.value === 'shp';
         const isTileMap = isTileUserMapType(typeInput.value);
         urlRow.style.display = isLocalShp ? 'none' : 'block';
         fileRow.style.display = isLocalShp ? 'block' : 'none';
         if (shpCrsRow) shpCrsRow.style.display = isLocalShp ? 'block' : 'none';
+        if (representativeFieldRow) representativeFieldRow.style.display = isLocalShp ? 'block' : 'none';
         if (shpSimplifyRow) shpSimplifyRow.style.display = isLocalShp ? 'block' : 'none';
         wmsRow.style.display = typeInput.value === 'wms' ? 'block' : 'none';
         if (maxZoomLabel) maxZoomLabel.textContent = isTileMap ? '타일 제공 최대 줌' : '최대 줌';
@@ -215,6 +387,17 @@ export function showUserMapModal(existing = null, deps = {}) {
         if (!existing) maxNativeZoomInput.value = isTileUserMapType(typeInput.value) ? 18 : 22;
         syncWmsRow();
     };
+    fileInput.onchange = () => {
+        parsedFileCache = null;
+        if (fileInput.files?.[0]) parseSelectedShpFile();
+        else loadExistingRepresentativeFields();
+    };
+    if (shpCrsInput) {
+        shpCrsInput.onchange = () => {
+            parsedFileCache = null;
+            if (fileInput.files?.[0]) parseSelectedShpFile();
+        };
+    }
     urlInput.onblur = () => {
         if (!existing) typeInput.value = inferUserMapType(urlInput.value);
         if (typeInput.value === 'wms' && !wmsLayersInput.value.trim()) {
@@ -282,11 +465,13 @@ export function showUserMapModal(existing = null, deps = {}) {
         if (existing?.categoryStyles) item.categoryStyles = existing.categoryStyles;
         if (existing?.defaultCategoryStyle) item.defaultCategoryStyle = existing.defaultCategoryStyle;
         if (existing?.categoryVisibleValues) item.categoryVisibleValues = existing.categoryVisibleValues;
+        if (existing?.groupId) item.groupId = existing.groupId;
 
         if (type === 'shp') {
             item.url = '';
             item.sourceName = existing?.sourceName || '';
             item.sourceCrs = shpCrsInput?.value || existing?.sourceCrs || 'auto';
+            item.representativeField = representativeFieldInput?.value || '';
             item.simplifyLevel = shpSimplifyInput?.value || existing?.simplifyLevel || 'off';
             item.geojsonKey = existing?.geojsonKey || `${item.id}-geojson`;
             item.featureCount = existing?.featureCount || 0;
@@ -294,7 +479,9 @@ export function showUserMapModal(existing = null, deps = {}) {
             if (fileInput.files?.[0]) {
                 try {
                     const file = fileInput.files[0];
-                    const geojson = await deps.parseLocalShpFile(file, item.sourceCrs);
+                    const geojson = parsedFileCache?.file === file && parsedFileCache.sourceCrs === item.sourceCrs
+                        ? parsedFileCache.geojson
+                        : await deps.parseLocalShpFile(file, item.sourceCrs);
                     await deps.getUserMapDataStore().setItem(item.geojsonKey, geojson);
                     item.sourceName = file.name;
                     item.featureCount = geojson.features.length;
@@ -332,6 +519,7 @@ export function showUserMapModal(existing = null, deps = {}) {
     };
 
     syncWmsRow();
+    loadExistingRepresentativeFields();
     overlay.style.display = 'flex';
     setTimeout(() => overlay.classList.add('visible'), 10);
 

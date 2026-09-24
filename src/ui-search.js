@@ -451,14 +451,20 @@ function createSearchResultItem(item) {
     if (roadAddr) {
         const roadDiv = document.createElement('div');
         roadDiv.className = 'search-result-addr';
-        roadDiv.innerHTML = `<span class="badge-road">도로명</span> ${roadAddr}`;
+        const badge = document.createElement('span');
+        badge.className = 'badge-road';
+        badge.textContent = '도로명';
+        roadDiv.append(badge, document.createTextNode(` ${roadAddr}`));
         li.appendChild(roadDiv);
     }
 
     if (parcelAddr) {
         const parcelDiv = document.createElement('div');
         parcelDiv.className = 'search-result-addr';
-        parcelDiv.innerHTML = `<span class="badge-parcel">지번</span> ${parcelAddr}`;
+        const badge = document.createElement('span');
+        badge.className = 'badge-parcel';
+        badge.textContent = '지번';
+        parcelDiv.append(badge, document.createTextNode(` ${parcelAddr}`));
         li.appendChild(parcelDiv);
     }
 

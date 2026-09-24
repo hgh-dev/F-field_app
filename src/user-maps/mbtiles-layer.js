@@ -6,6 +6,8 @@
    [참고]
    - MBTiles 사용자지도가 보이지 않거나 타일이 뒤집혀 보일 때 확인합니다.
    ========================================================================== */
+import { L } from '../vendor-globals.js';
+
 export class MbtilesLayer extends L.GridLayer {
     constructor(db, options = {}) {
         super(options);

@@ -6,8 +6,9 @@
    [참고]
    - SHP 파일 업로드, 좌표계 변환, 속성 분류가 이상할 때 확인합니다.
    ========================================================================== */
-import { getJSZipConstructor, getShpParser } from './dependencies.js';
 import { ensureGeojsonSpatialMetadata } from './spatial-utils.js';
+import { assertImportFileSize, assertSafeZipArchive } from '../zip-safety.js';
+import { parseShpZipToWgs84 } from '../shp-zip-parser.js';
 
 function getCategoryValueKey(value) {
     if (value === null || value === undefined || value === '') return '__EMPTY__';
@@ -99,131 +100,16 @@ export function getGeojsonPropertySummary(geojson) {
         .sort((a, b) => a.field.localeCompare(b.field, 'ko'));
 }
 
-function ensureShpCrsDefinitions() {
-    if (typeof proj4 === 'undefined' || !proj4.defs) return;
-    if (!proj4.defs('EPSG:5174')) {
-        proj4.defs('EPSG:5174', '+proj=tmerc +lat_0=38 +lon_0=127.0028902777778 +k=1 +x_0=200000 +y_0=500000 +ellps=bessel +towgs84=-115.80,474.99,674.11,1.16,-2.31,-1.63,6.43 +units=m +no_defs');
-    }
-    if (!proj4.defs('EPSG:5179')) {
-        proj4.defs('EPSG:5179', '+proj=tmerc +lat_0=38 +lon_0=127.5 +k=0.9996 +x_0=1000000 +y_0=2000000 +ellps=GRS80 +units=m +no_defs');
-    }
-    if (!proj4.defs('EPSG:5181')) {
-        proj4.defs('EPSG:5181', '+proj=tmerc +lat_0=38 +lon_0=127 +k=1 +x_0=200000 +y_0=500000 +ellps=GRS80 +units=m +no_defs');
-    }
-    if (!proj4.defs('EPSG:5186')) {
-        proj4.defs('EPSG:5186', '+proj=tmerc +lat_0=38 +lon_0=127 +k=1 +x_0=200000 +y_0=600000 +ellps=GRS80 +units=m +no_defs');
-    }
-}
-
-function resolveMaybePromise(value) {
-    return value && typeof value.then === 'function' ? value : Promise.resolve(value);
-}
-
-function transformGeometryCoordinates(geometry, sourceCrs) {
-    if (!geometry || sourceCrs === 'auto' || sourceCrs === 'EPSG:4326') return geometry;
-    ensureShpCrsDefinitions();
-    if (typeof proj4 === 'undefined') {
-        throw new Error('좌표 변환 라이브러리를 사용할 수 없습니다.');
-    }
-
-    const transformCoordinate = (coordinate) => {
-        if (!Array.isArray(coordinate) || coordinate.length < 2) return coordinate;
-        const x = Number(coordinate[0]);
-        const y = Number(coordinate[1]);
-        if (!Number.isFinite(x) || !Number.isFinite(y)) return coordinate;
-        const [lng, lat] = proj4(sourceCrs, 'EPSG:4326', [x, y]);
-        return coordinate.length > 2 ? [lng, lat, ...coordinate.slice(2)] : [lng, lat];
-    };
-
-    const walk = (coordinates) => {
-        if (!Array.isArray(coordinates)) return coordinates;
-        if (typeof coordinates[0] === 'number') return transformCoordinate(coordinates);
-        return coordinates.map(walk);
-    };
-
-    if (geometry.type === 'GeometryCollection') {
-        return {
-            ...geometry,
-            geometries: (geometry.geometries || []).map(innerGeometry => transformGeometryCoordinates(innerGeometry, sourceCrs))
-        };
-    }
-
-    return {
-        ...geometry,
-        coordinates: walk(geometry.coordinates)
-    };
-}
-
-function transformFeatureCollectionCoordinates(featureCollection, sourceCrs) {
-    if (sourceCrs === 'auto' || sourceCrs === 'EPSG:4326') return featureCollection;
-    return {
-        ...featureCollection,
-        features: featureCollection.features.map(feature => ({
-            ...feature,
-            geometry: transformGeometryCoordinates(feature.geometry, sourceCrs)
-        }))
-    };
-}
-
-async function parseShpZipWithManualCrs(arrayBuffer, sourceCrs) {
-    const [JSZip, shp] = await Promise.all([getJSZipConstructor(), getShpParser()]);
-    if (!shp || typeof shp.parseShp !== 'function' || typeof shp.combine !== 'function') {
-        throw new Error('SHP 파서를 사용할 수 없습니다.');
-    }
-
-    const zip = await JSZip.loadAsync(arrayBuffer);
-    const allEntries = Object.values(zip.files).filter(entry => !entry.dir);
-    const shpEntries = allEntries.filter(entry => /\.shp$/i.test(entry.name));
-    if (shpEntries.length === 0) throw new Error('ZIP 안에서 .shp 파일을 찾을 수 없습니다.');
-
-    const findSiblingEntry = (baseName, ext) => {
-        const target = `${baseName}.${ext}`.toLowerCase();
-        return allEntries.find(entry => entry.name.toLowerCase() === target) || null;
-    };
-
-    const collections = [];
-    for (const shpEntry of shpEntries) {
-        const baseName = shpEntry.name.replace(/\.shp$/i, '');
-        const dbfEntry = findSiblingEntry(baseName, 'dbf');
-        const shpBuffer = await shpEntry.async('arraybuffer');
-        const geometryRows = await resolveMaybePromise(shp.parseShp(shpBuffer));
-
-        let propertyRows = [];
-        if (dbfEntry && typeof shp.parseDbf === 'function') {
-            try {
-                propertyRows = await resolveMaybePromise(shp.parseDbf(await dbfEntry.async('arraybuffer')));
-            } catch {
-                propertyRows = [];
-            }
-        }
-
-        const safeProperties = Array.isArray(propertyRows) && propertyRows.length > 0
-            ? propertyRows
-            : (Array.isArray(geometryRows) ? geometryRows.map(() => ({})) : []);
-        const combined = await resolveMaybePromise(shp.combine([geometryRows, safeProperties]));
-        if (combined?.type === 'FeatureCollection' && Array.isArray(combined.features)) {
-            collections.push(transformFeatureCollectionCoordinates(combined, sourceCrs));
-        }
-    }
-
-    if (collections.length === 0) throw new Error('표시할 도형이 없습니다.');
-    if (collections.length === 1) return collections[0];
-    return {
-        type: 'FeatureCollection',
-        features: collections.flatMap(collection => collection.features || [])
-    };
-}
-
 export async function parseLocalShpFile(file, sourceCrs = 'auto') {
     const lowerName = file.name.toLowerCase();
     if (!lowerName.endsWith('.zip')) {
         throw new Error('SHP 파일 세트를 압축한 .zip 파일만 선택할 수 있습니다.');
     }
 
+    assertImportFileSize(file, true);
     const arrayBuffer = await readFileAsArrayBuffer(file);
-    const parsed = sourceCrs && sourceCrs !== 'auto'
-        ? await parseShpZipWithManualCrs(arrayBuffer, sourceCrs)
-        : await (await getShpParser())(arrayBuffer);
+    await assertSafeZipArchive(arrayBuffer);
+    const parsed = await parseShpZipToWgs84(arrayBuffer, sourceCrs || 'auto');
     const featureCollection = normalizeShpResult(parsed);
     if (featureCollection.features.length === 0) {
         throw new Error('표시할 도형이 없습니다.');

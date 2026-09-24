@@ -490,11 +490,24 @@
         }
 
         #user-map-list .survey-name {
-            font-weight: 600;
+            font-size: 14px;
+            font-weight: 400;
         }
 
         #user-map-list .map-layer-row-depth-3 .survey-name {
+            font-size: 13px;
             font-weight: 400;
+        }
+
+        #user-map-list .survey-group-name {
+            font-size: 14px;
+        }
+
+        #user-map-list .survey-group-icon svg,
+        #user-map-list .style-setting-btn svg,
+        #user-map-list .style-legend-svg {
+            width: 27px;
+            height: 27px;
         }
 
         #user-map-list .map-layer-toggle {
@@ -538,6 +551,22 @@
         #content-map .menu-title.accordion-header {
             justify-content: flex-start !important;
             gap: 6px;
+        }
+
+        #content-map .menu-title.accordion-header.user-map-section-header {
+            justify-content: space-between !important;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        #content-map .user-map-section-title {
+            flex: 1;
+            min-width: 0;
+        }
+
+        #content-map .user-map-section-more {
+            margin-left: auto;
+            flex-shrink: 0;
         }
 
         #content-map .section-toggle-triangle {
@@ -814,15 +843,15 @@
         }
 
         .survey-group-icon svg {
-            width: 22px;
-            height: 22px;
+            width: 27px;
+            height: 27px;
             fill: currentColor;
         }
 
         .survey-group-name {
             flex: 1;
             min-width: 0;
-            font-size: 13px;
+            font-size: 14px;
             font-weight: 700;
             color: #334155;
             white-space: nowrap;
@@ -847,6 +876,10 @@
             margin-left: 24px;
             padding-left: 0;
             border-bottom: none;
+        }
+
+        #user-map-list .survey-group-items > .user-map-item > .survey-item {
+            margin-left: 0;
         }
 
         .survey-group-items .survey-row-toggle-spacer {
@@ -925,7 +958,7 @@
         }
 
         .survey-name {
-            font-size: 13px;
+            font-size: 14px;
             font-weight: 600;
             color: #333;
             white-space: nowrap;
@@ -933,6 +966,16 @@
             text-overflow: ellipsis;
             /* block 레이아웃이어야 text-overflow: ellipsis가 동작함 */
             display: block;
+        }
+
+        .survey-group-items .survey-name {
+            font-size: 13px;
+        }
+
+        .survey-item .style-setting-btn svg,
+        .survey-item .style-legend-svg {
+            width: 27px;
+            height: 27px;
         }
 
 

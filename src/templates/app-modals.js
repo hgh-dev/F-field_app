@@ -43,22 +43,25 @@ const APP_MODALS_HTML = `    <div id="import-warning-modal-overlay" class="nav-m
                 <div class="sort-modal-group-title">정렬 기준</div>
                 <div class="sort-modal-options">
                     <label class="sort-modal-option">
-                        <input type="radio" name="sort-by" value="date"> 기록 시간
+                        <input type="radio" name="sort-by" value="date" onchange="syncRecordSortOrderLabels()"> 기록 시간
                     </label>
                     <label class="sort-modal-option">
-                        <input type="radio" name="sort-by" value="name"> 기록명
+                        <input type="radio" name="sort-by" value="name" onchange="syncRecordSortOrderLabels()"> 기록명
+                    </label>
+                    <label class="sort-modal-option">
+                        <input type="radio" name="sort-by" value="displayOrder" onchange="syncRecordSortOrderLabels()"> 지도 표시 순서
                     </label>
                 </div>
             </div>
 
-            <div class="sort-modal-group">
+            <div id="record-sort-order-group" class="sort-modal-group">
                 <div class="sort-modal-group-title">정렬 순서</div>
                 <div class="sort-modal-options">
                     <label class="sort-modal-option">
-                        <input type="radio" name="sort-order" value="desc"> 내림차순 (최신순)
+                        <input type="radio" name="sort-order" value="desc"> <span id="record-sort-order-desc-label">최신순</span>
                     </label>
                     <label class="sort-modal-option">
-                        <input type="radio" name="sort-order" value="asc"> 오름차순 (오래된순)
+                        <input type="radio" name="sort-order" value="asc"> <span id="record-sort-order-asc-label">오래된 순</span>
                     </label>
                 </div>
             </div>
@@ -176,36 +179,34 @@ const APP_MODALS_HTML = `    <div id="import-warning-modal-overlay" class="nav-m
         multiple>
     <!-- 사진 확대 보기 모달 (갤러리 뷰어) -->
     <div id="photo-modal" onclick="if(event.target === this) closePhotoModal()">
-        <!-- 상단 컨트롤 (다운로드, 닫기) -->
-        <div class="photo-modal-controls">
-            <button id="photo-modal-download" onclick="downloadCurrentPhoto()">
-                <svg viewBox="0 0 24 24">
-                    <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
-                </svg>
-            </button>
-            <button id="photo-modal-close" onclick="closePhotoModal()">
-                <svg viewBox="0 0 24 24">
-                    <path
-                        d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
-                </svg>
-            </button>
+        <div class="photo-modal-header">
+            <div class="photo-modal-context">
+                <div id="photo-modal-project-name"></div>
+                <div id="photo-modal-record-name"></div>
+            </div>
+            <!-- 상단 컨트롤 (다운로드, 닫기) -->
+            <div class="photo-modal-controls">
+                <button id="photo-modal-download" onclick="openPhotoDownloadMenu()" aria-label="사진 다운로드">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
+                    </svg>
+                </button>
+                <button id="photo-modal-close" onclick="closePhotoModal()" aria-label="갤러리 닫기">
+                    <svg viewBox="0 0 24 24">
+                        <path
+                            d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                    </svg>
+                </button>
+            </div>
         </div>
 
         <div class="photo-modal-content">
-            <button id="photo-prev-btn" class="photo-nav-btn" onclick="prevPhoto()">
-                <svg viewBox="0 0 24 24">
-                    <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
-                </svg>
-            </button>
             <img id="photo-modal-img" src="" alt="확대된 사진">
-            <button id="photo-next-btn" class="photo-nav-btn" onclick="nextPhoto()">
-                <svg viewBox="0 0 24 24">
-                    <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />
-                </svg>
-            </button>
         </div>
 
+        <div id="photo-modal-filename"></div>
         <div id="photo-counter">1 / 1</div>
+        <div id="photo-modal-thumbnails" aria-label="프로젝트 사진 목록"></div>
     </div>
 
     <!-- 사진 선택 모달 (중앙 오버레이) -->

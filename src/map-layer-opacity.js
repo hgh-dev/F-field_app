@@ -94,6 +94,7 @@ const mapLayerOpacityLabels = {
 
 let mapLayerOpacityLayers = {};
 const mapLayerEffects = {};
+const mapLayerEffectAddHandlers = new Map();
 
 const COLOR_ADJUST_CHANNELS = ['red', 'green', 'blue', 'yellow'];
 const COLOR_ADJUST_BIAS_SCALE = 0.35;
@@ -103,7 +104,18 @@ const MAP_LAYER_STYLE_STORAGE_KEY = 'setting_map_layer_styles';
 let isRestoringMapLayerStyles = false;
 
 export function configureMapLayerOpacityLayers(layers = {}) {
+    mapLayerEffectAddHandlers.forEach((handler, layer) => layer.off('add', handler));
+    mapLayerEffectAddHandlers.clear();
     mapLayerOpacityLayers = layers || {};
+    Object.entries(mapLayerOpacityLayers).forEach(([id, layer]) => {
+        if (!layer?.on) return;
+        // Leaflet recreates the tile container after each remove/add cycle.
+        // Read current state here so edits made while hidden also take effect.
+        const applyCurrentEffect = () => applyMapLayerEffectToLayer(id, layer, getMapLayerEffect(id));
+        layer.on('add', applyCurrentEffect);
+        mapLayerEffectAddHandlers.set(layer, applyCurrentEffect);
+        applyCurrentEffect();
+    });
 }
 
 function normalizeOpacity(value, fallback = 1) {
@@ -229,10 +241,7 @@ function getMapLayerEffectFilter(effect = {}) {
 
 function applyMapLayerEffectToLayer(id, layer, effect = {}) {
     const container = getMapLayerContainer(layer);
-    if (!container) {
-        layer?.once?.('add', () => applyMapLayerEffectToLayer(id, layer, effect));
-        return;
-    }
+    if (!container) return;
     const filters = [];
     if (hasColorAdjust(effect)) {
         filters.push(`url(#${ensureMapColorFilter(id, effect.colorAdjust)})`);

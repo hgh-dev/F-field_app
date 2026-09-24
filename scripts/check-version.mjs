@@ -42,6 +42,7 @@ const checks = [
     ['src/config.js APP_VERSION', matchRequired('src/config.js', /APP_VERSION = "(\d+\.\d+\.\d+)"/, 'APP_VERSION')],
     ['public/service-worker.js cache', matchRequired('public/service-worker.js', /F-field-v(\d+\.\d+\.\d+)/, 'service worker cache')],
     ['src/assets/pwa/service-worker.js cache', matchRequired('src/assets/pwa/service-worker.js', /F-field-v(\d+\.\d+\.\d+)/, 'archived service worker cache')],
+    ['open-source license notice', matchRequired('public/open-source-licenses.html', /F-Field (\d+\.\d+\.\d+) 빌드/, 'open-source license notice')],
     ['android versionName', matchRequired('android/app/build.gradle', /versionName "(\d+\.\d+\.\d+)"/, 'Android versionName')]
 ];
 

@@ -6,9 +6,10 @@
    [참고]
    - MBTiles, PMTiles, SHP 파싱 라이브러리 로딩 문제가 생기면 확인합니다.
    ========================================================================== */
+import { loadShpParser } from '../shp-parser-loader.js';
+
 let sqlJsPromise = null;
 let pmtilesPromise = null;
-let shpParserPromise = null;
 let jsZipPromise = null;
 
 export function getSqlJs() {
@@ -33,10 +34,7 @@ export function getPmtilesModule() {
 }
 
 export function getShpParser() {
-    if (!shpParserPromise) {
-        shpParserPromise = import('shpjs/dist/shp.min.js').then(module => module.default);
-    }
-    return shpParserPromise;
+    return loadShpParser();
 }
 
 export function getJSZipConstructor() {

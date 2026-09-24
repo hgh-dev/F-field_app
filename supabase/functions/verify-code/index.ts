@@ -89,73 +89,37 @@ Deno.serve(async (req) => {
   });
 
   const codeHash = await sha256Hex(code);
-  const { data: verificationCode, error: codeError } = await serviceClient
-    .from('verified_codes')
-    .select('id, status, expires_at, max_uses, used_count, assigned_to')
-    .eq('code_hash', codeHash)
-    .maybeSingle();
+  const { data: redemptionRows, error: redemptionError } = await serviceClient.rpc(
+    'redeem_verification_code',
+    {
+      p_code_hash: codeHash,
+      p_user_id: userData.user.id,
+    },
+  );
 
-  if (codeError) {
-    console.error('verified_codes select failed:', codeError);
-    return jsonResponse({ error: '인증코드 확인 중 오류가 발생했습니다.', detail: codeError.message }, 500);
+  if (redemptionError) {
+    console.error('redeem_verification_code failed:', redemptionError);
+    return jsonResponse({ error: '인증코드 확인 중 오류가 발생했습니다.', detail: redemptionError.message }, 500);
   }
 
-  if (!verificationCode) {
+  const redemption = Array.isArray(redemptionRows) ? redemptionRows[0] : redemptionRows;
+  if (!redemption?.ok) {
+    const errorCode = String(redemption?.error_code || 'invalid');
+    if (errorCode === 'not_assigned') {
+      return jsonResponse({ error: '이 계정에서 사용할 수 없는 인증코드입니다.' }, 403);
+    }
+    if (errorCode === 'expired') {
+      return jsonResponse({ error: '사용 기간이 만료된 인증코드입니다.' }, 410);
+    }
+    if (errorCode === 'used') {
+      return jsonResponse({ error: '이미 사용된 인증코드입니다.' }, 409);
+    }
     return jsonResponse({ error: '인증코드가 올바르지 않습니다.' }, 400);
   }
 
-  if (verificationCode.status !== 'unused') {
-    return jsonResponse({ error: '이미 사용된 인증코드입니다.' }, 409);
-  }
-
-  if (verificationCode.assigned_to && verificationCode.assigned_to !== userData.user.id) {
-    return jsonResponse({ error: '이 계정에서 사용할 수 없는 인증코드입니다.' }, 403);
-  }
-
-  const maxUses = Math.max(1, Number(verificationCode.max_uses || 1));
-  const usedCount = Math.max(0, Number(verificationCode.used_count || 0));
-  if (usedCount >= maxUses) {
-    return jsonResponse({ error: '이미 사용된 인증코드입니다.' }, 409);
-  }
-
-  const usedAt = new Date().toISOString();
-  const { error: entitlementError } = await serviceClient
-    .from('entitlements')
-    .upsert({
-      user_id: userData.user.id,
-      tier: 'verified',
-      source: 'verified_code',
-      expires_at: verificationCode.expires_at || null,
-    }, { onConflict: 'user_id' });
-
-  if (entitlementError) {
-    console.error('entitlements upsert failed:', entitlementError);
-    return jsonResponse({ error: '인증코드 확인 중 오류가 발생했습니다.', detail: entitlementError.message }, 500);
-  }
-
-  const nextUsedCount = usedCount + 1;
-  const nextStatus = nextUsedCount >= maxUses ? 'used' : 'unused';
-  const { data: updatedRows, error: updateError } = await serviceClient
-    .from('verified_codes')
-    .update({
-      status: nextStatus,
-      used_count: nextUsedCount,
-      used_by_user_id: userData.user.id,
-      used_at: usedAt,
-    })
-    .eq('id', verificationCode.id)
-    .eq('status', 'unused')
-    .lt('used_count', maxUses)
-    .select('id');
-
-  if (updateError) {
-    console.error('verified_codes update failed:', updateError);
-    return jsonResponse({ error: '인증코드 확인 중 오류가 발생했습니다.', detail: updateError.message }, 500);
-  }
-
-  if (!updatedRows || updatedRows.length === 0) {
-    return jsonResponse({ error: '이미 사용된 인증코드입니다.' }, 409);
-  }
-
-  return jsonResponse({ ok: true, tier: 'verified' });
+  return jsonResponse({
+    ok: true,
+    tier: redemption.entitlement_tier || 'verified',
+    expiresAt: redemption.entitlement_expires_at || null,
+  });
 });

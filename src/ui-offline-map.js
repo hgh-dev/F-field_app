@@ -7,7 +7,7 @@
    - 오프라인 지도 저장, 목록, 삭제, 권한 표시 문제가 생기면 확인합니다.
    ========================================================================== */
 import { VWORLD_API_KEY } from './config.js';
-import { AUTH_FEATURES, canUseFeature, getAuthState } from './auth.js';
+import { AUTH_FEATURES, canUseFeature, getAuthState } from './auth-policy.js';
 import { map, getOfflineDownloadBounds, getOfflineMapUrls, isOfflineDownloadableMapLayer } from './map.js';
 import { getShortAddress } from './utils.js';
 import { showAppConfirm } from './app-dialog.js';
@@ -176,7 +176,7 @@ export function renderOfflineMapPackageList() {
                     <div style="font-size:13px; font-weight:700; color:#111827; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(pkg.name || '오프라인 지도')}</div>
                     <div style="margin-top:3px; font-size:11px; color:#6b7280; line-height:1.45;">
                         ${escapeHtml((pkg.layerNames || []).join(' / ') || '지도')}<br>
-                        15~18레벨 / ${pkg.tileCount || 0}개 타일 / ${escapeHtml(formatOfflineMapSize(pkg.estimatedBytes || 0))}
+                        15~18레벨 / ${pkg.tileCount || 0}개 타일${pkg.failedTileCount ? ` (누락 ${pkg.failedTileCount}개)` : ''} / ${escapeHtml(formatOfflineMapSize(pkg.estimatedBytes || 0))}
                     </div>
                 </div>
                 <button type="button" class="btn-more" title="삭제" onclick="deleteOfflineMapPackage('${escapeJsString(pkg.id)}', event)" style="flex-shrink:0;">
@@ -257,6 +257,8 @@ export async function downloadOfflineMap() {
     try {
         const cache = await caches.open(packageCacheName);
         let count = 0;
+        let successCount = 0;
+        let failureCount = 0;
 
         // chunk fetch
         const chunkSize = 10;
@@ -267,8 +269,12 @@ export async function downloadOfflineMap() {
                     const response = await fetch(url, { mode: 'cors' });
                     if (response.ok || response.type === 'opaque') {
                         await cache.put(url, response.clone());
+                        successCount++;
+                    } else {
+                        failureCount++;
                     }
                 } catch (e) {
+                    failureCount++;
                     console.error("Tile fetch error:", url, e);
                 } finally {
                     count++;
@@ -277,14 +283,21 @@ export async function downloadOfflineMap() {
             }));
         }
 
+        if (successCount === 0) {
+            await caches.delete(packageCacheName);
+            throw new Error('지도 타일을 하나도 저장하지 못했습니다. 네트워크 연결과 지도 서비스를 확인하세요.');
+        }
+
         const packages = loadOfflineMapPackages();
         packages.push({
             id: packageId,
             cacheName: packageCacheName,
             name: await getOfflineMapPackageTitle(center.lat, center.lng),
             center: { lat: center.lat, lng: center.lng },
-            tileCount: urls.length,
-            estimatedBytes: urls.length * 25 * 1024,
+            tileCount: successCount,
+            requestedTileCount: urls.length,
+            failedTileCount: failureCount,
+            estimatedBytes: successCount * 25 * 1024,
             layerNames,
             minZoom,
             maxZoom,
@@ -292,10 +305,14 @@ export async function downloadOfflineMap() {
         });
         saveOfflineMapPackages(packages);
         renderOfflineMapPackageList();
-        alert('오프라인 지도 저장이 완료되었습니다.');
+        if (failureCount > 0) {
+            alert(`오프라인 지도를 일부 저장했습니다.\n성공 ${successCount}개 / 실패 ${failureCount}개\n인터넷이 연결된 상태에서 같은 지역을 다시 다운로드하면 누락된 타일을 보완할 수 있습니다.`);
+        } else {
+            alert(`오프라인 지도 저장이 완료되었습니다.\n${successCount}개 타일을 저장했습니다.`);
+        }
     } catch (e) {
         console.error('Offline map download failed:', e);
-        alert('다운로드 중 오류가 발생했습니다.');
+        alert(`다운로드 중 오류가 발생했습니다.\n${e?.message || e}`);
     } finally {
         if (overlay) {
             overlay.classList.remove('visible');

@@ -6,6 +6,8 @@
    [참고]
    - 스타일 설정 바텀시트/모달이나 기록 색상 표시가 이상할 때 확인합니다.
    ========================================================================== */
+import { L } from './vendor-globals.js';
+import { createRecordSvgRenderer } from './record-svg-renderer.js';
 import { drawnItems } from './draw.js';
 import { map } from './map.js';
 import { saveToStorage } from './data.js';
@@ -21,6 +23,7 @@ let currentStyleType = null;
 let tempStyleColor = '#3B82F6';
 let tempLineStyle = 'solid';
 let tempLineWeight = 3;
+let tempStrokeInside = false;
 let tempMarkerStyle = '';
 let tempMarkerSize = 3;
 let tempFillOpacity = 0.2;
@@ -36,8 +39,6 @@ let tempLineColor = '#3388ff';
 let tempLineColorMode = 'same';
 let solidDotOverlayLayer = null;
 let solidDotOverlayRenderer = null;
-let fillPatternOverlayLayer = null;
-let fillPatternSvgRenderer = null;
 
 const STYLE_PALETTE_COLORS = [
     '#7F1D1D', '#B91C1C', '#FF0000', '#EF4444', '#F87171', '#FEE2E2',
@@ -188,26 +189,12 @@ function getSolidDotOverlayLayer() {
         map.getPane('solidDotOverlayPane').style.pointerEvents = 'none';
     }
     if (!solidDotOverlayRenderer) {
-        solidDotOverlayRenderer = L.svg({ pane: 'solidDotOverlayPane', padding: 0.5 });
+        solidDotOverlayRenderer = createRecordSvgRenderer({ pane: 'solidDotOverlayPane', padding: 0.5 });
     }
     if (!solidDotOverlayLayer) {
         solidDotOverlayLayer = L.layerGroup().addTo(map);
     }
     return solidDotOverlayLayer;
-}
-
-function getFillPatternOverlayLayer() {
-    if (!fillPatternOverlayLayer) {
-        fillPatternOverlayLayer = L.layerGroup().addTo(map);
-    }
-    return fillPatternOverlayLayer;
-}
-
-function getFillPatternRenderer() {
-    if (!fillPatternSvgRenderer) {
-        fillPatternSvgRenderer = L.svg({ padding: 0.5 });
-    }
-    return fillPatternSvgRenderer;
 }
 
 function ensureFillPatternDefs(renderer) {
@@ -301,16 +288,19 @@ function addSolidDotOverlayForLayer(layer) {
     const segments = collectLatLngSegments(layer.getLatLngs());
     const isPolygonLayer = layer instanceof L.Polygon;
 
-    segments.forEach(segment => {
-        if (!segment || segment.length < 2) return;
+    const inside = isPolygonLayer && props.customStrokeInside === true;
+    const overlaySegments = inside ? [layer.getLatLngs()] : segments;
+    overlaySegments.forEach(segment => {
+        if (!segment || (!inside && segment.length < 2)) return;
         const dotLineLatLngs = [...segment];
-        if (isPolygonLayer && segment.length > 2) {
+        if (!inside && isPolygonLayer && segment.length > 2) {
             const first = segment[0];
             const last = segment[segment.length - 1];
             if (first.lat !== last.lat || first.lng !== last.lng) dotLineLatLngs.push(first);
         }
 
-        const dotLine = L.polyline(dotLineLatLngs, {
+        const dotLine = (inside ? L.polygon : L.polyline)(dotLineLatLngs, {
+            strokeInside: inside,
             pane: 'solidDotOverlayPane',
             renderer: solidDotOverlayRenderer,
             color,
@@ -336,47 +326,53 @@ export function syncSolidDotOverlays() {
     }
 }
 
-function getFillPatternId(pattern) {
-    const normalized = normalizeFillPattern(pattern);
-    return normalized === 'solid' || normalized === 'none' ? null : `ffield-fill-${normalized}`;
+function clearLayerFillPattern(layer) {
+    if (!(layer instanceof L.Polygon) || !layer._path) return;
+    const props = layer.feature?.properties || {};
+    const isHidden = props.isHidden === true;
+    const fillColor = props.customFillColor || props.customColor || layer.options?.fillColor || layer.options?.color || '#3388ff';
+    const fillOpacity = isHidden ? 0 : getLayerFillOpacity(layer);
+    layer._path.setAttribute('fill', fillColor);
+    layer._path.setAttribute('fill-opacity', String(fillOpacity));
+    layer._path.style.fill = fillColor;
+    layer._path.style.fillOpacity = String(fillOpacity);
+    layer._path.style.display = isHidden ? 'none' : '';
 }
 
-function addFillPatternOverlayForLayer(layer) {
-    if (!(layer instanceof L.Polygon) || typeof layer.getLatLngs !== 'function') return;
+function applyFillPatternToLayer(layer) {
+    if (!(layer instanceof L.Polygon)) return;
     const props = layer.feature?.properties || {};
     const pattern = normalizeFillPattern(props.customFillPattern);
-    if (pattern === 'solid' || pattern === 'none' || props.isHidden === true) return;
+    if (pattern === 'solid' || pattern === 'none' || props.isHidden === true) {
+        clearLayerFillPattern(layer);
+        return;
+    }
 
-    const fillOpacity = normalizeOpacityValue(props.customFillOpacity, 0);
-    if (fillOpacity <= 0) return;
+    const fillOpacity = getLayerStoredFillOpacity(layer);
+    if (fillOpacity <= 0) {
+        clearLayerFillPattern(layer);
+        return;
+    }
     const fillColor = props.customFillColor || props.customColor || layer.options?.fillColor || layer.options?.color || '#3388ff';
 
-    const renderer = getFillPatternRenderer();
-    const patternLayer = L.polygon(layer.getLatLngs(), {
-        renderer,
-        interactive: false,
-        bubblingMouseEvents: false,
-        stroke: false,
-        fill: true,
-        fillOpacity: 1,
-        fillColor
-    }).addTo(getFillPatternOverlayLayer());
-
     const applyPattern = () => {
+        const renderer = layer._renderer;
         const patternId = ensureLayerFillPattern(renderer, pattern, fillColor, fillOpacity);
-        if (patternLayer._path && patternId) {
-            patternLayer._path.setAttribute('fill', `url(#${patternId})`);
-            patternLayer._path.style.pointerEvents = 'none';
+        if (layer._path && patternId) {
+            const patternFill = `url(#${patternId})`;
+            layer._path.style.display = '';
+            layer._path.setAttribute('fill', patternFill);
+            layer._path.setAttribute('fill-opacity', '1');
+            layer._path.style.fill = patternFill;
+            layer._path.style.fillOpacity = '1';
         }
     };
-    if (patternLayer._path) applyPattern();
-    else patternLayer.once('add', applyPattern);
+    if (layer._path && layer._renderer?._container) applyPattern();
+    else layer.once('add', applyPattern);
 }
 
 export function syncFillPatternOverlays() {
-    const overlay = getFillPatternOverlayLayer();
-    overlay.clearLayers();
-    drawnItems.getLayers().forEach(addFillPatternOverlayForLayer);
+    drawnItems.getLayers().forEach(applyFillPatternToLayer);
 }
 
 /**
@@ -402,6 +398,7 @@ export function openStyleModal(id) {
     tempFillColor = props.customFillColor || props.customColor || '#3388ff';
     tempLineColor = props.customStrokeColor || props.customColor || '#3388ff';
     tempLineColorMode = props.customStrokeColor ? 'custom' : 'same';
+    tempStrokeInside = props.customStrokeInside === true;
     tempLineStyle = props.customLineStyle || getLineStyleFromDashArray(props.customDashArray);
     tempLineWeight = Number.isFinite(Number(props.customWeight)) ? normalizeLineWeight(props.customWeight) : 3;
     tempMarkerStyle = normalizeMarkerStyle(props.customEmoji || '');
@@ -487,6 +484,7 @@ export function openStyleModalForExternalLayer({ id, type = 'polygon', style = {
     tempFillColor = style.customFillColor || style.fillColor || style.customColor || '#3388ff';
     tempLineColor = style.customStrokeColor || style.color || style.customColor || tempFillColor;
     tempLineColorMode = (style.customStrokeColor || (style.color && style.color !== tempFillColor)) ? 'custom' : 'same';
+    tempStrokeInside = false;
     tempLineStyle = style.stroke === false
         ? 'none'
         : (style.customLineStyle || getLineStyleFromDashArray(style.customDashArray || style.dashArray));
@@ -568,6 +566,13 @@ function updateStyleModalUI() {
 
     const isPolygon = currentStyleType === 'polygon';
     const isTile = currentStyleType === 'tile';
+    const insideSection = document.getElementById('style-stroke-inside-section');
+    const insideInput = document.getElementById('style-stroke-inside');
+    if (insideSection) insideSection.style.display = isPolygon && !externalStyleTarget && currentStyleTab === 'line' ? 'block' : 'none';
+    if (insideInput) {
+        insideInput.checked = tempStrokeInside;
+        insideInput.onchange = () => { tempStrokeInside = insideInput.checked; };
+    }
     const fillTabBtn = document.getElementById('style-fill-tab-btn');
     const lineTabBtn = document.getElementById('style-line-tab-btn');
     if (fillTabBtn) fillTabBtn.classList.toggle('selected', currentStyleTab === 'fill');
@@ -588,7 +593,7 @@ function updateStyleModalUI() {
     if (colorTitle) colorTitle.innerText = isPolygon ? '면 색상 선택' : '색상 선택';
     if (fillColorSec) fillColorSec.style.display = !isTile && (!isPolygon || currentStyleTab === 'fill') ? 'block' : 'none';
     if (polySec) polySec.style.display = !isTile && isPolygon && currentStyleTab === 'fill' ? 'block' : 'none';
-    if (fillPatternSec) fillPatternSec.style.display = !isTile && isPolygon && currentStyleTab === 'fill' && !externalStyleTarget ? 'block' : 'none';
+    if (fillPatternSec) fillPatternSec.style.display = !isTile && isPolygon && currentStyleTab === 'fill' ? 'block' : 'none';
     if (lineColorSec) lineColorSec.style.display = !isTile && isPolygon && currentStyleTab === 'line' ? 'block' : 'none';
     if (lineSec) lineSec.style.display = !isTile && ((!isPolygon && currentStyleType !== 'marker') || (isPolygon && currentStyleTab === 'line')) ? 'block' : 'none';
     if (lineWeightSec) lineWeightSec.style.display = !isTile && ((!isPolygon && currentStyleType !== 'marker') || (isPolygon && currentStyleTab === 'line')) ? 'block' : 'none';
@@ -932,7 +937,8 @@ export function applyStyleSettings() {
             customWeight: tempLineWeight,
             customLineStyle: tempLineStyle,
             customDashArray,
-            customFillOpacity: currentStyleType === 'polygon' ? tempFillOpacity : 0
+            customFillOpacity: currentStyleType === 'polygon' ? tempFillOpacity : 0,
+            customFillPattern: currentStyleType === 'polygon' ? tempFillPattern : 'solid'
         });
         closeStyleModal();
         return;
@@ -955,6 +961,7 @@ export function applyStyleSettings() {
         props.customDashArray = getLineStyleDashArray(tempLineStyle, tempLineWeight);
 
         if (currentStyleType === 'polygon') {
+            props.customStrokeInside = tempStrokeInside;
             props.customFillColor = appliedFillColor;
             if (tempLineColorMode === 'custom') props.customStrokeColor = appliedLineColor;
             else delete props.customStrokeColor;

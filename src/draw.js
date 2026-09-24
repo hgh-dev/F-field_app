@@ -6,13 +6,14 @@
    [참고]
    - 사용자가 직접 그리는 기록의 생성/편집 흐름을 바꿀 때 확인합니다.
    ========================================================================== */
+import { L } from './vendor-globals.js';
+import { createRecordSvgRenderer } from './record-svg-renderer.js';
 import { map } from './map.js';
 import { AppState } from './state.js';
-import { updateLayerInfo, renderSurveyList, switchSidebarTab, highlightButton, resetButtonStyles, openBottomSheet, closeBottomSheet, currentBottomSheetLayerId, setCurrentBottomSheetLayerId, syncFillPatternOverlays, syncSolidDotOverlays } from './ui.js';
-import { getRandomColor, getTimestampString, createColoredMarkerIcon, setRecordingModeActive, setRecordName } from './utils.js';
-import { saveToStorage } from './data.js';
+import { getRandomColor, getTimestampString, createColoredMarkerIcon, getRecordName, setRecordingModeActive, setRecordName } from './utils.js';
 import { requestWakeLock, releaseWakeLock } from './wake-lock.js';
 import { showAppConfirm, showTextPrompt } from './app-dialog.js';
+import { validateRuntimeDependencies } from './runtime-dependencies.js';
 import {
     clearSnapGuide,
     configureDrawSnap,
@@ -25,6 +26,45 @@ import {
 } from './draw-snap.js';
 
 export { setSnapEnabled, syncSnapToggleButtons };
+
+let updateLayerInfo;
+let renderSurveyList;
+let switchSidebarTab;
+let highlightButton;
+let resetButtonStyles;
+let closeBottomSheet;
+let syncFillPatternOverlays;
+let syncSolidDotOverlays;
+let saveToStorage;
+
+/**
+ * 그리기 엔진이 데이터/UI 통합 모듈을 직접 import하지 않도록 콜백을 연결합니다.
+ * 앱 진입점(script.js)에서 한 번만 호출합니다.
+ */
+export function configureDrawRuntime(dependencies) {
+    const validatedDependencies = validateRuntimeDependencies('draw', dependencies, {
+        updateLayerInfo: 'function',
+        renderSurveyList: 'function',
+        switchSidebarTab: 'function',
+        highlightButton: 'function',
+        resetButtonStyles: 'function',
+        closeBottomSheet: 'function',
+        syncFillPatternOverlays: 'function',
+        syncSolidDotOverlays: 'function',
+        saveToStorage: 'function'
+    });
+    ({
+        updateLayerInfo,
+        renderSurveyList,
+        switchSidebarTab,
+        highlightButton,
+        resetButtonStyles,
+        closeBottomSheet,
+        syncFillPatternOverlays,
+        syncSolidDotOverlays,
+        saveToStorage
+    } = validatedDependencies);
+}
 
 
 
@@ -72,6 +112,17 @@ if (L.drawLocal?.draw?.handlers?.simpleshape?.tooltip) {
 // 앱에서 관리하는 모든 사용자 도형이 모이는 레이어 그룹입니다.
 // 원리: 개별 레이어 대신 그룹 단위로 add/remove/edit 대상을 통일하면 제어가 단순해집니다.
 export const drawnItems = new L.FeatureGroup();
+
+export function getUniqueRecordName(baseName) {
+    const normalizedBaseName = String(baseName || '기록').trim() || '기록';
+    const existingNames = new Set(drawnItems.getLayers().map(layer => getRecordName(layer.feature?.properties || {})));
+    if (!existingNames.has(normalizedBaseName)) return normalizedBaseName;
+
+    let suffix = 2;
+    while (existingNames.has(`${normalizedBaseName}(${suffix})`)) suffix += 1;
+    return `${normalizedBaseName}(${suffix})`;
+}
+export const recordSvgRenderer = createRecordSvgRenderer({ padding: 0.5 });
 // 현재 편집 중인 레이어 ID (없으면 null)
 export let currentEditLayerId = null;
 // 편집 취소/되돌리기용 원본 좌표 스냅샷
@@ -97,7 +148,7 @@ configureDrawSnap({ drawnItems });
                     className: 'leaflet-div-icon leaflet-editing-icon'
                 });
                 const restorePromotedMarkerIcon = () => {
-                    middleMarker.off('dragstart click touchmove', restorePromotedMarkerIcon);
+                    middleMarker.off('dragend click touchend', restorePromotedMarkerIcon);
                     requestAnimationFrame(() => {
                         if (!middleMarker._map) return;
                         middleMarker.setIcon(vertexIcon);
@@ -115,7 +166,14 @@ configureDrawSnap({ drawnItems });
                 middleMarker.on('click', event => {
                     if (event?.originalEvent) L.DomEvent.stop(event.originalEvent);
                 });
-                middleMarker.on('dragstart click touchmove', restorePromotedMarkerIcon);
+                // Finish touch promotion too; Leaflet.draw only creates the two
+                // replacement middle handles on dragend, not on touchend.
+                middleMarker.once('touchend', () => {
+                    if (Number.isInteger(middleMarker._index)) middleMarker.fire('dragend');
+                });
+                // Replacing an icon during dragstart detaches the active drag
+                // element. Restore it only after the gesture has finished.
+                middleMarker.on('dragend click touchend', restorePromotedMarkerIcon);
             }
         };
     }
@@ -129,6 +187,7 @@ const DRAW_PATH_OPACITY = 0.85;
 
 function getDrawPathStyle(color) {
     return {
+        renderer: recordSvgRenderer,
         color,
         fillColor: color,
         weight: DRAW_PATH_WEIGHT,
@@ -148,8 +207,8 @@ function getDefaultPolygonFillProperties() {
 const drawControl = new L.Control.Draw({
     edit: { featureGroup: drawnItems },
     draw: {
-        polygon: true,
-        polyline: true,
+        polygon: { shapeOptions: { renderer: recordSvgRenderer } },
+        polyline: { shapeOptions: { renderer: recordSvgRenderer } },
         marker: { icon: defaultSurveyIcon },
         circle: false,
         rectangle: false,
@@ -239,6 +298,18 @@ L.Edit.PolyVerticesEdit.prototype._onMarkerDrag = function (e) {
     syncSelectedVertexHighlightFromDrag(marker);
 
     return originalEditPolyMarkerDrag.call(this, e);
+};
+
+// Leaflet.draw's touch handler rebuilds all handles before a middle handle
+// is promoted, leaving promotion linked to removed vertex markers. Keep the
+// same handles throughout the gesture and use the normal drag update path.
+L.Edit.PolyVerticesEdit.prototype._onTouchMove = function (e) {
+    const touch = e.originalEvent?.touches?.[0] || e.originalEvent;
+    if (!touch || !Number.isFinite(touch.clientX) || !Number.isFinite(touch.clientY)) return;
+    const marker = e.target;
+    if (!Number.isInteger(marker._index)) marker.fire('dragstart');
+    marker.setLatLng(this._map.layerPointToLatLng(this._map.mouseEventToLayerPoint(touch)));
+    this._onMarkerDrag(e);
 };
 
 const originalEditPolyFireEdit = L.Edit.PolyVerticesEdit.prototype._fireEdit;
@@ -446,7 +517,13 @@ export function completeDrawing() {
 /**
  * 현재 그리기를 취소하고 입력 중 상태를 정리합니다.
  */
-export function cancelDrawing() {
+export async function cancelDrawing() {
+    const shouldCancel = await showAppConfirm(
+        "측량을 취소하시겠습니까?\n입력 중인 기록이 사라집니다.",
+        { title: '기록 취소' }
+    );
+    if (!shouldCancel) return;
+
     if (AppState.currentDrawer) {
         AppState.currentDrawer.disable();
         AppState.currentDrawer._lastSnapMousePointKey = null;
@@ -471,8 +548,42 @@ function resetDrawingState() {
     if (AppState.pendingPhotos) {
         AppState.pendingPhotos = null;
     }
+    if (AppState.pendingPhotoRecordName) {
+        AppState.pendingPhotoRecordName = null;
+    }
     // 다음 그리기 시작 시 새 색상을 뽑도록 초기화
     AppState.currentDrawColor = null;
+}
+
+/**
+ * 기록명 입력을 취소했을 때 완료 직전의 측량 상태로 되돌립니다.
+ * 선/면은 기존 꼭지점을 복원하고, 점은 위치를 다시 선택할 수 있게 합니다.
+ */
+function resumeDrawingAfterNameCancel(createdLayer, layerType) {
+    const drawer = AppState.currentDrawer;
+    if (!drawer) {
+        startDraw(layerType);
+        if (AppState.pendingPhotos?.length) highlightButton('btn-photo-point');
+        return;
+    }
+
+    let vertices = typeof createdLayer?.getLatLngs === 'function'
+        ? createdLayer.getLatLngs()
+        : [];
+    while (Array.isArray(vertices[0])) vertices = vertices[0];
+
+    drawer.enable();
+    drawer._lastSnapMousePointKey = null;
+
+    if (drawer instanceof L.Draw.Polygon || drawer instanceof L.Draw.Polyline) {
+        vertices.forEach(latlng => originalPolylineAddVertex.call(drawer, latlng));
+    }
+
+    setRecordingModeActive(true);
+    requestWakeLock();
+    actionToolbar.style.display = 'flex';
+    updateDrawingCompleteButtonState();
+    syncCompletionVertexClickTarget();
 }
 
 
@@ -895,22 +1006,11 @@ map.on(L.Draw.Event.EDITVERTEX, function () {
  */
 map.on(L.Draw.Event.CREATED, async function (event) {
     const layer = event.layer;
-    let memo = null;
-    // 실수로 취소를 눌렀을 때를 대비해, 취소 의사를 한 번 더 확인합니다.
-    while (memo === null) {
-        memo = await showTextPrompt("기록명 입력:", getTimestampString());
-        if (memo !== null) break;
-
-        const shouldCancelSave = await showAppConfirm("기록 저장을 취소하시겠습니까?\n측량한 기록이 사라집니다.", { title: '기록 저장 취소' });
-        if (shouldCancelSave) {
-            if (AppState.currentDrawer) {
-                AppState.currentDrawer.disable();
-                AppState.currentDrawer._lastSnapMousePointKey = null;
-                AppState.currentDrawer = null;
-            }
-            resetDrawingState();
-            return;
-        }
+    const defaultRecordName = AppState.pendingPhotoRecordName || getTimestampString();
+    let memo = await showTextPrompt("기록명 입력:", defaultRecordName);
+    if (memo === null) {
+        resumeDrawingAfterNameCancel(layer, event.layerType);
+        return;
     }
     if (!memo) memo = getTimestampString();
 
@@ -926,7 +1026,7 @@ map.on(L.Draw.Event.CREATED, async function (event) {
     };
     layer.feature = {
         type: "Feature",
-        properties: setRecordName(baseProperties, memo)
+        properties: setRecordName(baseProperties, getUniqueRecordName(memo))
     };
 
     // 점 생성 전 임시 보관했던 사진 목록이 있으면 이 레이어에 1회 귀속시킵니다.

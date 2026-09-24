@@ -8,7 +8,7 @@
    - fetch 이벤트에서 요청 종류를 구분해 캐시/네트워크 전략을 선택하고, 새 워커는 메시지로 즉시 활성화할 수 있습니다.
    ========================================================================== */
 
-const STATIC_CACHE_NAME = 'F-field-v1.0.10';
+const STATIC_CACHE_NAME = 'F-field-v1.2.1';
 const MAP_CACHE_NAME = 'F-field-map-v1';
 const OFFLINE_MAP_PACKAGE_CACHE_PREFIX = 'F-field-map-package-';
 const MAP_CACHE_MAX_ITEMS = 15000;
@@ -92,6 +92,7 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
+    const isSameOriginRequest = requestUrl.origin === self.location.origin;
     const isVworldRequest = url.includes('api.vworld.kr');
     const isVworldWmtsTileRequest = isVworldRequest && url.includes('/req/wmts');
     const isOwnStaticMapTileRequest = requestUrl.hostname === 'hgh-dev.github.io'
@@ -130,14 +131,23 @@ self.addEventListener('fetch', (event) => {
         return; // 여기서 종료
     }
 
-    // 전략 B: 내 코드 (index.html, script.js 등) -> "네트워크 우선 (Network First)"
+    // 사용자 지정 XYZ/WMS/PMTiles 등 외부 자원은 정적 앱 캐시에 넣지 않습니다.
+    // 출처를 알 수 없는 타일을 무제한 저장하면 Cache Storage가 IndexedDB와 저장 공간을
+    // 경쟁해 프로젝트나 사진 저장까지 실패할 수 있습니다.
+    if (!isSameOriginRequest) {
+        return;
+    }
+
+    // 전략 B: 같은 출처의 앱 코드와 정적 자원 -> "네트워크 우선 (Network First)"
     // 목적: 최신 업데이트 반영! 인터넷 되면 무조건 새거 받아옴. 안 될 때만 캐시 씀.
     event.respondWith(
         fetch(event.request)
             .then((networkResponse) => {
                 // 인터넷에서 잘 받아왔으면? -> 캐시도 최신으로 교체해두고, 브라우저에 줌
                 return caches.open(STATIC_CACHE_NAME).then((cache) => {
-                    cache.put(event.request, networkResponse.clone());
+                    if (networkResponse.ok) {
+                        cache.put(event.request, networkResponse.clone()).catch(() => {});
+                    }
                     return networkResponse;
                 });
             })

@@ -8,6 +8,7 @@
    ========================================================================== */
 import { SVG_ICONS } from './config.js';
 import { showAppPrompt } from './app-dialog.js';
+import { proj4, registerShpCrsDefinitions } from './shp-crs.js';
 
 /* ==========================================================================
    1) 포맷/생성 유틸
@@ -113,6 +114,13 @@ function escapeHtml(value) {
         .replace(/'/g, '&#39;');
 }
 
+export function normalizeColor(value, fallback = '#3388ff') {
+    const color = String(value || '').trim();
+    if (/^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(color)) return color;
+    if (/^[a-zA-Z]+$/.test(color)) return color;
+    return fallback;
+}
+
 export function isPresetMarkerStyle(style) {
     return MARKER_STYLE_IDS.has(style);
 }
@@ -197,6 +205,7 @@ export function getLineStyleFromDashArray(dashArray, fallback = 'solid') {
 }
 
 export function createMarkerShapeSvg(color, markerStyle = '', iconSize = 36) {
+    color = normalizeColor(color, '#FF0000');
     const style = normalizeMarkerStyle(markerStyle);
     const stroke = 'white';
     const strokeWidth = 0.8;
@@ -280,7 +289,11 @@ export function createColoredMarkerIcon(color, markerStyle = '', size = 3) {
  * 동작 원리: 우선 navigator.clipboard를 사용하고, 실패 시 textarea+execCommand로 fallback 합니다.
  */
 export function copyText(text, silent = false, itemLabel = "주소") {
-    const msg = `${itemLabel}가 복사되었습니다.`;
+    const label = String(itemLabel || '텍스트');
+    const lastChar = Array.from(label).pop();
+    const code = lastChar ? lastChar.charCodeAt(0) : 0;
+    const hasBatchim = code >= 0xac00 && code <= 0xd7a3 && ((code - 0xac00) % 28) !== 0;
+    const msg = `${label}${hasBatchim ? '이' : '가'} 복사되었습니다.`;
 
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(text).then(() => {
@@ -320,7 +333,7 @@ export function getShortAddress(addressName) {
  * 동작 원리: proj4 변환 결과를 반올림해 정수 미터 좌표로 반환합니다.
  */
 export function getTmCoords(lat, lng) {
-    // proj4는 index.html에서 전역으로 로드되어 있다고 가정합니다.
+    registerShpCrsDefinitions();
     const xy = proj4("EPSG:4326", "EPSG:5186", [lng, lat]);
     return { x: Math.round(xy[0]), y: Math.round(xy[1]) };
 }
@@ -346,15 +359,13 @@ export function formatCoordinate(lat, lng, mode = 0, options = {}) {
  * TM(EPSG:5186) 좌표를 WGS84(lat,lng)로 변환합니다.
  */
 export function getWgs84FromTm(x, y) {
+    registerShpCrsDefinitions();
     const coords = proj4("EPSG:5186", "EPSG:4326", [x, y]);
     return { lat: coords[1], lng: coords[0] };
 }
 
 function ensureCalculationCrs() {
-    if (typeof proj4 === 'undefined' || !proj4.defs) return;
-    if (!proj4.defs("EPSG:5179")) {
-        proj4.defs("EPSG:5179", "+proj=tmerc +lat_0=38 +lon_0=127.5 +k=0.9996 +x_0=1000000 +y_0=2000000 +ellps=GRS80 +units=m +no_defs");
-    }
+    registerShpCrsDefinitions();
 }
 
 function projectWgs84ToCalculationPoint(lng, lat) {

@@ -8,9 +8,10 @@
    ========================================================================== */
 import { AppState } from './state.js';
 import { drawnItems } from './draw.js';
-import { getTimestampString, getRecordName, ensureRecordNameAlias } from './utils.js';
+import { getTimestampString, getRecordName } from './utils.js';
 import { isNativeApp, saveBlobNative } from './native-bridge.js';
 import { showAppConfirm } from './app-dialog.js';
+import { attachProjectExportMetadata, ensureFeatureCollectionRecordNames } from './project-data-contract.js';
 
 let jsZipPromise = null;
 let shpWriteZipPromise = null;
@@ -18,25 +19,6 @@ let saveToStorageCallback = async () => {};
 
 export function configureDataTransferExport({ saveToStorage } = {}) {
     saveToStorageCallback = saveToStorage || saveToStorageCallback;
-}
-
-function cloneRecordGroups(recordGroups) {
-    if (!Array.isArray(recordGroups)) return [];
-    return recordGroups
-        .filter(group => group && typeof group === 'object' && group.id)
-        .map(group => ({
-            id: String(group.id),
-            name: String(group.name || '그룹'),
-            collapsed: Boolean(group.collapsed),
-            createdAt: group.createdAt || new Date().toISOString()
-        }));
-}
-
-function attachProjectExportMetadata(featureCollection, project) {
-    featureCollection.isProjectExport = true;
-    featureCollection.projectName = project.name;
-    featureCollection.exportedAt = new Date().toISOString();
-    featureCollection.recordGroups = cloneRecordGroups(project.recordGroups);
 }
 
 async function getJSZipConstructor() {
@@ -51,70 +33,6 @@ async function getShpWriteZip() {
         shpWriteZipPromise = import('@crmackey/shp-write').then(module => module.zip);
     }
     return shpWriteZipPromise;
-}
-
-function normalizeImportedFeatureProperties(feature) {
-    if (!feature || typeof feature !== 'object') return;
-    const props = feature.properties || (feature.properties = {});
-
-    const pickFirstDefined = (keys) => {
-        for (const key of keys) {
-            if (Object.prototype.hasOwnProperty.call(props, key) && props[key] !== undefined && props[key] !== null && props[key] !== '') {
-                return props[key];
-            }
-        }
-        return undefined;
-    };
-
-    const assignIfMissing = (targetKey, aliasKeys) => {
-        if (props[targetKey] !== undefined && props[targetKey] !== null && props[targetKey] !== '') return;
-        const value = pickFirstDefined(aliasKeys);
-        if (value !== undefined) props[targetKey] = value;
-    };
-
-    assignIfMissing('customColor', ['customcolo', 'CUSTOMCOLO', 'customcolor', 'CUSTOMCOLOR', 'color', 'COLOR']);
-    assignIfMissing('customEmoji', ['customemoj', 'CUSTOMEMOJ']);
-    assignIfMissing('customMarkerSize', ['custommarke', 'CUSTOMMARKE']);
-    assignIfMissing('customDashArray', ['customdash', 'CUSTOMDASH']);
-    assignIfMissing('customWeight', ['customweig', 'CUSTOMWEIG', 'weight', 'WEIGHT']);
-    assignIfMissing('customFillOpacity', ['customfill', 'CUSTOMFILL', 'fillopacit', 'FILLOPACIT']);
-    assignIfMissing('description', ['descriptio', 'DESCRIPTIO']);
-    assignIfMissing('name', ['name', 'NAME', 'memo', 'MEMO']);
-    assignIfMissing('memo', ['memo', 'MEMO', 'name', 'NAME']);
-    ensureRecordNameAlias(props);
-
-    if (props.customMarkerSize !== undefined) {
-        const parsed = parseInt(props.customMarkerSize, 10);
-        if (!Number.isNaN(parsed)) {
-            props.customMarkerSize = Math.min(5, Math.max(1, parsed));
-        }
-    }
-    if (props.customWeight !== undefined) {
-        const parsed = parseInt(props.customWeight, 10);
-        if (!Number.isNaN(parsed)) {
-            props.customWeight = Math.min(5, Math.max(1, parsed));
-        }
-    }
-    if (props.customFillOpacity !== undefined) {
-        const parsed = parseFloat(props.customFillOpacity);
-        if (!Number.isNaN(parsed)) {
-            props.customFillOpacity = Math.min(1, Math.max(0, parsed));
-        }
-    }
-
-    if (typeof props.isHidden === 'string') {
-        const v = props.isHidden.trim().toLowerCase();
-        props.isHidden = (v === 'true' || v === 't' || v === '1' || v === 'y');
-    }
-    if (typeof props.customFill === 'string') {
-        const v = props.customFill.trim().toLowerCase();
-        props.customFill = (v === 'true' || v === 't' || v === '1' || v === 'y');
-    }
-}
-
-function ensureFeatureCollectionRecordNames(featureCollection) {
-    if (!featureCollection || !Array.isArray(featureCollection.features)) return;
-    featureCollection.features.forEach(feature => normalizeImportedFeatureProperties(feature));
 }
 
 function buildShpExportOptions(baseName) {
@@ -339,7 +257,7 @@ export async function exportCurrentProject() {
     if (!project) return;
 
     const currentFeatures = drawnItems.toGeoJSON();
-    ensureFeatureCollectionRecordNames(currentFeatures);
+    ensureFeatureCollectionRecordNames(currentFeatures, { normalizeId: false });
 
     if (currentFeatures.features.length === 0) {
         alert("저장할 기록이 없습니다.");
@@ -382,7 +300,7 @@ export async function backupAllProjects() {
             if (!features || !features.features) {
                 features = { type: "FeatureCollection", features: [] };
             }
-            ensureFeatureCollectionRecordNames(features);
+            ensureFeatureCollectionRecordNames(features, { normalizeId: false });
 
             attachProjectExportMetadata(features, p);
 

@@ -6,6 +6,7 @@
    [참고]
    - 개별 기록 버튼 동작이나 공유 문구가 이상할 때 확인합니다.
    ========================================================================== */
+import { L } from './vendor-globals.js';
 import { SHARE_BASE_URL } from './config.js';
 import { drawnItems } from './draw.js';
 import { map } from './map.js';
@@ -18,6 +19,7 @@ import { closeBottomSheet } from './ui-bottomsheet.js';
 import { renderSurveyList } from './ui-project.js';
 import { closeSidebar } from './ui-sidebar.js';
 import { scheduleViewportVectorOptimization } from './ui-viewport.js';
+import { applyLayerVisibilityState } from './ui-layer-detail.js';
 
 /**
  * [함수] shareLocationText
@@ -67,6 +69,14 @@ export async function deleteLayerById(id) {
 export function zoomToLayer(id) {
     const layer = drawnItems.getLayers().find(l => l.feature.properties.id === id);
     if (!layer) return;
+
+    if (layer.feature.properties.isHidden === true) {
+        applyLayerVisibilityState(layer, false);
+        saveToStorage();
+        renderSurveyList();
+        scheduleViewportVectorOptimization();
+    }
+
     closeSidebar();
     if (layer instanceof L.Marker) {
         map.flyTo(layer.getLatLng(), 19);

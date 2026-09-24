@@ -1,7 +1,7 @@
 /* ==========================================================================
    [모듈] 화면 꺼짐 방지 (wake-lock.js)
    [역할]
-   - 트랙 기록이나 현장 기록 중 화면이 자동으로 꺼지지 않도록 Wake Lock을 관리합니다.
+   - 수동 현장 기록 중 화면이 자동으로 꺼지지 않도록 Wake Lock을 관리합니다.
    - Wake Lock 미지원 환경에서는 무음 비디오 fallback으로 보조합니다.
    [참고]
    - 기록 중 화면 꺼짐 방지 기능이 동작하지 않을 때 확인합니다.
@@ -65,7 +65,9 @@ export function releaseWakeLock() {
 
 // 백그라운드 복귀 시 기록 모드면 wake lock을 다시 요청합니다.
 document.addEventListener('visibilitychange', async () => {
-    if (document.visibilityState === 'visible' && document.body.classList.contains('recording-mode')) {
+    if (document.visibilityState === 'visible'
+        && document.body.classList.contains('recording-mode')
+        && AppState.currentDrawer !== 'track') {
         requestWakeLock();
     }
 });

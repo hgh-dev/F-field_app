@@ -6,32 +6,61 @@
    [참고]
    - 앱 데이터가 저장/복원되지 않거나 프로젝트 전환이 이상할 때 확인합니다.
    ========================================================================== */
+import { L, turf } from './vendor-globals.js';
 import { STORAGE_KEY } from './config.js';
 import { AppState } from './state.js';
-import { drawnItems } from './draw.js';
-import { renderSurveyList, updateLayerInfo, renderProjectSelector, openSidebar, switchSidebarTab } from './ui.js';
-import { getRandomColor, createColoredMarkerIcon, getShortAddress, getLineStyleDashArray, normalizeFillPattern, setRecordName, ensureRecordNameAlias } from './utils.js';
+import { getRandomColor, createColoredMarkerIcon, getRecordName, getShortAddress, getLineStyleDashArray, normalizeFillPattern, setRecordName, ensureRecordNameAlias } from './utils.js';
 import { VWORLD_API_KEY } from './config.js';
 import { map } from './map.js';
 import localforage from 'localforage';
 import { showAppConfirm } from './app-dialog.js';
+import { enqueueStorageWrite } from './storage-write-queue.js';
+import {
+    cloneRecordGroups,
+    normalizeImportedFeatureProperties
+} from './project-data-contract.js';
+import { validateRuntimeDependencies } from './runtime-dependencies.js';
+
+let drawnItems;
+let getUniqueRecordName;
+let recordSvgRenderer;
+let renderSurveyList;
+let updateLayerInfo;
+let renderProjectSelector;
+let openSidebar;
+let switchSidebarTab;
+
+/**
+ * 데이터 저장소가 지도/화면 구현을 직접 import하지 않도록 런타임 의존성을 연결합니다.
+ * 앱 진입점(script.js)에서 한 번만 호출합니다.
+ */
+export function configureProjectDataRuntime(dependencies) {
+    const validatedDependencies = validateRuntimeDependencies('project-data', dependencies, {
+        drawnItems: 'object',
+        getUniqueRecordName: 'function',
+        recordSvgRenderer: 'object',
+        renderSurveyList: 'function',
+        updateLayerInfo: 'function',
+        renderProjectSelector: 'function',
+        openSidebar: 'function',
+        switchSidebarTab: 'function'
+    });
+    ({
+        drawnItems,
+        getUniqueRecordName,
+        recordSvgRenderer,
+        renderSurveyList,
+        updateLayerInfo,
+        renderProjectSelector,
+        openSidebar,
+        switchSidebarTab
+    } = validatedDependencies);
+}
 
 let dataTransferPromise = null;
 function getDataTransferModule() {
     if (!dataTransferPromise) dataTransferPromise = import('./data-transfer.js');
     return dataTransferPromise;
-}
-
-function cloneRecordGroups(recordGroups) {
-    if (!Array.isArray(recordGroups)) return [];
-    return recordGroups
-        .filter(group => group && typeof group === 'object' && group.id)
-        .map(group => ({
-            id: String(group.id),
-            name: String(group.name || '그룹'),
-            collapsed: Boolean(group.collapsed),
-            createdAt: group.createdAt || new Date().toISOString()
-        }));
 }
 
 /* ==========================================================================
@@ -79,7 +108,7 @@ export async function saveToStorage() {
 
     // localForage는 내부적으로 IndexedDB를 사용해 큰 객체도 문자열 변환 없이 저장할 수 있습니다.
     try {
-        await localforage.setItem(STORAGE_KEY, storageData);
+        await enqueueStorageWrite(STORAGE_KEY, storageData);
     } catch (err) {
         console.error("Storage save failed:", err);
         alert("데이터 저장 실패: " + err);
@@ -249,81 +278,11 @@ export function fitCurrentProjectToMap() {
 }
 
 /**
- * SHP/DBF 불러오기 시 잘릴 수 있는 속성명(최대 10자)을 표준 키로 보정합니다.
- * 동작 원리:
- * - DBF 필드 길이 제한으로 `customColor -> customcolo`처럼 잘린 키를 원래 키로 매핑합니다.
- * - 타입(숫자/불리언)으로 쓰이는 값은 후속 렌더링 충돌을 막기 위해 한 번 더 정규화합니다.
- */
-function normalizeImportedFeatureProperties(feature) {
-    if (!feature || typeof feature !== 'object') return;
-    const props = feature.properties || (feature.properties = {});
-
-    const pickFirstDefined = (keys) => {
-        for (const key of keys) {
-            if (Object.prototype.hasOwnProperty.call(props, key) && props[key] !== undefined && props[key] !== null && props[key] !== '') {
-                return props[key];
-            }
-        }
-        return undefined;
-    };
-
-    const assignIfMissing = (targetKey, aliasKeys) => {
-        if (props[targetKey] !== undefined && props[targetKey] !== null && props[targetKey] !== '') return;
-        const value = pickFirstDefined(aliasKeys);
-        if (value !== undefined) props[targetKey] = value;
-    };
-
-    assignIfMissing('customColor', ['customcolo', 'CUSTOMCOLO', 'customcolor', 'CUSTOMCOLOR', 'color', 'COLOR']);
-    assignIfMissing('customEmoji', ['customemoj', 'CUSTOMEMOJ']);
-    assignIfMissing('customMarkerSize', ['custommarke', 'CUSTOMMARKE']);
-    assignIfMissing('customDashArray', ['customdash', 'CUSTOMDASH']);
-    assignIfMissing('customWeight', ['customweig', 'CUSTOMWEIG', 'weight', 'WEIGHT']);
-    assignIfMissing('customFillOpacity', ['customfill', 'CUSTOMFILL', 'fillopacit', 'FILLOPACIT']);
-    assignIfMissing('description', ['descriptio', 'DESCRIPTIO']);
-    assignIfMissing('name', ['name', 'NAME', 'memo', 'MEMO']);
-    assignIfMissing('memo', ['memo', 'MEMO', 'name', 'NAME']);
-    ensureRecordNameAlias(props);
-
-    if (props.customMarkerSize !== undefined) {
-        const parsed = parseInt(props.customMarkerSize, 10);
-        if (!Number.isNaN(parsed)) {
-            props.customMarkerSize = Math.min(5, Math.max(1, parsed));
-        }
-    }
-    if (props.customWeight !== undefined) {
-        const parsed = parseInt(props.customWeight, 10);
-        if (!Number.isNaN(parsed)) {
-            props.customWeight = Math.min(5, Math.max(1, parsed));
-        }
-    }
-    if (props.customFillOpacity !== undefined) {
-        const parsed = parseFloat(props.customFillOpacity);
-        if (!Number.isNaN(parsed)) {
-            props.customFillOpacity = Math.min(1, Math.max(0, parsed));
-        }
-    }
-
-    if (typeof props.isHidden === 'string') {
-        const v = props.isHidden.trim().toLowerCase();
-        props.isHidden = (v === 'true' || v === 't' || v === '1' || v === 'y');
-    }
-    if (typeof props.customFill === 'string') {
-        const v = props.customFill.trim().toLowerCase();
-        props.customFill = (v === 'true' || v === 't' || v === '1' || v === 'y');
-    }
-}
-
-function ensureFeatureCollectionRecordNames(featureCollection) {
-    if (!featureCollection || !Array.isArray(featureCollection.features)) return;
-    featureCollection.features.forEach(feature => normalizeImportedFeatureProperties(feature));
-}
-
-/**
  * GeoJSON을 Leaflet 레이어로 복원해 현재 프로젝트 레이어 그룹(drawnItems)에 추가합니다.
  * 동작 원리: L.geoJSON의 콜백(pointToLayer/style/onEachFeature)으로
  * 지오메트리 타입별 생성 규칙, 스타일 규칙, 속성 후처리를 분리합니다.
  */
-export function restoreFeatures(geoJsonData) {
+export function restoreFeatures(geoJsonData, options = {}) {
     const orderedGeoJsonData = getGeoJsonDataInDisplayOrder(geoJsonData);
 
     L.geoJSON(orderedGeoJsonData, {
@@ -351,7 +310,7 @@ export function restoreFeatures(geoJsonData) {
                 const weight = Number.isFinite(Number(feature.properties.customWeight))
                     ? Math.min(5, Math.max(1, parseInt(feature.properties.customWeight, 10)))
                     : 3;
-                const styleObj = { color: strokeColor, fillColor: fillColor, weight: weight };
+                const styleObj = { renderer: recordSvgRenderer, color: strokeColor, fillColor: fillColor, weight: weight };
                 styleObj.lineCap = 'round';
                 styleObj.lineJoin = 'round';
                 if (feature.geometry.type === 'Polygon') {
@@ -394,6 +353,10 @@ export function restoreFeatures(geoJsonData) {
                     } else {
                         feature.properties.customColor = layer.options.color || getRandomColor();
                     }
+                }
+
+                if (options.ensureUniqueNames === true) {
+                    setRecordName(feature.properties, getUniqueRecordName(getRecordName(feature.properties, '기록')));
                 }
 
                 layer.feature = feature;
@@ -464,11 +427,11 @@ export async function handleFileSelect(input) {
    5) 데이터 초기화/기록 생성/주소 조회
    ========================================================================== */
 /**
- * 모든 프로젝트와 기록을 삭제하고 기본 프로젝트 1개만 남기도록 초기화합니다.
- * 동작 원리: 빈 상태 대신 기본 프로젝트를 즉시 재생성해 앱의 최소 동작 조건을 유지합니다.
+ * 모든 프로젝트와 기록을 삭제하고 기본 프로젝트 1개만 남깁니다.
+ * 사용자 지도, 오프라인 지도, 검색/지도 설정과 로그인 정보는 유지합니다.
  */
 export async function clearAllData() {
-    if (!await showAppConfirm("모든 프로젝트와 기록이 삭제되고, 앱이 최초 상태로 초기화됩니다.\n이 작업은 되돌릴 수 없습니다. 계속하시겠습니까?", { title: '전체 초기화' })) return;
+    if (!await showAppConfirm("모든 프로젝트와 기록이 삭제됩니다.\n사용자 지도, 오프라인 지도, 검색/지도 설정과 로그인 정보는 유지됩니다.\n이 작업은 되돌릴 수 없습니다. 계속하시겠습니까?", { title: '프로젝트·기록 초기화' })) return;
 
     drawnItems.clearLayers();
 
@@ -495,7 +458,7 @@ export async function clearAllData() {
 export function saveCurrentPoint(lat, lng, addressName) {
     const shortName = getShortAddress(addressName);
     const marker = L.marker([lat, lng], { icon: createColoredMarkerIcon('#FF0000') });
-    marker.feature = { type: "Feature", properties: setRecordName({ id: Date.now(), customColor: '#FF0000', isHidden: false }, shortName || "지점 기록") };
+    marker.feature = { type: "Feature", properties: setRecordName({ id: Date.now(), customColor: '#FF0000', isHidden: false }, getUniqueRecordName(shortName || "지점 기록")) };
     updateLayerInfo(marker);
     drawnItems.addLayer(marker);
     saveToStorage();
@@ -524,15 +487,16 @@ export function saveCurrentBoundary(addressName) {
             addedCount++;
 
             const newLayer = L.geoJSON(singleFeature, {
-                style: { color: '#FF0000', weight: 3, opacity: 0.8, fillColor: '#FF0000', fillOpacity: 0 }
+                style: { renderer: recordSvgRenderer, color: '#FF0000', weight: 3, opacity: 0.8, fillColor: '#FF0000', fillOpacity: 0 }
             });
 
             newLayer.eachLayer(function (innerLayer) {
                 innerLayer.feature = innerLayer.feature || {};
+                const recordName = getUniqueRecordName(shortName || "지적 영역");
                 innerLayer.feature.properties = {
                     id: uniqueId,
-                    name: shortName || "지적 영역",
-                    memo: shortName || "지적 영역",
+                    name: recordName,
+                    memo: recordName,
                     customColor: '#FF0000',
                     customWeight: 3,
                     customFillPattern: 'none',

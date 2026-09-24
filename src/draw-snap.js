@@ -6,6 +6,7 @@
    [참고]
    - 그리기 중 점이 붙는 위치나 스냅 표시가 이상할 때 확인합니다.
    ========================================================================== */
+import { L } from './vendor-globals.js';
 import { map } from './map.js';
 import { AppState } from './state.js';
 

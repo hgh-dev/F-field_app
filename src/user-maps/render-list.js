@@ -13,30 +13,98 @@ export function renderUserMapListView(userMaps, helpers = {}) {
     const list = document.getElementById('user-map-list');
     if (!list) return;
 
-    if (userMaps.length === 0) {
+    const groups = Array.isArray(helpers.userMapGroups) ? helpers.userMapGroups : [];
+    if (userMaps.length === 0 && groups.length === 0) {
         list.innerHTML = '<div style="font-size:11px; color:#888; padding:2px 0 0 0;">추가된 사용자 지도가 없습니다.</div>';
         return;
     }
 
-    list.innerHTML = [...userMaps].slice().reverse().map(item => {
-        const selectionState = helpers.getCategorySelectionState(item);
-        const checked = selectionState.checked ? 'checked' : '';
-        const indeterminate = selectionState.indeterminate ? 'true' : 'false';
-        const escapedIdArg = escapeHtml(escapeJsString(item.id));
-        const styleBtnHTML = helpers.createUserMapStyleButton(item);
-        const categoryRowsHTML = item.styleMode === 'categorized'
-            ? createUserMapCategoryRows(item, helpers)
-            : '';
-        const hasSubmenu = !!categoryRowsHTML;
-        const toggleClass = `map-layer-toggle${hasSubmenu ? ' expanded' : ' disabled'}`;
-        const toggleAttrs = hasSubmenu
-            ? `aria-label="하위 메뉴 접기" onclick="toggleUserMapCategoryRows('${escapedIdArg}', event)"`
-            : 'aria-hidden="true" tabindex="-1"';
-        const infoClick = hasSubmenu
-            ? `toggleUserMapCategoryRows('${escapedIdArg}', event)`
-            : `fitUserMapToBounds('${escapedIdArg}', event)`;
-        const infoCursor = hasSubmenu ? 'cursor:pointer;' : '';
+    const orderedItems = [...userMaps].slice().reverse();
+    const validGroupIds = new Set(groups.map(group => group.id));
+    const groupById = new Map(groups.map(group => [group.id, group]));
+    const groupedItems = new Map();
+
+    orderedItems.forEach(item => {
+        if (item.groupId && validGroupIds.has(item.groupId)) {
+            if (!groupedItems.has(item.groupId)) groupedItems.set(item.groupId, []);
+            groupedItems.get(item.groupId).push(item);
+        }
+    });
+
+    const createGroupHtml = group => {
+        const items = groupedItems.get(group.id) || [];
+        const visibleCount = items.filter(item => item.enabled).length;
+        const checked = items.length > 0 && visibleCount === items.length ? 'checked' : '';
+        const indeterminate = visibleCount > 0 && visibleCount < items.length ? 'true' : 'false';
+        const escapedGroupId = escapeHtml(escapeJsString(group.id));
         return `
+            <div class="survey-group user-map-group" data-user-map-group-id="${escapeHtml(group.id)}">
+                <div class="survey-group-header">
+                    <button type="button" class="survey-group-toggle ${group.collapsed ? '' : 'expanded'}" onclick="toggleUserMapGroup('${escapedGroupId}', event)" aria-label="${group.collapsed ? '그룹 펼치기' : '그룹 접기'}">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l10-7z"/></svg>
+                    </button>
+                    <div class="survey-check-area">
+                        <input type="checkbox" class="survey-checkbox user-map-group-checkbox" data-indeterminate="${indeterminate}" ${checked} onchange="toggleUserMapGroupVisibility('${escapedGroupId}', this.checked)">
+                    </div>
+                    <span class="survey-group-icon">
+                        ${SVG_ICONS.folder}
+                    </span>
+                    <div class="survey-info" onclick="toggleUserMapGroup('${escapedGroupId}', event)">
+                        <div class="survey-group-name">${escapeHtml(group.name || '그룹')}</div>
+                        <div class="survey-group-meta">${items.length}개 지도</div>
+                    </div>
+                    <div class="survey-actions">
+                        <button type="button" class="btn-more" title="더보기" onclick="openUserMapGroupMenu(event, '${escapedGroupId}')">${SVG_ICONS.more}</button>
+                    </div>
+                </div>
+                <div class="survey-group-items" style="display:${group.collapsed ? 'none' : 'block'};">
+                    ${items.map(item => createUserMapItemHtml(item, helpers)).join('')}
+                </div>
+            </div>
+        `;
+    };
+
+    const renderedGroupIds = new Set();
+    const rows = [];
+    orderedItems.forEach(item => {
+        if (item.groupId && validGroupIds.has(item.groupId)) {
+            if (renderedGroupIds.has(item.groupId)) return;
+            renderedGroupIds.add(item.groupId);
+            rows.push(createGroupHtml(groupById.get(item.groupId)));
+            return;
+        }
+        rows.push(createUserMapItemHtml(item, helpers));
+    });
+
+    groups.forEach(group => {
+        if (!renderedGroupIds.has(group.id)) rows.push(createGroupHtml(group));
+    });
+
+    list.innerHTML = rows.join('');
+    list.querySelectorAll('.user-map-parent-checkbox, .user-map-group-checkbox').forEach(checkbox => {
+        checkbox.indeterminate = checkbox.dataset.indeterminate === 'true';
+    });
+}
+
+function createUserMapItemHtml(item, helpers) {
+    const selectionState = helpers.getCategorySelectionState(item);
+    const checked = selectionState.checked ? 'checked' : '';
+    const indeterminate = selectionState.indeterminate ? 'true' : 'false';
+    const escapedIdArg = escapeHtml(escapeJsString(item.id));
+    const styleBtnHTML = helpers.createUserMapStyleButton(item);
+    const categoryRowsHTML = item.styleMode === 'categorized'
+        ? createUserMapCategoryRows(item, helpers)
+        : '';
+    const hasSubmenu = !!categoryRowsHTML;
+    const toggleClass = `map-layer-toggle${hasSubmenu ? ' expanded' : ' disabled'}`;
+    const toggleAttrs = hasSubmenu
+        ? `aria-label="하위 메뉴 접기" onclick="toggleUserMapCategoryRows('${escapedIdArg}', event)"`
+        : 'aria-hidden="true" tabindex="-1"';
+    const infoClick = hasSubmenu
+        ? `toggleUserMapCategoryRows('${escapedIdArg}', event)`
+        : `fitUserMapToBounds('${escapedIdArg}', event)`;
+    const infoCursor = hasSubmenu ? 'cursor:pointer;' : '';
+    return `
             <div class="user-map-item" data-user-map-id="${escapeHtml(item.id)}" style="border-bottom:1px solid #f0f0f0;">
                 <div class="survey-item" style="border-bottom:none;">
                     <button type="button" class="${toggleClass}" ${toggleAttrs}>
@@ -55,10 +123,6 @@ export function renderUserMapListView(userMaps, helpers = {}) {
                 ${categoryRowsHTML}
             </div>
         `;
-    }).join('');
-    list.querySelectorAll('.user-map-parent-checkbox').forEach(checkbox => {
-        checkbox.indeterminate = checkbox.dataset.indeterminate === 'true';
-    });
 }
 
 
@@ -95,4 +159,3 @@ function createUserMapCategoryRows(item, helpers) {
         </div>
     `;
 }
-

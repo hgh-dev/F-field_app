@@ -10,9 +10,13 @@
 <uses-permission android:name="android.permission.INTERNET" />
 <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+<uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION" />
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 ```
 
-현재 직접 선언한 권한은 위 3개뿐입니다.
+현재 직접 선언한 권한은 위 7개입니다. `ACCESS_BACKGROUND_LOCATION`은 선언하지 않습니다.
 
 ## 권한별 사용 목적
 
@@ -40,6 +44,9 @@
 
 - `android.permission.ACCESS_COARSE_LOCATION`
 - `android.permission.ACCESS_FINE_LOCATION`
+- `android.permission.FOREGROUND_SERVICE`
+- `android.permission.FOREGROUND_SERVICE_LOCATION`
+- `android.permission.POST_NOTIFICATIONS`
 
 사용 목적:
 
@@ -53,13 +60,15 @@
 
 사용 범위:
 
-- 앱이 켜져 있고 사용 중일 때만 위치를 사용한다.
-- 백그라운드 위치 권한은 요청하지 않는다.
-- 앱이 백그라운드로 가거나 화면이 꺼지면 트랙 기록이 중단될 수 있다.
+- 현재 위치 표시와 일반 위치 기능은 앱 화면에서 사용자가 실행할 때 처리한다.
+- Android GPS 트랙은 사용자가 앱 화면에서 직접 시작한다.
+- 트랙이 시작되면 위치 포그라운드 서비스와 지속 알림을 사용하여 화면 꺼짐·앱 전환 중에도 기록할 수 있다.
+- 앱의 완료·취소 또는 알림의 중지 버튼으로 서비스를 중지할 수 있다.
+- `ACCESS_BACKGROUND_LOCATION`(항상 허용) 권한은 요청하지 않는다.
 
 사용자 설명 초안:
 
-> 현재 위치 표시, GPS 트랙 기록, 현위치 기록, 내 위치 공유 기능을 위해 위치 권한을 사용합니다. 백그라운드 위치는 사용하지 않습니다.
+> 현재 위치 표시, GPS 트랙 기록, 현위치 기록, 내 위치 공유 기능을 위해 위치 권한을 사용합니다. 사용자가 트랙을 직접 시작하면 지속 알림이 표시되는 위치 포그라운드 서비스에서 화면 꺼짐·앱 전환 중에도 기록을 이어갑니다. 항상 허용 위치 권한은 요청하지 않습니다.
 
 ## 권한을 선언하지 않는 기능
 
@@ -110,7 +119,7 @@
 
 상세 설명:
 
-> F-Field는 사용자의 현재 위치를 지도에 표시하고, GPS 트랙 기록, 현위치 기록, 내 위치 공유 기능을 제공하기 위해 위치 정보를 사용합니다. 위치 정보는 사용자가 앱을 실행해 기능을 사용하는 동안에만 처리되며, 백그라운드 위치 권한은 요청하지 않습니다.
+> F-Field는 사용자의 현재 위치를 지도에 표시하고, GPS 트랙 기록, 현위치 기록, 내 위치 공유 기능을 제공하기 위해 위치 정보를 사용합니다. Android에서 사용자가 트랙을 직접 시작하면 지속 알림이 표시되는 위치 포그라운드 서비스에서 화면 꺼짐·앱 전환 중에도 기록을 계속합니다. 사용자는 앱이나 알림에서 언제든 기록을 중지할 수 있으며, ACCESS_BACKGROUND_LOCATION 권한은 요청하지 않습니다.
 
 ### 데이터 수집/공유 설명 초안
 
@@ -128,6 +137,9 @@
 ## 출시 전 점검 체크리스트
 
 - [ ] AndroidManifest에 백그라운드 위치 권한이 없는지 확인
+- [ ] AndroidManifest의 위치 포그라운드 서비스 유형과 권한이 일치하는지 확인
+- [ ] 트랙 중 지속 알림과 알림의 중지 버튼이 동작하는지 확인
+- [ ] 화면 꺼짐·앱 전환 후 트랙이 이어지는지 실제 기기에서 확인
 - [ ] AndroidManifest에 카메라 권한이 없는지 확인
 - [ ] AndroidManifest에 외부 저장소 전체 접근 권한이 없는지 확인
 - [ ] 위치 권한 요청 시 앱 사용 중 권한으로 동작하는지 확인
@@ -141,6 +153,6 @@
 ## 현재 판단
 
 - 현재 권한 구조는 1차 출시 기준으로 적절하다.
-- 백그라운드 위치 권한을 쓰지 않으므로 Play Store 위치 심사 부담이 낮다.
+- `ACCESS_BACKGROUND_LOCATION`은 쓰지 않지만 위치 포그라운드 서비스 권한 선언과 심사 설명·시연 영상 준비가 필요하다.
 - 카메라/사진/저장소 권한을 직접 요청하지 않으므로 권한 설명이 단순하다.
 - 개인정보처리방침에서는 위치정보, 사진 첨부, 외부 지도/API 요청을 명확히 설명해야 한다.

@@ -1,0 +1,55 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[126.96, 37.24], [126.97, 37.25]]
+      },
+      "properties": {
+        "id": 1002,
+        "name": "선 기록",
+        "memo": "선 기록",
+        "displayOrder": 0,
+        "customColor": "#0040FF",
+        "customWeight": 3
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[126.96, 37.24], [126.97, 37.24], [126.97, 37.25], [126.96, 37.24]]]
+      },
+      "properties": {
+        "id": 1003,
+        "name": "면 기록",
+        "memo": "면 기록",
+        "displayOrder": 1,
+        "groupId": "group-1",
+        "customColor": "#00AA00",
+        "customFillOpacity": 0.35
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [126.960302, 37.245911]
+      },
+      "properties": {
+        "id": 1001,
+        "name": "사진 기록",
+        "memo": "사진 기록",
+        "description": "현장 확인",
+        "displayOrder": 2,
+        "groupId": "group-1",
+        "customColor": "#FF0000",
+        "photos": [
+          "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB"
+        ]
+      }
+    }
+  ]
+}

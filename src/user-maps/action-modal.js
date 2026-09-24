@@ -6,6 +6,7 @@
    [참고]
    - 사용자지도 목록에서 항목 메뉴 UI가 이상할 때 확인합니다.
    ========================================================================== */
+import { SVG_ICONS } from '../config.js';
 import { escapeHtml, getUserMapLabel } from './utils.js';
 
 export function closeUserMapActionModal() {
@@ -41,6 +42,17 @@ export function showUserMapActionModal(item, event = null, actions = {}) {
                 <svg viewBox="0 0 24 24"><path d="M9 3H3v6h2V6.41l4.29 4.3 1.42-1.42L6.41 5H9V3zm6 0v2h2.59l-4.3 4.29 1.42 1.42 4.29-4.3V9h2V3h-6zM5 17.59V15H3v6h6v-2H6.41l4.3-4.29-1.42-1.42L5 17.59zM19 17.59l-4.29-4.3-1.42 1.42 4.3 4.29H15v2h6v-6h-2v2.59z"/></svg>
                 레이어로 확대/축소
             </div>
+            ${item.groupId ? `
+            <div id="user-map-action-remove-group" class="more-menu-item">
+                ${SVG_ICONS.file_group_remove}
+                그룹에서 제외
+            </div>
+            ` : `
+            <div id="user-map-action-add-group" class="more-menu-item">
+                ${SVG_ICONS.file_group_add}
+                그룹에 추가
+            </div>
+            `}
             <hr style="width:100%; margin:4px 0; border:none; border-top:1px solid #f0f0f0;">
             <div id="user-map-action-front" class="more-menu-item">
                 <svg viewBox="0 0 24 24">
@@ -103,6 +115,10 @@ export function showUserMapActionModal(item, event = null, actions = {}) {
     overlay.querySelector('#user-map-action-back').onclick = () => { actions.moveLayer?.(id, 'back'); closeUserMapActionModal(); };
     overlay.querySelector('#user-map-action-edit').onclick = () => { closeUserMapActionModal(); actions.edit?.(id); };
     overlay.querySelector('#user-map-action-fit').onclick = () => { closeUserMapActionModal(); actions.fit?.(id); };
+    const addGroupAction = overlay.querySelector('#user-map-action-add-group');
+    if (addGroupAction) addGroupAction.onclick = () => { closeUserMapActionModal(); actions.openAddToGroup?.(id); };
+    const removeGroupAction = overlay.querySelector('#user-map-action-remove-group');
+    if (removeGroupAction) removeGroupAction.onclick = () => { closeUserMapActionModal(); actions.removeFromGroup?.(id); };
     const categoryAction = overlay.querySelector('#user-map-action-category');
     if (categoryAction) {
         categoryAction.onclick = () => {

@@ -6,6 +6,7 @@
    [참고]
    - 기록이 많을 때 지도 성능이나 표시 누락 문제가 생기면 확인합니다.
    ========================================================================== */
+import { L } from './vendor-globals.js';
 import { drawnItems } from './draw.js';
 import { map } from './map.js';
 import { AppState } from './state.js';

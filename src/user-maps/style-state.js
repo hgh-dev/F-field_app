@@ -8,17 +8,26 @@
    ========================================================================== */
 import { DEFAULT_VECTOR_STYLE } from './constants.js';
 import { escapeHtml, getUserMapLabel } from './utils.js';
-import { getLineStyleDashArray } from '../utils.js';
+import { getLineStyleDashArray, normalizeFillPattern, normalizeMarkerStyle } from '../utils.js';
 
-export function getUserMapStyle(item) {
-    return normalizeUserMapStyle(item?.style || {});
+function getMarkerStyleWithDefault(source = {}, fallback = 'circle') {
+    if (Object.prototype.hasOwnProperty.call(source, 'customEmoji')) {
+        return normalizeMarkerStyle(source.customEmoji);
+    }
+    return fallback;
 }
 
-export function normalizeUserMapStyle(source = {}) {
+export function getUserMapStyle(item) {
+    return normalizeUserMapStyle(item?.style || {}, getUserMapGeometryType(item));
+}
+
+export function normalizeUserMapStyle(source = {}, geometryType = 'polygon') {
     const customDashArray = source.customLineStyle
         ? getLineStyleDashArray(source.customLineStyle, source.customWeight || source.weight || DEFAULT_VECTOR_STYLE.weight)
         : (source.customDashArray ?? source.dashArray ?? null);
     const isNoStroke = customDashArray === 'none' || source.stroke === false;
+    const fillPattern = normalizeFillPattern(source.customFillPattern);
+    const fillOpacity = Math.min(1, Math.max(0, Number(source.customFillOpacity ?? source.fillOpacity ?? DEFAULT_VECTOR_STYLE.fillOpacity)));
 
     return {
         ...DEFAULT_VECTOR_STYLE,
@@ -26,11 +35,16 @@ export function normalizeUserMapStyle(source = {}) {
         color: source.customStrokeColor || source.color || source.customColor || DEFAULT_VECTOR_STYLE.color,
         fillColor: source.customFillColor || source.fillColor || source.customColor || source.color || DEFAULT_VECTOR_STYLE.fillColor,
         weight: Math.min(5, Math.max(1, parseInt(source.customWeight || source.weight || DEFAULT_VECTOR_STYLE.weight, 10))),
-        fillOpacity: Math.min(1, Math.max(0, Number(source.customFillOpacity ?? source.fillOpacity ?? DEFAULT_VECTOR_STYLE.fillOpacity))),
+        fillOpacity: fillPattern === 'none' || fillPattern !== 'solid' ? 0 : fillOpacity,
         dashArray: isNoStroke ? null : (customDashArray || null),
         lineCap: 'round',
         lineJoin: 'round',
-        stroke: !isNoStroke
+        stroke: !isNoStroke,
+        customFillOpacity: fillOpacity,
+        customFillPattern: fillPattern,
+        ...(geometryType === 'marker' ? {
+            customEmoji: getMarkerStyleWithDefault(source)
+        } : {})
     };
 }
 
@@ -50,7 +64,7 @@ export function getFeatureCategoryKey(feature, fieldName) {
 export function getFeatureUserMapStyle(item, feature) {
     if (item?.styleMode === 'categorized' && item.categoryField) {
         const key = getFeatureCategoryKey(feature, item.categoryField);
-        return normalizeUserMapStyle(item.categoryStyles?.[key] || item.defaultCategoryStyle || item.style || {});
+        return normalizeUserMapStyle(item.categoryStyles?.[key] || item.defaultCategoryStyle || item.style || {}, getUserMapGeometryType(item));
     }
     return getUserMapStyle(item);
 }
@@ -129,6 +143,7 @@ export function getDefaultCategoryStyle(item, index = 0) {
         fillColor: color,
         customColor: color,
         customFillColor: color,
-        customStrokeColor: null
+        customStrokeColor: null,
+        ...(getUserMapGeometryType(item) === 'marker' ? { customEmoji: getMarkerStyleWithDefault(base) } : {})
     };
 }

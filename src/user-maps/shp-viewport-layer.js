@@ -6,8 +6,9 @@
    [참고]
    - 큰 SHP 파일 표시 성능이나 일부 도형 표시 누락 문제가 생기면 확인합니다.
    ========================================================================== */
+import { L } from '../vendor-globals.js';
 import { map } from '../map.js';
-import { createColoredMarkerIcon } from '../utils.js';
+import { createColoredMarkerIcon, normalizeFillPattern } from '../utils.js';
 import { DEFAULT_VECTOR_STYLE } from './constants.js';
 import { getUserMapLayerZIndex } from './layer-pane.js';
 import { bboxIntersects, bboxToLeafletBounds, collectLatLngSegments, getBufferedMapBbox, getStoredFeatureBbox } from './spatial-utils.js';
@@ -72,6 +73,80 @@ function addSolidDotUserMapDots(group, pathLayer, featureStyle, paneName, render
     });
 }
 
+function buildFillPatternMarkup(patternId, pattern, color, opacity) {
+    const strokeColor = color || '#333333';
+    const strokeOpacity = Math.min(1, Math.max(0, Number(opacity) || 0));
+    const strokeAttrs = `stroke="${strokeColor}" stroke-opacity="${strokeOpacity}" fill="none"`;
+
+    switch (pattern) {
+    case 'horizontal':
+        return `<pattern id="${patternId}" patternUnits="userSpaceOnUse" width="8" height="8">
+            <path d="M0 4 H8" ${strokeAttrs} stroke-width="1.4" />
+        </pattern>`;
+    case 'vertical':
+        return `<pattern id="${patternId}" patternUnits="userSpaceOnUse" width="8" height="8">
+            <path d="M4 0 V8" ${strokeAttrs} stroke-width="1.4" />
+        </pattern>`;
+    case 'diagonal-right':
+        return `<pattern id="${patternId}" patternUnits="userSpaceOnUse" width="8" height="8">
+            <path d="M-2 10 L10 -2" ${strokeAttrs} stroke-width="1.2" />
+        </pattern>`;
+    case 'diagonal-left':
+        return `<pattern id="${patternId}" patternUnits="userSpaceOnUse" width="8" height="8">
+            <path d="M-2 -2 L10 10" ${strokeAttrs} stroke-width="1.2" />
+        </pattern>`;
+    case 'grid':
+        return `<pattern id="${patternId}" patternUnits="userSpaceOnUse" width="8" height="8">
+            <path d="M0 4 H8 M4 0 V8" ${strokeAttrs} stroke-width="1.1" />
+        </pattern>`;
+    case 'crosshatch':
+        return `<pattern id="${patternId}" patternUnits="userSpaceOnUse" width="8" height="8">
+            <path d="M-2 10 L10 -2 M-2 -2 L10 10" ${strokeAttrs} stroke-width="1" />
+        </pattern>`;
+    default:
+        return '';
+    }
+}
+
+function ensureFillPattern(renderer, pattern, color, opacity) {
+    const svg = renderer?._container;
+    if (!svg) return null;
+
+    let defs = svg.querySelector('#ffield-user-map-fill-pattern-defs');
+    if (!defs) {
+        defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+        defs.id = 'ffield-user-map-fill-pattern-defs';
+        svg.insertBefore(defs, svg.firstChild);
+    }
+
+    const safeColor = String(color || '#333333').replace('#', '').toLowerCase();
+    const opacityKey = Math.round(Math.min(1, Math.max(0, Number(opacity) || 0)) * 100);
+    const patternId = `ffield-user-map-fill-${pattern}-${safeColor}-${opacityKey}`;
+    if (!defs.querySelector(`#${patternId}`)) {
+        const markup = buildFillPatternMarkup(patternId, pattern, color, opacity);
+        if (!markup) return null;
+        defs.insertAdjacentHTML('beforeend', markup);
+    }
+    return patternId;
+}
+
+function applyUserMapFillPattern(pathLayer, featureStyle, renderer) {
+    if (!(pathLayer instanceof L.Polygon) || !pathLayer._path) return;
+
+    const pattern = normalizeFillPattern(featureStyle?.customFillPattern);
+    if (pattern === 'solid' || pattern === 'none') return;
+
+    const opacity = Number(featureStyle?.customFillOpacity ?? featureStyle?.fillOpacity ?? DEFAULT_VECTOR_STYLE.fillOpacity);
+    if (!Number.isFinite(opacity) || opacity <= 0) return;
+
+    const fillColor = featureStyle.fillColor || featureStyle.customFillColor || featureStyle.customColor || DEFAULT_VECTOR_STYLE.fillColor;
+    const patternId = ensureFillPattern(renderer, pattern, fillColor, opacity);
+    if (!patternId) return;
+
+    pathLayer._path.setAttribute('fill', `url(#${patternId})`);
+    pathLayer._path.setAttribute('fill-opacity', '1');
+}
+
 function getShpRenderGeojson(item, geojson) {
     const viewportBbox = getBufferedMapBbox();
     const features = (geojson?.features || []).filter(feature =>
@@ -96,7 +171,7 @@ function buildShpFeatureLayer(item, geojson, paneName, renderer) {
         pointToLayer: (feature, latlng) => {
             const featureStyle = getFeatureUserMapStyle(item, feature);
             if (getUserMapGeometryType(item) === 'marker') {
-                const markerStyle = featureStyle.customEmoji || 'circle';
+                const markerStyle = featureStyle.customEmoji ?? 'circle';
                 return L.marker(latlng, {
                     pane: paneName,
                     icon: createColoredMarkerIcon(
@@ -117,9 +192,12 @@ function buildShpFeatureLayer(item, geojson, paneName, renderer) {
 
     const group = L.featureGroup();
     baseLayer.eachLayer(childLayer => {
+        const featureStyle = getFeatureUserMapStyle(item, childLayer.feature);
         group.addLayer(childLayer);
         if (!(childLayer instanceof L.Marker) && !(childLayer instanceof L.CircleMarker)) {
-            addSolidDotUserMapDots(group, childLayer, getFeatureUserMapStyle(item, childLayer.feature), paneName, renderer);
+            addSolidDotUserMapDots(group, childLayer, featureStyle, paneName, renderer);
+            childLayer.on('add', () => applyUserMapFillPattern(childLayer, featureStyle, renderer));
+            applyUserMapFillPattern(childLayer, featureStyle, renderer);
         }
     });
     return group;
@@ -133,15 +211,21 @@ export function syncShpViewportLayer(layer, item) {
     if (layer.__lastRenderKey === renderKey) return;
 
     const visibleGeojson = getShpRenderGeojson(item, layer.__allGeojson);
-    layer.clearLayers();
-    buildShpFeatureLayer(item, visibleGeojson, layer.__paneName, layer.__renderer).eachLayer(childLayer => {
+    const previousLayers = layer.getLayers();
+    const nextLayers = buildShpFeatureLayer(item, visibleGeojson, layer.__paneName, layer.__renderer).getLayers();
+
+    // 새 경로를 먼저 연결해 공용 SVG renderer가 중간에 제거·재생성되지 않도록 합니다.
+    nextLayers.forEach(childLayer => {
         layer.addLayer(childLayer);
+    });
+    previousLayers.forEach(childLayer => {
+        layer.removeLayer(childLayer);
     });
     layer.__lastRenderKey = renderKey;
 }
 
 export function createShpViewportLayer(item, geojson, paneName, getItemIndex) {
-    const renderer = L.canvas({ pane: paneName, padding: 0.5, tolerance: 15 });
+    const renderer = L.svg({ pane: paneName, padding: 0.5 });
     const layer = L.featureGroup();
     layer.options = {
         pane: paneName,

@@ -8,7 +8,6 @@
    ========================================================================== */
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import 'leaflet-draw';
 import 'leaflet-draw/dist/leaflet.draw.css';
 import area from '@turf/area';
 import booleanPointInPolygon from '@turf/boolean-point-in-polygon';
@@ -17,7 +16,7 @@ import distance from '@turf/distance';
 import flatten from '@turf/flatten';
 import { point } from '@turf/helpers';
 import length from '@turf/length';
-import proj4 from 'proj4';
+import { proj4 } from './shp-crs.js';
 
 const turf = {
     area,
@@ -32,5 +31,9 @@ const turf = {
 window.L = L;
 window.turf = turf;
 window.proj4 = proj4;
+
+// Leaflet.Draw의 UMD 번들은 실행 시점에 window.L을 바로 참조합니다.
+// 정적 import로 두면 번들러가 이 대입보다 먼저 실행할 수 있으므로 순서를 명시합니다.
+await import('leaflet-draw');
 
 export { L, turf, proj4 };

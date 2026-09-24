@@ -6,6 +6,7 @@
    [참고]
    - 기록 상세 정보 값이나 표시 형식이 이상할 때 확인합니다.
    ========================================================================== */
+import { L } from './vendor-globals.js';
 import { SVG_ICONS } from './config.js';
 import { AppState } from './state.js';
 import { map } from './map.js';
@@ -15,8 +16,9 @@ import { saveToStorage } from './data.js';
 import { scheduleViewportVectorOptimization } from './ui-viewport.js';
 import { getLayerFillOpacity, syncFillPatternOverlays, syncSolidDotOverlays } from './ui-style-modal.js';
 import { createLayerPhotoSection } from './ui-photo.js';
-import { currentBottomSheetLayerId, flyToWithBottomSheet, getBottomSheetAwareFitOptions, setCurrentBottomSheetLayerId, openBottomSheet, closeBottomSheet, syncBottomSheetHoleMenuForLayer } from './ui-bottomsheet.js';
+import { currentBottomSheetLayerId, flyToWithBottomSheet, getBottomSheetAwareFitOptions, setCurrentBottomSheetLayerId, openBottomSheet, closeBottomSheet, suppressBottomSheetCloseOnMapMove, syncBottomSheetHoleMenuForLayer } from './ui-bottomsheet.js';
 import { renderSurveyList } from './ui-project.js';
+import { escapeHtml } from './user-maps/utils.js';
 
 /* --------------------------------------------------------------------------
    7. 레이어 상세 및 관리 (Layer Detail & Management)
@@ -42,6 +44,17 @@ function setLayerInteractivity(layer, isInteractive) {
     const pointerEvents = isInteractive ? 'visiblePainted' : 'none';
     if (layer._path) layer._path.style.pointerEvents = pointerEvents;
     else layer.once('add', () => { if (layer._path) layer._path.style.pointerEvents = pointerEvents; });
+}
+
+function clearTemporaryCadastralSelection() {
+    if (AppState.currentBoundaryLayer) {
+        map.removeLayer(AppState.currentBoundaryLayer);
+        AppState.currentBoundaryLayer = null;
+    }
+    if (AppState.currentSearchMarker) {
+        map.removeLayer(AppState.currentSearchMarker);
+        AppState.currentSearchMarker = null;
+    }
 }
 
 /**
@@ -106,7 +119,7 @@ export function updateLayerInfo(layer) {
 
     let popupContent = `<div style="display:flex; align-items:center; gap:6px; margin-bottom:5px;">
         <span style="width:20px; height:18px; flex-shrink:0; display:flex; align-items:center; justify-content:center; color:#3B82F6;">${typeIcon}</span>
-        <span style="font-size:16px; color:#3B82F6; font-weight:bold;">${memo}</span>
+        <span style="font-size:16px; color:#3B82F6; font-weight:bold;">${escapeHtml(memo)}</span>
         <button onclick="editLayerMemo(${layer.feature.properties.id})" title="기록명 수정" style="background:none; border:none; padding:0; cursor:pointer; color:#3B82F6; opacity:0.7; display:flex; align-items:center;">
             <svg viewBox="0 0 24 24" style="width:16px; height:16px; fill:#3B82F6;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
         </button>
@@ -123,7 +136,7 @@ export function updateLayerInfo(layer) {
     const id = layer.feature.properties.id;
     popupContent += `<div class="bottom-sheet-extra"><div class="extra-inner">`;
     const description = layer.feature.properties.description || "";
-    if (description) popupContent += `<div style="background:#f8f9fa; padding:8px; border-radius:6px; white-space:pre-wrap; font-size:14px; color:#333; line-height:1.5; margin: 15px 0;">${description}</div>`;
+    if (description) popupContent += `<div style="background:#f8f9fa; padding:8px; border-radius:6px; white-space:pre-wrap; font-size:14px; color:#333; line-height:1.5; margin: 15px 0;">${escapeHtml(description)}</div>`;
 
     const photos = layer.feature.properties.photos || [];
     const photoSection = createLayerPhotoSection(id, photos);
@@ -140,6 +153,7 @@ export function updateLayerInfo(layer) {
     applyLayerVisibilityState(layer, layer.feature?.properties?.isHidden === true);
 
     const openLayerBottomSheet = (options = {}) => {
+        if (options.move !== false) clearTemporaryCadastralSelection();
         setCurrentBottomSheetLayerId(id);
         const moreBtn = document.getElementById('bottom-sheet-more-btn');
         if (moreBtn) moreBtn.style.display = 'flex';
@@ -149,7 +163,10 @@ export function updateLayerInfo(layer) {
 
         if (options.move === false) return;
         if (layer instanceof L.Marker) flyToWithBottomSheet(layer.getLatLng(), Math.max(map.getZoom(), 17), { duration: 0.5 });
-        else map.fitBounds(layer.getBounds(), getBottomSheetAwareFitOptions({ basePadding: 60, maxZoom: 19 }));
+        else {
+            suppressBottomSheetCloseOnMapMove();
+            map.fitBounds(layer.getBounds(), getBottomSheetAwareFitOptions({ basePadding: 60, maxZoom: 19 }));
+        }
     };
 
     layer.refreshBottomSheetContent = function () {

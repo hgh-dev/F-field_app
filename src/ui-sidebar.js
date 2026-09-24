@@ -10,6 +10,7 @@ import { AppState } from './state.js';
 import { currentEditLayerId } from './draw.js';
 import { map, vworldBase, vworldSatellite, vworldHybrid, esriSatelliteLayer, vworldLxLayer, vworldContinuousLayer, toggleOverlay } from './map.js';
 import { renderProjectList, renderSurveyList } from './ui-project.js';
+import { SVG_ICONS } from './config.js';
 
 export function isDockedSidebarViewport() {
     return window.matchMedia('(min-width: 1024px) and (orientation: landscape)').matches;
@@ -116,7 +117,7 @@ function getMapLayerStylePlaceholderHtml() {
 }
 
 function getMapLayerGroupPlaceholderHtml() {
-    return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h13v10H7V4zm-3 3h2v8h11v2H4V7zm-3 3h2v8h11v2H1V10z"/></svg>';
+    return SVG_ICONS.folder;
 }
 
 function getMapLayerAccordionTarget(row, accordionHeader) {

@@ -6,6 +6,7 @@
    [참고]
    - 사용자지도가 지도에 표시되지 않거나 레이어 유형별 문제가 생기면 확인합니다.
    ========================================================================== */
+import { L } from '../vendor-globals.js';
 import { map, updateLayerOrder } from '../map.js';
 import { AppState } from '../state.js';
 import { DEFAULT_MAX_ZOOM } from './constants.js';
@@ -30,6 +31,8 @@ export function createUserMapLayerRuntime({
     let userMapZoomSyncInitialized = false;
     let userMapViewportSyncQueued = false;
     let userMapViewportSyncDelayTimer = null;
+    let isUserMapMoving = false;
+    let isUserMapZooming = false;
 
     async function createLayerForUserMap(item) {
         const userMaps = getUserMaps();
@@ -180,15 +183,19 @@ export function createUserMapLayerRuntime({
         userMapViewportSyncQueued = true;
         window.requestAnimationFrame(() => {
             userMapViewportSyncQueued = false;
+            if (isUserMapMoving || isUserMapZooming) return;
             syncAllUserMapZoomVisibility();
         });
     }
 
     function queueSyncAllUserMapViewport() {
+        if (isUserMapMoving || isUserMapZooming) return;
+
         if (AppState.isVectorRenderDelayEnabled) {
             clearTimeout(userMapViewportSyncDelayTimer);
             userMapViewportSyncDelayTimer = setTimeout(() => {
                 userMapViewportSyncDelayTimer = null;
+                if (isUserMapMoving || isUserMapZooming) return;
                 runQueuedUserMapViewportSync();
             }, 500);
             return;
@@ -200,8 +207,24 @@ export function createUserMapLayerRuntime({
     function initUserMapZoomVisibilitySync() {
         if (userMapZoomSyncInitialized) return;
         userMapZoomSyncInitialized = true;
-        map.on('zoomend', queueSyncAllUserMapViewport);
-        map.on('moveend', queueSyncAllUserMapViewport);
+        map.on('movestart', () => {
+            isUserMapMoving = true;
+            clearTimeout(userMapViewportSyncDelayTimer);
+            userMapViewportSyncDelayTimer = null;
+        });
+        map.on('zoomstart', () => {
+            isUserMapZooming = true;
+            clearTimeout(userMapViewportSyncDelayTimer);
+            userMapViewportSyncDelayTimer = null;
+        });
+        map.on('moveend', () => {
+            isUserMapMoving = false;
+            queueSyncAllUserMapViewport();
+        });
+        map.on('zoomend', () => {
+            isUserMapZooming = false;
+            queueSyncAllUserMapViewport();
+        });
     }
 
     async function activateUserMapLayer(item) {

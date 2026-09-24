@@ -43,6 +43,10 @@ create unique index if not exists verified_codes_code_hash_key
   on public.verified_codes (code_hash);
 ```
 
+인증코드 동시 사용을 안전하게 처리하려면 저장소의
+`supabase/migrations/20260910000000_atomic_verification_code_redemption.sql`도 SQL Editor에서 실행한다.
+이 함수는 코드 사용 횟수 증가와 계정 권한 지급을 하나의 트랜잭션으로 처리한다.
+
 `verified_codes.expires_at`은 이 코드로 인증된 계정의 권한 만료일로 사용한다. 인증 성공 시 `entitlements.expires_at`에 복사된다.
 
 관리자 계정은 `entitlements.tier = 'admin'`이어야 한다.

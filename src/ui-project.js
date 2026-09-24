@@ -6,15 +6,18 @@
    [참고]
    - 프로젝트 목록이나 기록 목록 표시/정렬 문제가 생기면 확인합니다.
    ========================================================================== */
+import { L } from './vendor-globals.js';
 import { SVG_ICONS } from './config.js';
 import { AppState } from './state.js';
 import { drawnItems } from './draw.js';
 import { saveToStorage } from './data.js';
-import { closeAllDropdowns, switchSidebarTab } from './ui-core.js';
+import { closeAllDropdowns } from './ui-dropdown.js';
 import { showAppConfirm, showTextPrompt } from './app-dialog.js';
+import { validateRuntimeDependencies } from './runtime-dependencies.js';
 import { createMarkerShapeSvg, getLineStyleDashArray, getLineStyleFromDashArray, getRecordName, ensureRecordNameAlias, normalizeFillPattern, normalizeMarkerStyle, parseDashArray } from './utils.js';
 import {
     closeAddRecordToGroupModal,
+    closeCreateRecordGroupModal,
     configureRecordGroupActions,
     escapeHtml,
     escapeJsString,
@@ -33,9 +36,22 @@ import {
 } from './ui-record-groups.js';
 
 export let moveTargetLayerIds = [];
+let switchSidebarTab;
+
+export function configureProjectRuntime(dependencies) {
+    const validatedDependencies = validateRuntimeDependencies('project-ui', dependencies, {
+        switchSidebarTab: 'function'
+    });
+    ({ switchSidebarTab } = validatedDependencies);
+}
 const PROJECT_BADGE_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2z"/></svg>';
+const RECORD_SORT_ORDER_LABELS = {
+    date: { desc: '최신순', asc: '오래된 순' },
+    name: { desc: '내림차순', asc: '오름차순' }
+};
 export {
     closeAddRecordToGroupModal,
+    closeCreateRecordGroupModal,
     groupSelectedLayers,
     handleRecordGroupMenuAction,
     hasRecordGroups,
@@ -73,7 +89,10 @@ export function renderProjectSelector() {
 
     const mapBadge = document.getElementById('map-active-project-badge');
     if (mapBadge && currentProject) {
-        mapBadge.innerHTML = `${PROJECT_BADGE_ICON}<span>${currentProject.name}</span>`;
+        mapBadge.innerHTML = PROJECT_BADGE_ICON;
+        const nameEl = document.createElement('span');
+        nameEl.textContent = String(currentProject.name || '');
+        mapBadge.appendChild(nameEl);
         mapBadge.style.display = 'flex';
     }
 
@@ -252,7 +271,7 @@ function createProjectCard(p, index, defaultProject) {
     const textEl = document.createElement('div');
     textEl.style.cssText = 'flex:1; min-width:0;';
 
-    let dateStr = "";
+    let dateText = "";
     if (p.createdAt) {
         const d = new Date(p.createdAt);
         const yy = d.getFullYear();
@@ -261,14 +280,25 @@ function createProjectCard(p, index, defaultProject) {
         const hh = String(d.getHours()).padStart(2, '0');
         const mins = String(d.getMinutes()).padStart(2, '0');
         const ss = String(d.getSeconds()).padStart(2, '0');
-        dateStr = `<div style="font-size:11px; color:#9ca3af; margin-top:2px;">${yy}.${mm}.${dd} ${hh}:${mins}:${ss} 생성</div>`;
+        dateText = `${yy}.${mm}.${dd} ${hh}:${mins}:${ss} 생성`;
     }
 
-    textEl.innerHTML = `
-        <div style="font-size:14px; font-weight:${isActive ? '700' : '500'}; color:${isActive ? '#1D4ED8' : '#374151'}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${p.name}</div>
-        <div style="font-size:12px; color:#9ca3af; margin-top:2px;">기록 ${featureCount}개</div>
-        ${dateStr}
-    `;
+    const nameEl = document.createElement('div');
+    nameEl.style.cssText = `font-size:14px; font-weight:${isActive ? '700' : '500'}; color:${isActive ? '#1D4ED8' : '#374151'}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;`;
+    nameEl.textContent = String(p.name || '');
+    textEl.appendChild(nameEl);
+
+    const countEl = document.createElement('div');
+    countEl.style.cssText = 'font-size:12px; color:#9ca3af; margin-top:2px;';
+    countEl.textContent = `기록 ${featureCount}개`;
+    textEl.appendChild(countEl);
+
+    if (dateText) {
+        const dateEl = document.createElement('div');
+        dateEl.style.cssText = 'font-size:11px; color:#9ca3af; margin-top:2px;';
+        dateEl.textContent = dateText;
+        textEl.appendChild(dateEl);
+    }
 
     const dropdownContainer = document.createElement('div');
     dropdownContainer.className = 'dropdown-container';
@@ -375,7 +405,12 @@ export function renderProjectList() {
 function createProjectMoveButton(project) {
     const btn = document.createElement('button');
     btn.style.cssText = "padding:14px; background:white; border:1px solid #ddd; border-radius:12px; text-align:left; cursor:pointer; font-size:15px; color:#333;";
-    btn.innerHTML = `<b>${project.name}</b> <span style='color:#888; font-size:13px;'>(${project.features.features ? project.features.features.length : 0}개)</span>`;
+    const nameEl = document.createElement('b');
+    nameEl.textContent = String(project.name || '');
+    const countEl = document.createElement('span');
+    countEl.style.cssText = 'color:#888; font-size:13px;';
+    countEl.textContent = ` (${project.features?.features?.length || 0}개)`;
+    btn.append(nameEl, countEl);
     btn.onclick = () => executeMoveProject(project.id);
     return btn;
 }
@@ -667,7 +702,7 @@ function createSurveyItem(layer) {
     </div>
     ${styleBtnHTML}
     <div class="survey-info" onclick="zoomToLayer(${props.id})">
-        <div class="survey-name">${getRecordName(props)}</div>
+        <div class="survey-name">${escapeHtml(getRecordName(props))}</div>
         ${dateStr ? `<div style="font-size:11px; color:#aaa; margin-top:1px;">${dateStr}</div>` : ''}
     </div>
     <div class="survey-actions">
@@ -714,6 +749,29 @@ function createSurveyGroup(group, layers) {
     return wrapper;
 }
 
+function getLayerDisplayOrder(layer, fallbackIndex = 0) {
+    const value = Number(layer.feature?.properties?.displayOrder);
+    return Number.isFinite(value) ? value : fallbackIndex;
+}
+
+function compareSurveyLayers(a, b, fallbackOrderMap) {
+    const pa = a.feature.properties;
+    const pb = b.feature.properties;
+    let cmp = 0;
+
+    if (AppState.sortBy === 'name') {
+        const na = getRecordName(pa, '').toLowerCase();
+        const nb = getRecordName(pb, '').toLowerCase();
+        cmp = na.localeCompare(nb, 'ko');
+    } else if (AppState.sortBy === 'displayOrder') {
+        cmp = getLayerDisplayOrder(a, fallbackOrderMap.get(a) ?? 0) - getLayerDisplayOrder(b, fallbackOrderMap.get(b) ?? 0);
+    } else {
+        cmp = (pa.id || 0) - (pb.id || 0);
+    }
+
+    return AppState.sortOrder === 'asc' ? cmp : -cmp;
+}
+
 /**
  * [함수] renderSurveyList
  * [역할] 현재 데이터 상태를 화면 요소로 재구성해 렌더링한다.
@@ -724,50 +782,66 @@ export function renderSurveyList() {
     if (!listContainer) return;
     listContainer.innerHTML = "";
     const layers = drawnItems.getLayers();
+    const groups = getRecordGroups();
     const chkSelectAll = document.getElementById('chk-select-all');
     const allVisible = layers.length > 0 && layers.every(l => !l.feature.properties.isHidden);
     if (chkSelectAll) chkSelectAll.checked = (layers.length > 0 && allVisible);
 
-    if (layers.length === 0) {
+    if (layers.length === 0 && groups.length === 0) {
         listContainer.innerHTML = '<div style="padding:15px; text-align:center; color:#999; font-size:12px;">기록 없음</div>';
         return;
     }
 
-    const sortedLayers = [...layers].sort((a, b) => {
-        const pa = a.feature.properties;
-        const pb = b.feature.properties;
-        let cmp = 0;
-        if (AppState.sortBy === 'name') {
-            const na = getRecordName(pa, '').toLowerCase();
-            const nb = getRecordName(pb, '').toLowerCase();
-            cmp = na.localeCompare(nb, 'ko');
-        } else {
-            cmp = (pa.id || 0) - (pb.id || 0);
-        }
-        return AppState.sortOrder === 'asc' ? cmp : -cmp;
-    });
+    const fallbackOrderMap = new Map(layers.map((layer, index) => [layer, index]));
+    const sortedLayers = [...layers].sort((a, b) => compareSurveyLayers(a, b, fallbackOrderMap));
 
-    const groups = getRecordGroups();
     const validGroupIds = new Set(groups.map(group => group.id));
     const groupedLayers = new Map();
     const ungroupedLayers = [];
+    const displayOrderItems = [];
+    const displayOrderGroupIds = new Set();
 
     sortedLayers.forEach(layer => {
         const groupId = layer.feature?.properties?.groupId;
         if (groupId && validGroupIds.has(groupId)) {
             if (!groupedLayers.has(groupId)) groupedLayers.set(groupId, []);
             groupedLayers.get(groupId).push(layer);
+            if (!displayOrderGroupIds.has(groupId)) {
+                displayOrderGroupIds.add(groupId);
+                displayOrderItems.push({ type: 'group', groupId });
+            }
         } else {
             if (groupId && layer.feature?.properties) delete layer.feature.properties.groupId;
             ungroupedLayers.push(layer);
+            displayOrderItems.push({ type: 'record', layer });
         }
     });
 
+    if (AppState.sortBy === 'displayOrder') {
+        const renderedGroupIds = new Set();
+        displayOrderItems.forEach(item => {
+            if (item.type === 'group') {
+                const group = groups.find(group => group.id === item.groupId);
+                const layersInGroup = groupedLayers.get(item.groupId) || [];
+                if (group) {
+                    listContainer.appendChild(createSurveyGroup(group, layersInGroup));
+                    renderedGroupIds.add(group.id);
+                }
+                return;
+            }
+            listContainer.appendChild(createSurveyItem(item.layer));
+        });
+        groups.forEach(group => {
+            if (!renderedGroupIds.has(group.id)) {
+                listContainer.appendChild(createSurveyGroup(group, groupedLayers.get(group.id) || []));
+            }
+        });
+        return;
+    }
+
     groups.forEach(group => {
         const layersInGroup = groupedLayers.get(group.id) || [];
-        if (layersInGroup.length > 0) {
-            listContainer.appendChild(createSurveyGroup(group, layersInGroup));
-        }
+        listContainer.appendChild(createSurveyGroup(group, layersInGroup));
     });
     ungroupedLayers.forEach(layer => {
         listContainer.appendChild(createSurveyItem(layer));
@@ -791,9 +865,26 @@ export function openSortModal() {
     document.querySelectorAll('input[name="sort-order"]').forEach(r => {
         r.checked = (r.value === AppState.sortOrder);
     });
+    syncRecordSortOrderLabels();
 
     overlay.style.display = 'flex';
     setTimeout(() => overlay.classList.add('visible'), 10);
+}
+
+export function syncRecordSortOrderLabels() {
+    const selectedSortBy = document.querySelector('input[name="sort-by"]:checked')?.value || AppState.sortBy || 'date';
+    const labels = RECORD_SORT_ORDER_LABELS[selectedSortBy] || RECORD_SORT_ORDER_LABELS.date;
+    const orderGroup = document.getElementById('record-sort-order-group');
+    const descLabel = document.getElementById('record-sort-order-desc-label');
+    const ascLabel = document.getElementById('record-sort-order-asc-label');
+    if (orderGroup) orderGroup.style.display = selectedSortBy === 'displayOrder' ? 'none' : '';
+    if (selectedSortBy === 'displayOrder') {
+        const descInput = document.querySelector('input[name="sort-order"][value="desc"]');
+        if (descInput) descInput.checked = true;
+        return;
+    }
+    if (descLabel) descLabel.textContent = labels.desc;
+    if (ascLabel) ascLabel.textContent = labels.asc;
 }
 
 /**
@@ -820,9 +911,10 @@ export function applySortSetting() {
         AppState.sortBy = byEl.value;
         localStorage.setItem('setting_sort_by', byEl.value);
     }
-    if (orderEl) {
-        AppState.sortOrder = orderEl.value;
-        localStorage.setItem('setting_sort_order', orderEl.value);
+    const nextOrder = byEl?.value === 'displayOrder' ? 'desc' : orderEl?.value;
+    if (nextOrder) {
+        AppState.sortOrder = nextOrder;
+        localStorage.setItem('setting_sort_order', nextOrder);
     }
     closeSortModal();
     renderSurveyList();

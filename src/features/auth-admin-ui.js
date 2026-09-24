@@ -11,16 +11,17 @@ import { APP_PLAY_STORE_URL } from '../config.js';
 import { isNativeApp } from '../native-bridge.js';
 import { showAppAlert, showTextPrompt } from '../app-dialog.js';
 import { copyText } from '../utils.js';
+import { ensureFeatureAccess, revokePremiumActionAccess } from '../auth-access.js';
 import {
     AUTH_FEATURES, canUseFeature, createVerificationCode, deleteAccount, fetchAdminUsers, fetchAppSettings, fetchAuthInfo, getAuthState, isAdminAccount,
     isAuthConfigured, loadCurrentEntitlement, redeemVerificationCode, signInWithGoogle, signOut,
     updateApiKeySettings, updateNoticeBadgeSettings, updateUserEntitlement
 } from '../auth.js';
 
-const PREMIUM_ACTION_GRANT_MS = 10 * 60 * 1000;
+export { ensureFeatureAccess } from '../auth-access.js';
+
 const API_KEY_EXPIRATION_WARNING_DAYS = 10;
 const DAY_MS = 24 * 60 * 60 * 1000;
-const featureActionGrants = new Map();
 let latestNoticeBadgeSettings = null;
 let latestAdminUsers = [];
 let adminUsersTierFilter = 'all';
@@ -43,29 +44,6 @@ function syncAppDownloadRow() {
 
 function openAppDownloadPage() {
     window.location.href = APP_PLAY_STORE_URL;
-}
-
-function grantFeatureActionAccess(feature) {
-    featureActionGrants.set(feature, Date.now() + PREMIUM_ACTION_GRANT_MS);
-}
-
-function hasActiveFeatureActionGrant(feature) {
-    return (featureActionGrants.get(feature) || 0) > Date.now();
-}
-
-function revokePremiumActionAccess() {
-    featureActionGrants.clear();
-}
-
-export function ensureFeatureAccess(feature, message = '권한이 필요한 기능입니다.') {
-    const authState = getAuthState();
-    if (hasActiveFeatureActionGrant(feature)) return true;
-    if (canUseFeature(feature, authState)) {
-        grantFeatureActionAccess(feature);
-        return true;
-    }
-    alert(message);
-    return false;
 }
 
 function setPremiumControlsVisible(isVisible) {

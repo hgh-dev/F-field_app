@@ -6,6 +6,7 @@
    [참고]
    - 지도 자체가 보이지 않거나 배경지도/지적도 전환 문제가 생기면 확인합니다.
    ========================================================================== */
+import { L } from './vendor-globals.js';
 import { VWORLD_API_KEY } from './config.js';
 import { AppState } from './state.js';
 import {
@@ -148,13 +149,6 @@ map.getPane('userMapPane').style.pointerEvents = 'none';
 map.createPane('nasRestrictionPane');
 map.getPane('nasRestrictionPane').style.zIndex = 410; // 산림보호구역(overlayPane 기본 400) 위
 map.getPane('nasRestrictionPane').style.pointerEvents = 'none';
-
-// Proj4 좌표계 정의입니다.
-// 동작 원리: 외부 API 데이터가 EPSG별로 달라질 수 있어 사전에 변환 규칙을 등록해 둡니다.
-proj4.defs("EPSG:5186", "+proj=tmerc +lat_0=38 +lon_0=127 +k=1 +x_0=200000 +y_0=600000 +ellps=GRS80 +units=m +no_defs");
-proj4.defs("EPSG:5179", "+proj=tmerc +lat_0=38 +lon_0=127.5 +k=0.9996 +x_0=1000000 +y_0=2000000 +ellps=GRS80 +units=m +no_defs");
-
-
 
 /* --------------------------------------------------------------------------
    2-2) 배경 지도 (TileLayer)

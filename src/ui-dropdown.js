@@ -67,5 +67,16 @@ export function closeAllDropdowns() {
             menu.classList.remove('visible');
         }
     });
-}
 
+    const contextMenus = document.querySelectorAll('.more-context-menu');
+    contextMenus.forEach(menu => {
+        if (menu.classList.contains('visible')) {
+            menu.classList.remove('visible');
+        }
+        if (menu.style.display && menu.style.display !== 'none') {
+            setTimeout(() => {
+                if (!menu.classList.contains('visible')) menu.style.display = 'none';
+            }, 100);
+        }
+    });
+}

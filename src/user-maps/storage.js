@@ -8,6 +8,8 @@
    ========================================================================== */
 import { USER_MAPS_KEY } from './constants.js';
 
+const USER_MAP_GROUPS_KEY = 'f-field-user-map-groups-v1';
+
 export function loadUserMapsFromStorage() {
     try {
         const parsed = JSON.parse(localStorage.getItem(USER_MAPS_KEY) || '[]');
@@ -21,3 +23,15 @@ export function saveUserMapsToStorage(userMaps) {
     localStorage.setItem(USER_MAPS_KEY, JSON.stringify(userMaps));
 }
 
+export function loadUserMapGroupsFromStorage() {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(USER_MAP_GROUPS_KEY) || '[]');
+        return Array.isArray(parsed) ? parsed : [];
+    } catch {
+        return [];
+    }
+}
+
+export function saveUserMapGroupsToStorage(groups) {
+    localStorage.setItem(USER_MAP_GROUPS_KEY, JSON.stringify(groups));
+}

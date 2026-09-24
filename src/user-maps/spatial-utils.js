@@ -6,6 +6,7 @@
    [참고]
    - 사용자지도 화면 범위 필터링이나 bbox 계산이 이상할 때 확인합니다.
    ========================================================================== */
+import { L } from '../vendor-globals.js';
 import { map } from '../map.js';
 import { SHP_VIEWPORT_BUFFER_RATIO } from './constants.js';
 
@@ -126,4 +127,3 @@ export function collectLatLngSegments(latlngs, segments = []) {
     latlngs.forEach(child => collectLatLngSegments(child, segments));
     return segments;
 }
-

@@ -11,9 +11,39 @@ import { Directory, Filesystem } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 
 const NativeFileSaver = registerPlugin('NativeFileSaver');
+const NativePhotoPicker = registerPlugin('NativePhotoPicker');
+const NativeTrack = registerPlugin('NativeTrack');
 
 export function isNativeApp() {
     return Capacitor.isNativePlatform();
+}
+
+export function isAndroidNativeApp() {
+    return Capacitor.getPlatform() === 'android';
+}
+
+export function startNativeTrack(options = {}) {
+    return NativeTrack.start(options);
+}
+
+export function stopNativeTrack() {
+    return NativeTrack.stop();
+}
+
+export function getNativeTrackStatus() {
+    return NativeTrack.getStatus();
+}
+
+export function getNativePendingTrackSession() {
+    return NativeTrack.getPendingSession();
+}
+
+export function clearNativePendingTrackSession() {
+    return NativeTrack.clearPendingSession();
+}
+
+export function addNativeTrackListener(eventName, listener) {
+    return NativeTrack.addListener(eventName, listener);
 }
 
 export async function shareTextUrl({ title = '', text = '', url = '', dialogTitle = '' }) {
@@ -96,4 +126,9 @@ export async function saveBlobNative({ blob, fileName, mimeType }) {
     });
 
     return saveBase64FileNative({ dataUrl, fileName, mimeType });
+}
+
+export async function pickNativePhotos({ maxCount = 5 } = {}) {
+    if (!isNativeApp()) return null;
+    return await NativePhotoPicker.pickImages({ maxCount });
 }
