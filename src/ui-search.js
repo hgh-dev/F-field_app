@@ -69,10 +69,10 @@ export function setIsSearchHistoryEnabled(val) { isSearchHistoryEnabled = val; }
  * [원리] 현재 클래스/상태 플래그를 읽어 분기한 뒤 반대 상태로 전환하고,
  *        연관 메뉴·패널의 표시 상태를 함께 동기화해 UI 충돌을 방지한다.
  */
-export function toggleSearchBox() {
+export function toggleSearchBox(forceOpen = false) {
     if (AppState.currentDrawer || currentEditLayerId !== null) return;
     const box = document.getElementById('search-container');
-    if (box.style.display === 'flex' || box.style.display === 'block') {
+    if (!forceOpen && (box.style.display === 'flex' || box.style.display === 'block')) {
         box.style.display = 'none';
         document.getElementById('history-panel').style.display = 'none';
         const resultPanel = document.getElementById('search-result-panel');
@@ -92,6 +92,13 @@ export function toggleSearchBox() {
         }
     }
 }
+
+document.addEventListener('keydown', event => {
+    if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey || event.key.toLowerCase() !== 'f') return;
+    if (AppState.currentDrawer || currentEditLayerId !== null) return;
+    event.preventDefault();
+    toggleSearchBox(true);
+});
 
 /**
  * [함수] switchSearchTab

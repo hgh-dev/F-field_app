@@ -6,6 +6,7 @@
    [참고]
    - 프로젝트 메뉴나 레이어 메뉴 버튼 동작이 이상할 때 확인합니다.
    ========================================================================== */
+import { isRecordSelected, setRecordSelectionMode } from '../record-selection.js';
 import { showAppConfirm } from '../app-dialog.js';
 import { SHARE_BASE_URL } from '../config.js';
 import { closeExportFormatModal, exportLayerWithFormat, fitCurrentProjectToMap, loadCurrentProjectFeatures, saveToStorage } from '../data.js';
@@ -32,6 +33,7 @@ import { applyLayerVisibilityState, openStyleModalForExternalLayer, renderProjec
 
 // 프로젝트 전환 시 현재 프로젝트를 먼저 저장한 뒤 새 프로젝트를 로드합니다.
 export function switchProject(id) {
+    setRecordSelectionMode(false);
     saveToStorage();
     AppState.currentProjectId = parseInt(id);
     loadCurrentProjectFeatures();
@@ -145,13 +147,13 @@ export function toggleAllLayers(isChecked) {
     renderSurveyList();
 }
 
-// 현재 선택된(숨김 아님) 레이어를 일괄 삭제합니다.
+// 작업 대상으로 선택된 레이어를 일괄 삭제합니다.
 export async function deleteSelectedLayers() {
     let deletedCount = 0;
     const layersToRemove = [];
 
     drawnItems.getLayers().forEach(layer => {
-        if (layer.feature && layer.feature.properties && !layer.feature.properties.isHidden) {
+        if (isRecordSelected(layer)) {
             layersToRemove.push(layer);
         }
     });
@@ -175,11 +177,11 @@ export async function deleteSelectedLayers() {
     }
 }
 
-// 현재 선택된(숨김 아님) 레이어를 일괄 내보냅니다.
+// 작업 대상으로 선택된 레이어를 일괄 내보냅니다.
 export async function exportSelectedLayers() {
-    // 화면 표시 중(isHidden=false) 레이어를 내보내기 대상으로 수집
+    // 지도 표시 여부와 무관하게 작업 선택만 사용합니다.
     const layers = drawnItems.getLayers().filter(
-        l => l.feature && l.feature.properties && !l.feature.properties.isHidden
+        isRecordSelected
     );
 
     if (layers.length === 0) {

@@ -6,6 +6,7 @@
    [참고]
    - 기록 그룹 기능이나 그룹 목록 표시가 이상할 때 확인합니다.
    ========================================================================== */
+import { isRecordSelected } from './record-selection.js';
 import { L } from './vendor-globals.js';
 import { SVG_ICONS } from './config.js';
 import { AppState } from './state.js';
@@ -14,7 +15,6 @@ import { drawnItems } from './draw.js';
 import { saveToStorage } from './data.js';
 import { closeAllDropdowns } from './ui-dropdown.js';
 import { showAppConfirm, showTextPrompt } from './app-dialog.js';
-import { getRecordName } from './utils.js';
 import { scheduleViewportVectorOptimization } from './ui-viewport.js';
 
 export const RECORD_GROUP_ICON = SVG_ICONS.folder;
@@ -224,17 +224,11 @@ function ensureCreateRecordGroupModal() {
     overlay.className = 'nav-modal-overlay center-modal-overlay';
     overlay.style.display = 'none';
     overlay.innerHTML = `
-        <div class="nav-modal-content center-modal-content tall" data-record-group-create-content>
+        <div class="nav-modal-content center-modal-content" data-record-group-create-content>
             <div class="nav-modal-header" style="font-size:18px; font-weight:bold; margin-bottom:10px; text-align:center;">그룹 만들기</div>
             <label for="record-group-create-name" style="display:block; font-size:13px; font-weight:700; color:#374151; margin-bottom:6px;">그룹명</label>
             <input id="record-group-create-name" type="text" autocomplete="off"
                 style="width:100%; box-sizing:border-box; padding:12px; border:1px solid #d1d5db; border-radius:10px; font-size:15px; margin-bottom:14px;">
-            <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px;">
-                <div style="font-size:13px; font-weight:700; color:#374151;">그룹으로 추가할 기록</div>
-                <div id="record-group-create-count" style="font-size:12px; color:#6b7280;">0개 선택</div>
-            </div>
-            <p id="record-group-create-empty" style="display:none; text-align:center; color:#666; font-size:13px; margin:16px 0 20px;">추가할 기록이 없습니다.</p>
-            <div id="record-group-create-list" style="display:flex; flex-direction:column; gap:8px; margin-bottom:16px; max-height:280px; overflow-y:auto;"></div>
             <button id="record-group-create-submit" type="button"
                 style="width:100%; padding:14px; background:#3b82f6; border:none; border-radius:12px; font-size:15px; font-weight:bold; color:white; margin-bottom:8px;">그룹 만들기</button>
             <button id="record-group-create-cancel" type="button"
@@ -250,54 +244,9 @@ function ensureCreateRecordGroupModal() {
     });
     overlay.querySelector('#record-group-create-cancel')?.addEventListener('click', closeCreateRecordGroupModal);
     overlay.querySelector('#record-group-create-submit')?.addEventListener('click', createRecordGroupFromModal);
-    overlay.querySelector('#record-group-create-list')?.addEventListener('change', updateCreateRecordGroupSelectionCount);
 
     document.body.appendChild(overlay);
     return overlay;
-}
-
-function createRecordGroupRow(layer) {
-    const props = layer.feature?.properties || {};
-    const id = props.id;
-    const currentGroup = props.groupId ? getRecordGroup(props.groupId) : null;
-    const row = document.createElement('label');
-    row.className = 'record-group-select-item';
-    row.style.cursor = 'pointer';
-    row.style.alignItems = 'center';
-    row.style.gap = '10px';
-    row.innerHTML = `
-        <input type="checkbox" class="record-group-create-checkbox" value="${escapeHtml(id)}"
-            style="width:18px; height:18px; flex:0 0 auto;">
-        <span class="record-group-select-name" style="min-width:0;">
-            <span style="display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(getRecordName(props, '기록'))}</span>
-            ${currentGroup ? `<span style="display:block; font-size:12px; color:#6b7280; margin-top:2px;">현재 그룹: ${escapeHtml(currentGroup.name || '그룹')}</span>` : ''}
-        </span>
-    `;
-    return row;
-}
-
-function renderCreateRecordGroupList() {
-    const overlay = ensureCreateRecordGroupModal();
-    const list = overlay.querySelector('#record-group-create-list');
-    const empty = overlay.querySelector('#record-group-create-empty');
-    const submit = overlay.querySelector('#record-group-create-submit');
-    if (!list || !empty || !submit) return;
-
-    const layers = getRecordLayers();
-    list.innerHTML = '';
-    layers.forEach(layer => list.appendChild(createRecordGroupRow(layer)));
-    empty.style.display = layers.length === 0 ? 'block' : 'none';
-    list.style.display = layers.length === 0 ? 'none' : 'flex';
-    submit.disabled = false;
-    submit.style.opacity = '1';
-    updateCreateRecordGroupSelectionCount();
-}
-
-function updateCreateRecordGroupSelectionCount() {
-    const overlay = document.getElementById('record-group-create-modal-overlay');
-    const count = overlay?.querySelectorAll('.record-group-create-checkbox:checked').length || 0;
-    const label = overlay?.querySelector('#record-group-create-count');
-    if (label) label.textContent = `${count}개 선택`;
 }
 
 export function closeCreateRecordGroupModal() {
@@ -329,14 +278,6 @@ function createRecordGroupFromModal() {
     };
     getRecordGroups().push(group);
 
-    const selectedIds = new Set(Array.from(overlay.querySelectorAll('.record-group-create-checkbox:checked')).map(input => input.value));
-    getRecordLayers().forEach(layer => {
-        const id = String(layer.feature?.properties?.id ?? '');
-        if (selectedIds.has(id)) {
-            layer.feature.properties.groupId = group.id;
-        }
-    });
-
     closeCreateRecordGroupModal();
     saveToStorage();
     renderSurveyListCallback();
@@ -347,7 +288,6 @@ export function groupSelectedLayers() {
     const overlay = ensureCreateRecordGroupModal();
     const input = overlay.querySelector('#record-group-create-name');
     if (input) input.value = getDefaultRecordGroupName();
-    renderCreateRecordGroupList();
     overlay.style.display = 'flex';
     requestAnimationFrame(() => overlay.classList.add('visible'));
     requestAnimationFrame(() => {
@@ -485,6 +425,46 @@ export function openAddRecordToGroupModal(id) {
     });
 
     overlay.dataset.layerId = String(id);
+    overlay.style.display = 'flex';
+    requestAnimationFrame(() => overlay.classList.add('visible'));
+}
+
+export function openAddSelectedRecordsToGroupModal() {
+    closeAllDropdowns();
+    const layers = getRecordLayers().filter(isRecordSelected);
+    if (!layers.length) {
+        alert('선택된 기록이 없습니다.');
+        return;
+    }
+    const overlay = document.getElementById('record-group-select-modal-overlay');
+    const list = document.getElementById('record-group-select-list');
+    const empty = document.getElementById('record-group-select-empty');
+    if (!overlay || !list || !empty) return;
+    const projectId = AppState.currentProjectId;
+    const groups = getRecordGroups();
+    list.innerHTML = '';
+    empty.textContent = '그룹이 없습니다. 선택 모드를 완료한 뒤 그룹을 만들어 주세요.';
+    empty.style.display = groups.length ? 'none' : 'block';
+    groups.forEach(group => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'record-group-select-item';
+        button.innerHTML = `<span class="record-group-select-icon">${RECORD_GROUP_ICON}</span><span class="record-group-select-name">${escapeHtml(group.name || '그룹')}</span>`;
+        button.onclick = () => {
+            if (AppState.currentProjectId !== projectId || !getRecordGroup(group.id)) {
+                closeAddRecordToGroupModal();
+                return;
+            }
+            layers.filter(layer => drawnItems.hasLayer(layer)).forEach(layer => {
+                layer.feature.properties.groupId = group.id;
+            });
+            group.collapsed = false;
+            closeAddRecordToGroupModal();
+            saveToStorage();
+            renderSurveyListCallback();
+        };
+        list.appendChild(button);
+    });
     overlay.style.display = 'flex';
     requestAnimationFrame(() => overlay.classList.add('visible'));
 }

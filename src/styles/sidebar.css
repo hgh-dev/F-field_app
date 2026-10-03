@@ -1113,3 +1113,25 @@
            position: fixed를 사용하여 화면 전체를 덮는 오버레이(배경)를 만듭니다.
            z-index 값을 높게 설정하여 다른 요소들 위에 뜨도록 합니다.
            -------------------------------------------------------------------------- */
+
+/* 표시 상태와 작업 선택은 같은 자리를 사용해 기록명 너비를 유지합니다. */
+#survey-list-area .survey-name { color: #111827; }
+#survey-list-area .record-hidden .survey-name { color: #9CA3AF; }
+.record-visibility {
+    border: 0; padding: 0; background: transparent; color: #111827;
+    width: 16px; height: 32px; flex-shrink: 0; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+}
+.record-visibility[aria-pressed="false"] { color: #6B7280; }
+.record-visibility svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+#record-list-controls { display: flex; align-items: center; gap: 12px; color: #374151; }
+#record-list-controls label { display: flex; align-items: center; gap: 4px; }
+#record-list-controls button { min-height: 36px; border: 0; background: transparent; color: var(--color-primary); font-weight: 600; cursor: pointer; }
+#more-menu [hidden] { display: none; }
+
+#record-list-controls .record-all-control { width: 32px; height: 36px; margin: 0; padding: 0; justify-content: center; flex-shrink: 0; cursor: pointer; }
+#record-list-controls .record-all-control + [role="status"] { margin-left: -12px; }
+
+#record-list-controls #record-visibility-all { color: #000; }
+#record-more-button.selection-active { color: var(--color-primary); }
+#record-more-button.selection-active svg { fill: var(--color-primary); }

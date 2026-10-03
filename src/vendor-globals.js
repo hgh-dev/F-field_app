@@ -18,6 +18,20 @@ import { point } from '@turf/helpers';
 import length from '@turf/length';
 import { proj4 } from './shp-crs.js';
 
+// 핀치 중에는 기존 타일을 확대하고, 제스처가 끝난 배율에서 타일을 요청합니다.
+// 중간 줌 레벨마다 요청/취소/교체가 반복되는 것을 막습니다. 사용자지도에도 적용합니다.
+L.GridLayer.mergeOptions({ updateWhenZooming: false });
+const gridLayerGetEvents = L.GridLayer.prototype.getEvents;
+L.GridLayer.include({
+    getEvents() {
+        const events = gridLayerGetEvents.call(this);
+        // Leaflet 1.9는 핀치가 정확히 정수 배율에서 끝나면 마지막 zoom을 생략합니다.
+        // zoomend에서도 갱신해야 이전 배율의 타일에 머무르지 않습니다.
+        if (!this.options.updateWhenZooming) events.zoomend = this._resetView;
+        return events;
+    }
+});
+
 const turf = {
     area,
     booleanPointInPolygon,

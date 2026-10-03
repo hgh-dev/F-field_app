@@ -6,6 +6,7 @@
    [참고]
    - 프로젝트 목록이나 기록 목록 표시/정렬 문제가 생기면 확인합니다.
    ========================================================================== */
+import { isRecordSelectionMode, setRecordSelectionMode, isRecordSelected, selectRecord, pruneRecordSelection } from './record-selection.js';
 import { L } from './vendor-globals.js';
 import { SVG_ICONS } from './config.js';
 import { AppState } from './state.js';
@@ -16,6 +17,7 @@ import { showAppConfirm, showTextPrompt } from './app-dialog.js';
 import { validateRuntimeDependencies } from './runtime-dependencies.js';
 import { createMarkerShapeSvg, getLineStyleDashArray, getLineStyleFromDashArray, getRecordName, ensureRecordNameAlias, normalizeFillPattern, normalizeMarkerStyle, parseDashArray } from './utils.js';
 import {
+    openAddSelectedRecordsToGroupModal,
     closeAddRecordToGroupModal,
     closeCreateRecordGroupModal,
     configureRecordGroupActions,
@@ -284,7 +286,7 @@ function createProjectCard(p, index, defaultProject) {
     }
 
     const nameEl = document.createElement('div');
-    nameEl.style.cssText = `font-size:14px; font-weight:${isActive ? '700' : '500'}; color:${isActive ? '#1D4ED8' : '#374151'}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;`;
+    nameEl.style.cssText = `font-size:14px; font-weight:${isActive ? '700' : '500'}; color:${isActive ? 'var(--color-primary)' : '#374151'}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;`;
     nameEl.textContent = String(p.name || '');
     textEl.appendChild(nameEl);
 
@@ -428,7 +430,7 @@ export function openMoveProjectModal(layerId) {
         moveTargetLayerIds = [];
         const layers = drawnItems.getLayers();
         layers.forEach(layer => {
-            if (!layer.feature.properties.isHidden) {
+            if (isRecordSelected(layer)) {
                 moveTargetLayerIds.push(layer.feature.properties.id);
             }
         });
@@ -678,6 +680,19 @@ function createSurveyStyleButton(layer, props, displayColor, customEmoji) {
  * [역할] 기록 목록 한 줄 항목 DOM을 생성한다.
  * [원리] 레이어 타입, 가시성, 날짜, 스타일 버튼을 조합해 기존 목록 구조를 그대로 반환한다.
  */
+function recordControlHtml(hidden, selected, mixed = false) {
+    if (isRecordSelectionMode()) return `<input type="checkbox" class="survey-checkbox record-control" aria-label="작업 대상으로 선택" ${selected ? 'checked' : ''}>`;
+    const icon = recordEyeIcon(hidden);
+    return `<button type="button" class="record-visibility record-control" aria-label="${hidden ? '지도에 표시' : mixed ? '일부 표시 중: 전체 표시' : '지도에서 숨기기'}" aria-pressed="${mixed ? 'mixed' : !hidden}">${icon}</button>`;
+}
+
+function recordEyeIcon(hidden) {
+    const paths = hidden
+        ? '<path d="M3 3l18 18M10.5 10.5a2.2 2.2 0 003 3M9 5.5A12 12 0 0112 5c6 0 10 7 10 7a19 19 0 01-4 4M6 6C3.5 8 2 12 2 12s4 7 10 7a12 12 0 005-1"/>'
+        : '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>';
+    return `<svg viewBox="0 0 24 24" aria-hidden="true">${paths}</svg>`;
+}
+
 function createSurveyItem(layer) {
     const props = layer.feature.properties || {};
     ensureRecordNameAlias(props);
@@ -690,7 +705,8 @@ function createSurveyItem(layer) {
         }
     }
     const div = document.createElement('div');
-    div.className = 'survey-item';
+    div.className = `survey-item${isHidden ? ' record-hidden' : ''}`;
+    div.dataset.recordId = String(props.id);
     const displayColor = props.customColor || (layer instanceof L.Marker ? '#FF0000' : '#3388ff');
     const customEmoji = props.customEmoji || null;
     const styleBtnHTML = createSurveyStyleButton(layer, props, displayColor, customEmoji);
@@ -698,7 +714,7 @@ function createSurveyItem(layer) {
     div.innerHTML = `
     <button type="button" class="survey-row-toggle-spacer" aria-hidden="true" tabindex="-1">${RECORD_GROUP_TOGGLE_ICON}</button>
     <div class="survey-check-area">
-        <input type="checkbox" class="survey-checkbox" ${!isHidden ? "checked" : ""} onchange="toggleLayerVisibility(${props.id})">
+        ${recordControlHtml(isHidden, isRecordSelected(layer))}
     </div>
     ${styleBtnHTML}
     <div class="survey-info" onclick="zoomToLayer(${props.id})">
@@ -708,6 +724,16 @@ function createSurveyItem(layer) {
     <div class="survey-actions">
         <button class="btn-more" onclick="openContextMenu(event, ${props.id})">${SVG_ICONS.more}</button>
     </div>`;
+    const control = div.querySelector('.record-control');
+    if (isRecordSelectionMode()) control.onchange = () => {
+        selectRecord(layer, control.checked);
+        renderSurveyList();
+    };
+    else control.onclick = () => window.toggleLayerVisibility(props.id);
+    if (isRecordSelectionMode()) div.querySelector('.survey-info').onclick = () => {
+        selectRecord(layer, !isRecordSelected(layer));
+        renderSurveyList();
+    };
     return div;
 }
 
@@ -718,8 +744,9 @@ function createSurveyGroup(group, layers) {
 
     const isCollapsed = group.collapsed === true;
     const visibleCount = layers.filter(layer => !layer.feature.properties.isHidden).length;
-    const checked = visibleCount > 0 && visibleCount === layers.length;
-    const indeterminate = visibleCount > 0 && visibleCount < layers.length;
+    const count = isRecordSelectionMode() ? layers.filter(isRecordSelected).length : visibleCount;
+    const checked = count > 0 && count === layers.length;
+    const indeterminate = count > 0 && count < layers.length;
     const escapedGroupId = escapeHtml(escapeJsString(group.id));
 
     wrapper.innerHTML = `
@@ -728,11 +755,11 @@ function createSurveyGroup(group, layers) {
                 ${RECORD_GROUP_TOGGLE_ICON}
             </button>
             <div class="survey-check-area">
-                <input type="checkbox" class="survey-checkbox survey-group-checkbox" ${checked ? 'checked' : ''} onchange="toggleRecordGroupVisibility('${escapedGroupId}', this.checked)">
+                ${recordControlHtml(visibleCount === 0, checked, indeterminate)}
             </div>
             <span class="survey-group-icon">${RECORD_GROUP_ICON}</span>
             <div class="survey-info" onclick="toggleRecordGroup('${escapedGroupId}', event)">
-                <div class="survey-group-name">${escapeHtml(group.name || '그룹')}</div>
+                <div class="survey-group-name" style="color:${visibleCount === 0 ? '#9CA3AF' : '#111827'}">${escapeHtml(group.name || '그룹')}</div>
                 <div class="survey-group-meta">${layers.length}개 기록</div>
             </div>
             <div class="survey-actions">
@@ -742,8 +769,15 @@ function createSurveyGroup(group, layers) {
         <div class="survey-group-items" style="display:${isCollapsed ? 'none' : 'block'};"></div>
     `;
 
-    const checkbox = wrapper.querySelector('.survey-group-checkbox');
-    if (checkbox) checkbox.indeterminate = indeterminate;
+    const control = wrapper.querySelector('.record-control');
+    if (isRecordSelectionMode()) {
+        control.indeterminate = indeterminate;
+        control.onchange = () => {
+            layers.forEach(layer => selectRecord(layer, control.checked));
+            renderSurveyList();
+        };
+    } else control.onclick = () => toggleRecordGroupVisibility(group.id, visibleCount !== layers.length);
+    control.disabled = layers.length === 0;
     const items = wrapper.querySelector('.survey-group-items');
     layers.forEach(layer => items.appendChild(createSurveyItem(layer)));
     return wrapper;
@@ -783,9 +817,40 @@ export function renderSurveyList() {
     listContainer.innerHTML = "";
     const layers = drawnItems.getLayers();
     const groups = getRecordGroups();
-    const chkSelectAll = document.getElementById('chk-select-all');
-    const allVisible = layers.length > 0 && layers.every(l => !l.feature.properties.isHidden);
-    if (chkSelectAll) chkSelectAll.checked = (layers.length > 0 && allVisible);
+    pruneRecordSelection(layers);
+    const selecting = isRecordSelectionMode();
+    document.getElementById('record-more-button')?.classList.toggle('selection-active', selecting);
+    const count = layers.filter(isRecordSelected).length;
+    const controls = document.getElementById('record-list-controls');
+    if (controls) {
+        const allVisible = layers.length > 0 && layers.every(l => !l.feature.properties.isHidden);
+        controls.innerHTML = selecting
+            ? `<label class="record-all-control"><input id="chk-select-all" class="survey-checkbox" type="checkbox" aria-label="${count === layers.length && layers.length ? '전체 선택 해제' : '전체 선택'}"></label><span role="status">${count}개 선택</span><button id="record-selection-toggle" type="button">완료</button>`
+            : `<button id="record-visibility-all" class="record-visibility record-all-control" type="button" aria-label="${allVisible ? '전체 숨김' : '전체 표시'}" title="${allVisible ? '전체 숨김' : '전체 표시'}" aria-pressed="${allVisible}">${recordEyeIcon(!allVisible)}</button><button id="record-selection-toggle" type="button">기록 선택</button>`;
+        controls.querySelector('#record-selection-toggle').onclick = () => {
+            setRecordSelectionMode(!selecting);
+            closeAllDropdowns();
+            renderSurveyList();
+        };
+        const all = controls.querySelector('#chk-select-all');
+        if (all) {
+            all.checked = layers.length > 0 && count === layers.length;
+            all.indeterminate = count > 0 && count < layers.length;
+            all.onchange = () => {
+                layers.forEach(layer => selectRecord(layer, all.checked));
+                renderSurveyList();
+            };
+        }
+        const visibility = controls.querySelector('#record-visibility-all');
+        if (visibility) visibility.onclick = () => window.toggleAllLayers(!layers.every(l => !l.feature.properties.isHidden));
+    }
+    document.querySelectorAll('[data-record-bulk-action]').forEach(item => { item.hidden = !selecting; });
+    document.querySelectorAll('[data-record-normal-action]').forEach(item => { item.hidden = selecting; });
+    const addToGroup = document.getElementById('add-selected-records-to-group');
+    if (addToGroup) {
+        addToGroup.innerHTML = `${SVG_ICONS.file_group_add} 선택 그룹에 추가`;
+        addToGroup.onclick = openAddSelectedRecordsToGroupModal;
+    }
 
     if (layers.length === 0 && groups.length === 0) {
         listContainer.innerHTML = '<div style="padding:15px; text-align:center; color:#999; font-size:12px;">기록 없음</div>';

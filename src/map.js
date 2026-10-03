@@ -52,6 +52,8 @@ export const map = L.map('map', {
     attributionControl: false,
     tap: false,
     maxZoom: 22,
+    // 타일마다 투명도가 변하면서 겹친 지도와 지적도가 번쩍이는 현상을 줄입니다.
+    fadeAnimation: false,
     // 더블클릭은 확대 대신 앱의 정보 조회 동작에 쓰기 위해 비활성화합니다.
     doubleClickZoom: false,
     // Canvas renderer는 벡터 클릭 판정 범위를 조절하기 쉬워 모바일 편집에서 유리합니다.

@@ -661,3 +661,27 @@
     outline: 2px solid #2563eb;
     outline-offset: 3px;
 }
+
+.style-choice-dropdown { margin: 8px 0; border: 1px solid #d1d5db; border-radius: 10px; background: #fff; overflow: hidden; }
+.style-choice-dropdown summary { min-height: 44px; padding: 0 12px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; font-size: 14px; list-style: none; }
+.style-choice-dropdown summary::-webkit-details-marker { display: none; }
+.style-choice-dropdown summary svg { width: 18px; height: 18px; fill: none; stroke: #6b7280; stroke-width: 2; }
+.style-choice-dropdown[open] summary svg { transform: rotate(180deg); }
+.style-choice-options { padding: 4px; border-top: 1px solid #e5e7eb; display: grid; gap: 2px; }
+.style-choice-options button { min-height: 44px; padding: 0 12px; border: 0; border-radius: 6px; background: #fff; text-align: left; color: #374151; font-size: 14px; cursor: pointer; }
+.style-choice-options button[aria-pressed="true"] { background: #eff6ff; color: var(--color-primary); font-weight: 600; }
+.style-choice-options button[aria-pressed="true"]::after { content: '✓'; float: right; }
+.style-choice-options button:hover { background: #f3f4f6; }
+.style-choice-dropdown summary:focus-visible, .style-choice-options button:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -3px; }
+
+.style-preview-options { max-height: 280px; overflow-y: auto; }
+.style-preview-options .style-btn,
+.style-preview-options .style-btn.line-style-advanced,
+.style-preview-options .style-btn.fill-pattern-advanced { display: flex; align-items: center; justify-content: flex-start; text-align: left; gap: 12px; width: 100%; height: auto; min-height: 44px; }
+.style-preview-options .style-btn svg,
+.style-choice-current svg { width: 80px !important; height: 24px !important; flex-shrink: 0; }
+.style-choice-current { display: flex; align-items: center; gap: 12px; }
+.style-preview-options button[aria-pressed="true"]::after { margin-left: auto; }
+.style-choice-dropdown summary .style-choice-current svg { transform: none; stroke: none; }
+
+#style-modal .setting-group { margin-bottom: 20px; }

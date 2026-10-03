@@ -6,8 +6,12 @@
    [참고]
    - 스타일 설정 바텀시트/모달이나 기록 색상 표시가 이상할 때 확인합니다.
    ========================================================================== */
+import { isRecordSelected } from './record-selection.js';
+import { AppState } from './state.js';
+import { showAppAlert, showAppConfirm } from './app-dialog.js';
+import { closeAllDropdowns } from './ui-dropdown.js';
 import { L } from './vendor-globals.js';
-import { createRecordSvgRenderer } from './record-svg-renderer.js';
+import { createRecordSvgRenderer, getStrokePosition } from './record-svg-renderer.js';
 import { drawnItems } from './draw.js';
 import { map } from './map.js';
 import { saveToStorage } from './data.js';
@@ -19,11 +23,13 @@ import { scheduleViewportVectorOptimization } from './ui-viewport.js';
    7-2. 스타일 설정 모달 (Style Modal)
    -------------------------------------------------------------------------- */
 let currentStyleLayerId = null;
+let bulkStyleLayers = null;
+let bulkStyleProjectId = null;
 let currentStyleType = null;
 let tempStyleColor = '#3B82F6';
 let tempLineStyle = 'solid';
 let tempLineWeight = 3;
-let tempStrokeInside = false;
+let tempStrokePosition = 'center';
 let tempMarkerStyle = '';
 let tempMarkerSize = 3;
 let tempFillOpacity = 0.2;
@@ -100,6 +106,7 @@ function resetStyleColorPalettes() {
 }
 
 function resetStyleMoreOptions() {
+    document.querySelectorAll('#style-modal-overlay .style-choice-dropdown').forEach(dropdown => { dropdown.open = false; });
     const lineStyleChoices = document.getElementById('style-line-choices');
     const lineStyleMoreBtn = document.getElementById('style-line-more-btn');
     const fillPatternChoices = document.getElementById('style-fill-pattern-choices');
@@ -288,7 +295,8 @@ function addSolidDotOverlayForLayer(layer) {
     const segments = collectLatLngSegments(layer.getLatLngs());
     const isPolygonLayer = layer instanceof L.Polygon;
 
-    const inside = isPolygonLayer && props.customStrokeInside === true;
+    const position = getStrokePosition(layer);
+    const inside = isPolygonLayer && position !== 'center';
     const overlaySegments = inside ? [layer.getLatLngs()] : segments;
     overlaySegments.forEach(segment => {
         if (!segment || (!inside && segment.length < 2)) return;
@@ -300,7 +308,7 @@ function addSolidDotOverlayForLayer(layer) {
         }
 
         const dotLine = (inside ? L.polygon : L.polyline)(dotLineLatLngs, {
-            strokeInside: inside,
+            strokePosition: position,
             pane: 'solidDotOverlayPane',
             renderer: solidDotOverlayRenderer,
             color,
@@ -381,7 +389,35 @@ export function syncFillPatternOverlays() {
  * [원리] 대상 DOM/레이어 존재 여부를 확인한 뒤 display 값을 열고,
  *        requestAnimationFrame 또는 setTimeout으로 visible 클래스를 붙여 전환 애니메이션을 시작한다.
  */
+function getRecordStyleType(layer) {
+    if (layer instanceof L.Marker) return '점';
+    if (layer instanceof L.Polygon) return '면';
+    if (layer instanceof L.Polyline) return '선';
+    return null;
+}
+
+export async function openBulkStyleModal() {
+    closeAllDropdowns();
+    const layers = drawnItems.getLayers().filter(isRecordSelected);
+    if (!layers.length) {
+        await showAppAlert('선택된 기록이 없습니다.');
+        return;
+    }
+    const type = getRecordStyleType(layers[0]);
+    if (!type || layers.some(layer => getRecordStyleType(layer) !== type)) {
+        await showAppAlert('같은 형식의 기록을 선택해야 합니다.');
+        return;
+    }
+    const projectId = AppState.currentProjectId;
+    if (!await showAppConfirm(`${layers.length}개 ${type} 기록의 스타일을 일괄 설정합니다.`, { title: '스타일 일괄 설정' })) return;
+    if (projectId !== AppState.currentProjectId || layers.some(layer => !drawnItems.hasLayer(layer))) return;
+    openStyleModal(layers[0].feature.properties.id);
+    bulkStyleLayers = layers;
+    bulkStyleProjectId = projectId;
+}
+
 export function openStyleModal(id) {
+    bulkStyleLayers = null;
     const layer = drawnItems.getLayers().find(l => l.feature.properties.id === id);
     if (!layer) return;
 
@@ -398,7 +434,7 @@ export function openStyleModal(id) {
     tempFillColor = props.customFillColor || props.customColor || '#3388ff';
     tempLineColor = props.customStrokeColor || props.customColor || '#3388ff';
     tempLineColorMode = props.customStrokeColor ? 'custom' : 'same';
-    tempStrokeInside = props.customStrokeInside === true;
+    tempStrokePosition = getStrokePosition(layer);
     tempLineStyle = props.customLineStyle || getLineStyleFromDashArray(props.customDashArray);
     tempLineWeight = Number.isFinite(Number(props.customWeight)) ? normalizeLineWeight(props.customWeight) : 3;
     tempMarkerStyle = normalizeMarkerStyle(props.customEmoji || '');
@@ -471,6 +507,7 @@ export function openStyleModal(id) {
 }
 
 export function openStyleModalForExternalLayer({ id, type = 'polygon', style = {}, onApply }) {
+    bulkStyleLayers = null;
     ensureFillColorPalette();
     ensureLineColorPalette();
     resetStyleColorPalettes();
@@ -484,7 +521,7 @@ export function openStyleModalForExternalLayer({ id, type = 'polygon', style = {
     tempFillColor = style.customFillColor || style.fillColor || style.customColor || '#3388ff';
     tempLineColor = style.customStrokeColor || style.color || style.customColor || tempFillColor;
     tempLineColorMode = (style.customStrokeColor || (style.color && style.color !== tempFillColor)) ? 'custom' : 'same';
-    tempStrokeInside = false;
+    tempStrokePosition = 'center';
     tempLineStyle = style.stroke === false
         ? 'none'
         : (style.customLineStyle || getLineStyleFromDashArray(style.customDashArray || style.dashArray));
@@ -546,6 +583,11 @@ export function openStyleModalForExternalLayer({ id, type = 'polygon', style = {
  *        지연 후 display를 none으로 바꿔 클릭 영역과 임시 상태를 정리한다.
  */
 export function closeStyleModal() {
+    document.querySelectorAll('#style-modal-overlay .style-choice-dropdown').forEach(dropdown => { dropdown.open = false; });
+    const dropdown = document.getElementById('style-stroke-position-dropdown');
+    if (dropdown) dropdown.open = false;
+    bulkStyleLayers = null;
+    bulkStyleProjectId = null;
     const overlay = document.getElementById('style-modal-overlay');
     if (overlay) {
         overlay.classList.remove('visible');
@@ -560,18 +602,72 @@ export function closeStyleModal() {
  * [원리] 현재 상태값을 화면 표현값으로 재계산한 뒤,
  *        DOM 텍스트·버튼 상태·레이어 스타일에 즉시 반영해 표시를 최신으로 유지한다.
  */
+function syncPreviewDropdown(id, attribute, value) {
+    const dropdown = document.getElementById(id);
+    if (!dropdown) return;
+    const buttons = dropdown.querySelectorAll(`[${attribute}]`);
+    buttons.forEach(button => {
+        button.setAttribute('aria-pressed', String(button.getAttribute(attribute) === value));
+    });
+    const selected = Array.from(buttons).find(button => button.getAttribute(attribute) === value);
+    if (selected) dropdown.querySelector('.style-choice-current').innerHTML = selected.innerHTML;
+    if (dropdown.dataset.initialized) return;
+    dropdown.dataset.initialized = 'true';
+    dropdown.addEventListener('click', event => {
+        if (event.target.closest(`[${attribute}]`)) {
+            dropdown.open = false;
+            dropdown.querySelector('summary').focus();
+        }
+    });
+    dropdown.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && dropdown.open) {
+            event.stopPropagation();
+            dropdown.open = false;
+            dropdown.querySelector('summary').focus();
+        }
+    });
+    document.addEventListener('click', event => {
+        if (!dropdown.contains(event.target)) dropdown.open = false;
+    });
+}
+
 function updateStyleModalUI() {
+    syncPreviewDropdown('style-line-dropdown', 'data-style', tempLineStyle);
+    syncPreviewDropdown('style-fill-dropdown', 'data-pattern', tempFillPattern);
     ensureFillColorPalette();
     ensureLineColorPalette();
 
     const isPolygon = currentStyleType === 'polygon';
     const isTile = currentStyleType === 'tile';
     const insideSection = document.getElementById('style-stroke-inside-section');
-    const insideInput = document.getElementById('style-stroke-inside');
     if (insideSection) insideSection.style.display = isPolygon && !externalStyleTarget && currentStyleTab === 'line' ? 'block' : 'none';
-    if (insideInput) {
-        insideInput.checked = tempStrokeInside;
-        insideInput.onchange = () => { tempStrokeInside = insideInput.checked; };
+    const dropdown = document.getElementById('style-stroke-position-dropdown');
+    if (dropdown) {
+        const trigger = dropdown.querySelector('summary');
+        const labels = { inside: '안쪽', center: '중앙', outside: '바깥쪽' };
+        dropdown.querySelector('#style-stroke-position-value').textContent = labels[tempStrokePosition];
+        dropdown.querySelectorAll('[data-stroke-position]').forEach(button => {
+            button.setAttribute('aria-pressed', String(button.dataset.strokePosition === tempStrokePosition));
+            button.onclick = () => {
+                tempStrokePosition = button.dataset.strokePosition;
+                dropdown.open = false;
+                updateStyleModalUI();
+                trigger.focus();
+            };
+        });
+        if (!dropdown.dataset.initialized) {
+            dropdown.dataset.initialized = 'true';
+            dropdown.addEventListener('keydown', event => {
+                if (event.key === 'Escape' && dropdown.open) {
+                    event.stopPropagation();
+                    dropdown.open = false;
+                    trigger.focus();
+                }
+            });
+            document.addEventListener('click', event => {
+                if (!dropdown.contains(event.target)) dropdown.open = false;
+            });
+        }
     }
     const fillTabBtn = document.getElementById('style-fill-tab-btn');
     const lineTabBtn = document.getElementById('style-line-tab-btn');
@@ -944,43 +1040,54 @@ export function applyStyleSettings() {
         return;
     }
 
-    const layer = drawnItems.getLayers().find(l => l.feature.properties.id === currentStyleLayerId);
-    if (!layer) return;
+    if (bulkStyleLayers && bulkStyleProjectId !== AppState.currentProjectId) {
+        closeStyleModal();
+        return;
+    }
+    const targets = bulkStyleLayers
+        ? bulkStyleLayers.filter(layer => drawnItems.hasLayer(layer))
+        : drawnItems.getLayers().filter(layer => layer.feature.properties.id === currentStyleLayerId);
+    if (!targets.length) return;
 
-    const props = layer.feature.properties;
-    props.customColor = appliedFillColor;
+    for (const layer of targets) {
+        const props = layer.feature.properties;
+        props.customColor = appliedFillColor;
 
-    if (currentStyleType === 'marker') {
-        props.customEmoji = tempMarkerStyle;
-        props.customMarkerSize = tempMarkerSize;
-        layer.setIcon(createColoredMarkerIcon(tempStyleColor, tempMarkerStyle, tempMarkerSize));
-    } else {
-        props.customWeight = tempLineWeight;
+        if (currentStyleType === 'marker') {
+            props.customEmoji = tempMarkerStyle;
+            props.customMarkerSize = tempMarkerSize;
+            layer.setIcon(createColoredMarkerIcon(tempStyleColor, tempMarkerStyle, tempMarkerSize));
+            layer.setOpacity(props.isHidden ? 0 : 1);
+        } else {
+            props.customWeight = tempLineWeight;
 
-        props.customLineStyle = tempLineStyle;
-        props.customDashArray = getLineStyleDashArray(tempLineStyle, tempLineWeight);
+            props.customLineStyle = tempLineStyle;
+            props.customDashArray = getLineStyleDashArray(tempLineStyle, tempLineWeight);
 
-        if (currentStyleType === 'polygon') {
-            props.customStrokeInside = tempStrokeInside;
-            props.customFillColor = appliedFillColor;
-            if (tempLineColorMode === 'custom') props.customStrokeColor = appliedLineColor;
-            else delete props.customStrokeColor;
-            props.customFillOpacity = tempFillOpacity;
-            props.customFillPattern = tempFillPattern;
-            delete props.customFill;
+            if (currentStyleType === 'polygon') {
+                props.customStrokePosition = tempStrokePosition;
+                props.customStrokeInside = tempStrokePosition === 'inside';
+                props.customFillColor = appliedFillColor;
+                if (tempLineColorMode === 'custom') props.customStrokeColor = appliedLineColor;
+                else delete props.customStrokeColor;
+                props.customFillOpacity = tempFillOpacity;
+                props.customFillPattern = tempFillPattern;
+                delete props.customFill;
+            }
+
+            layer.setStyle({
+                color: appliedLineColor,
+                fillColor: appliedFillColor,
+                weight: tempLineWeight,
+                dashArray: props.customDashArray === 'none' ? null : props.customDashArray,
+                lineCap: 'round',
+                lineJoin: 'round',
+                stroke: !props.isHidden && props.customDashArray !== 'none',
+                fillOpacity: props.isHidden ? 0 : appliedFillOpacity,
+                opacity: props.isHidden ? 0 : 0.8
+            });
         }
 
-        layer.setStyle({
-            color: appliedLineColor,
-            fillColor: appliedFillColor,
-            weight: tempLineWeight,
-            dashArray: props.customDashArray === 'none' ? null : props.customDashArray,
-            lineCap: 'round',
-            lineJoin: 'round',
-            stroke: props.customDashArray !== 'none',
-            fillOpacity: appliedFillOpacity,
-            opacity: 0.8
-        });
     }
 
     saveToStorage();
