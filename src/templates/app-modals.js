@@ -10,18 +10,19 @@ const APP_MODALS_HTML = `    <div id="import-warning-modal-overlay" class="nav-m
         onclick="closeImportWarningModal()">
         <div class="nav-modal-content center-modal-content compact" onclick="event.stopPropagation()">
             <div class="nav-modal-header"
-                style="font-size:18px; font-weight:bold; margin-bottom:15px; text-align:center;">불러오기</div>
+                style="font-size:18px; font-weight:bold; margin-bottom:15px; text-align:center;">가저오기</div>
 
             <div
                 style="font-size:14px; color:#444; line-height:1.5; margin-bottom:20px; background:#f8f9fa; padding:15px; border-radius:12px;">
-                <p style="margin:0 0 10px 0; font-weight:bold;">GeoJSON, SHP, GPX 파일을 불러올 수 있습니다.</p>
+                <p style="margin:0 0 10px 0; font-weight:bold;">GeoJSON, SHP, GPX 파일을 가저올 수 있습니다.</p>
                 <ul
                     style="margin:0; padding-left:20px; color:#666; font-size:13px; display:flex; flex-direction:column; gap:6px;">
-                    <li><b>SHP파일</b>은 .shp, .shx, .dbf, .prj 파일을 <b>.ZIP</b> 파일로 압축한 후 불러올 수 있습니다. 그 외의 다른 파일이 포함되면
-                        불러오기가 실패할 수 있습니다.</li>
-                    <li>여러 개의 파일을 한 번에 불러올 수 있습니다.</li>
+                    <li><b>SHP파일</b>은 .shp, .shx, .dbf, .prj 파일을 <b>.ZIP</b> 파일로 압축한 후 가저올 수 있습니다. 그 외의 다른 파일이 포함되면
+                        가저오기가 실패할 수 있습니다.</li>
+                    <li>여러 개의 파일을 한 번에 가저올 수 있습니다.</li>
+                    <li>파일을 앱 화면으로 드래그하여 가저올 수 있습니다.</li>
                     <li>프로젝트 파일은 해당 프로젝트명으로 새로운 프로젝트가 추가되고, 단일 기록은 현재 프로젝트에 추가됩니다.</li>
-                    <li>도형이 많고 수정이 필요 없는 읽기 전용의 SHP파일은 사용자 지도에서 배경지도로 불러오는 것이 적합합니다.</li>
+                    <li>도형이 많고 수정이 필요 없는 읽기 전용의 SHP파일은 사용자 지도에서 배경지도로 가저오는 것이 적합합니다.</li>
                 </ul>
             </div>
 
@@ -29,7 +30,7 @@ const APP_MODALS_HTML = `    <div id="import-warning-modal-overlay" class="nav-m
                 <button onclick="closeImportWarningModal()"
                     style="flex:1; padding:14px; background:#f5f5f5; border:none; border-radius:12px; font-weight:bold; color:#666;">취소</button>
                 <button onclick="proceedWithImport()"
-                    style="flex:1; padding:14px; background:#3b82f6; border:none; border-radius:12px; font-weight:bold; color:#fff;">불러오기</button>
+                    style="flex:1; padding:14px; background:#3b82f6; border:none; border-radius:12px; font-weight:bold; color:#fff;">가저오기</button>
             </div>
         </div>
     </div>
@@ -115,7 +116,7 @@ const APP_MODALS_HTML = `    <div id="import-warning-modal-overlay" class="nav-m
                 <button id="btn-export-geojson" onclick="window._resolveExportFormat('geojson')"
                     style="padding:16px; background:#f8f9fa; border:1.5px solid #ddd; border-radius:12px; font-size:15px; font-weight:bold; color:#333; cursor:pointer; text-align:left;">
                     GeoJSON(권장)<div style="font-size:12px; font-weight:normal; color:#888; margin-top:3px;">웹과 앱에서 가장
-                        선호하는 표준 형식으로 QGIS에서 불러올 수 있습니다. 이 앱에서 불러올 때 기록 내에 저장한 메모, 사진, 도형의 스타일 정보가 유지됩니다.</div>
+                        선호하는 표준 형식으로 QGIS에서 가저올 수 있습니다. 이 앱에서 가저올 때 기록 내에 저장한 메모, 사진, 도형의 스타일 정보가 유지됩니다.</div>
                 </button>
                 <button id="btn-export-shp" onclick="window._resolveExportFormat('shp')"
                     style="padding:16px; background:#f8f9fa; border:1.5px solid #ddd; border-radius:12px; font-size:15px; font-weight:bold; color:#333; cursor:pointer; text-align:left;">

@@ -59,7 +59,7 @@ export function setupMapFileDropImport({ map, handleFileSelect }) {
     dropPanel.style.textShadow = '0 1px 2px rgba(0,0,0,0.35)';
     dropPanel.style.padding = '18px 20px';
     dropPanel.style.boxSizing = 'border-box';
-    dropPanel.textContent = '파일을 놓아 불러오기';
+    dropPanel.textContent = '파일을 놓아 가저오기';
 
     dropOverlay.appendChild(dropPanel);
     document.body.appendChild(dropOverlay);
@@ -90,7 +90,7 @@ export function setupMapFileDropImport({ map, handleFileSelect }) {
     };
 
     const updateDropPanelState = (inMap) => {
-        dropPanel.textContent = inMap ? '파일을 놓아 불러오기' : '지도로 이동해 놓으세요';
+        dropPanel.textContent = inMap ? '파일을 놓아 가저오기' : '지도로 이동해 놓으세요';
         dropPanel.style.opacity = inMap ? '1' : '0.85';
     };
 

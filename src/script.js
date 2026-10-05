@@ -1,3 +1,5 @@
+import { initRecordLabels } from './record-labels.js';
+import { currentBottomSheetLayerId as labelCurrentId } from './ui-bottomsheet.js';
 /* ==========================================================================
    [모듈] 앱 시작 진입점 (script.js)
    [역할]
@@ -80,6 +82,7 @@ import {
 
     renderSurveyList as uiRenderSurveyList,
     updateLayerInfo as uiUpdateLayerInfo,
+    refreshLayerAddress,
     renderProjectSelector,
     openSidebar,
     switchSidebarTab,
@@ -111,7 +114,8 @@ configureDrawRuntime({
     closeBottomSheet,
     syncFillPatternOverlays,
     syncSolidDotOverlays,
-    saveToStorage
+    saveToStorage,
+    refreshLayerAddress
 });
 
 configureBottomSheetRuntime({
@@ -212,6 +216,13 @@ async function initializeApp() {
     setupMapFileDropImport({ map, handleFileSelect });
     await initAuth(updateAuthUI);
     await loadFromStorage();
+    initRecordLabels({
+        map,
+        drawnItems,
+        saveToStorage,
+        renderSurveyList: uiRenderSurveyList,
+        getCurrentId: () => labelCurrentId
+    });
     await initializeTrackRecordingRecovery();
     await handleDeepLink();
     updateLayerOrder();

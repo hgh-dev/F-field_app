@@ -178,6 +178,55 @@ export async function deleteSelectedLayers() {
 }
 
 // 작업 대상으로 선택된 레이어를 일괄 내보냅니다.
+let excelExportInProgress = false;
+async function exportRecordsExcel(features, projectName, recordGroups = []) {
+    if (excelExportInProgress) return;
+    if (!features.length) {
+        alert('내보낼 기록이 없습니다.');
+        return;
+    }
+    excelExportInProgress = true;
+    try {
+        const [{ createRecordExcel, recordExcelFileName, EXCEL_MIME }, { saveOrShareFile }] = await Promise.all([
+            import('../record-excel-export.js'),
+            import('../data-transfer-export.js')
+        ]);
+        const content = await createRecordExcel(features, recordGroups);
+        await saveOrShareFile(content, recordExcelFileName(projectName), EXCEL_MIME);
+    } catch (error) {
+        alert(`엑셀 내보내기 실패: ${error?.message || error}`);
+    } finally {
+        excelExportInProgress = false;
+    }
+}
+
+export async function exportSelectedRecordsExcel() {
+    const layers = drawnItems.getLayers().filter(isRecordSelected);
+    if (!layers.length) {
+        alert('선택된 기록이 없습니다.');
+        return;
+    }
+    // 그룹과 정렬 설정이 반영된 실제 기록 목록 순서를 사용합니다.
+    const order = new Map([...document.querySelectorAll('#survey-list-area .survey-item')]
+        .map((row, index) => [row.dataset.recordId, index]));
+    layers.sort((a, b) => (order.get(String(a.feature.properties.id)) ?? Infinity) - (order.get(String(b.feature.properties.id)) ?? Infinity));
+    const features = layers.map(layer => structuredClone(layer.toGeoJSON()));
+    const project = AppState.projects.find(item => String(item.id) === String(AppState.currentProjectId));
+    await exportRecordsExcel(features, project?.name || '프로젝트', project?.recordGroups || []);
+}
+
+export async function exportProjectRecordsExcel(projectId) {
+    const project = AppState.projects.find(item => String(item.id) === String(projectId));
+    if (!project) {
+        alert('프로젝트를 찾을 수 없습니다.');
+        return;
+    }
+    const features = String(project.id) === String(AppState.currentProjectId)
+        ? drawnItems.getLayers().map(layer => structuredClone(layer.toGeoJSON()))
+        : structuredClone(project.features?.features || []);
+    await exportRecordsExcel(features, project.name || '프로젝트', project.recordGroups || []);
+}
+
 export async function exportSelectedLayers() {
     // 지도 표시 여부와 무관하게 작업 선택만 사용합니다.
     const layers = drawnItems.getLayers().filter(

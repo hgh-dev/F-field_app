@@ -7,10 +7,28 @@ import {
     attachProjectExportMetadata,
     cloneRecordGroupsForExport,
     ensureFeatureCollectionRecordNames,
-    normalizeImportedFeatureProperties
+    normalizeImportedFeatureProperties,
+    upgradeFeatureCollectionRecordProperties
 } from '../src/project-data-contract.js';
 
 const fixtureUrl = new URL('./fixtures/photo-project.geojson', import.meta.url);
+
+test('내보내기 정리는 memo를 제거하고 주소와 사용자 메모를 보존한다', () => {
+    const collection = {
+        type: 'FeatureCollection',
+        features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: [127, 37] }, properties: {
+            name: '매곡리 산35-2', memo: '사용하지 않는 값',
+            address: '경기도 예시시 예시면 매곡리 산 35-2', description: '현장 확인 완료'
+        } }]
+    };
+    ensureFeatureCollectionRecordNames(collection);
+    const restored = JSON.parse(JSON.stringify(collection)).features[0];
+    assert.equal(Object.hasOwn(restored.properties, 'memo'), false);
+    assert.equal(restored.properties.name, '매곡리 산35-2');
+    assert.equal(restored.properties.address, '경기도 예시시 예시면 매곡리 산 35-2');
+    assert.equal(restored.properties.description, '현장 확인 완료');
+    assert.deepEqual(restored.geometry.coordinates, [127, 37]);
+});
 
 test('사진 포함 GeoJSON을 직렬화해도 Base64와 기록 속성이 유지된다', async () => {
     const source = JSON.parse(await readFile(fileURLToPath(fixtureUrl), 'utf8'));
@@ -84,7 +102,7 @@ test('SHP 축약 속성과 문자열 값을 앱 표준 속성으로 정리한다
 
     assert.equal(feature.properties.id, 42);
     assert.equal(feature.properties.name, '가져온 기록');
-    assert.equal(feature.properties.memo, '가져온 기록');
+    assert.equal(Object.hasOwn(feature.properties, 'memo'), false);
     assert.equal(feature.properties.customColor, '#123456');
     assert.equal(feature.properties.customMarkerSize, 5);
     assert.equal(feature.properties.customWeight, 1);
@@ -95,15 +113,33 @@ test('SHP 축약 속성과 문자열 값을 앱 표준 속성으로 정리한다
 });
 
 test('가져오기에서는 잘못된 ID를 제거하고 내보내기에서는 기존 ID를 보존한다', () => {
-    const imported = { type: 'Feature', geometry: null, properties: { id: 'not-an-id', memo: '기록' } };
+    const imported = { type: 'Feature', geometry: null, properties: { id: 'not-an-id', name: '기록' } };
     normalizeImportedFeatureProperties(imported);
     assert.equal(Object.hasOwn(imported.properties, 'id'), false);
 
     const exported = {
         type: 'FeatureCollection',
-        features: [{ type: 'Feature', geometry: null, properties: { id: 'legacy-id', memo: '기록' } }]
+        features: [{ type: 'Feature', geometry: null, properties: { id: 'legacy-id', name: '기록' } }]
     };
     ensureFeatureCollectionRecordNames(exported, { normalizeId: false });
     assert.equal(exported.features[0].properties.id, 'legacy-id');
     assert.equal(exported.features[0].properties.name, '기록');
+});
+
+test('기존 저장 기록은 memo를 이름으로 옮기지 않고 시각 속성만 현재 형식으로 보정한다', () => {
+    const collection = {
+        type: 'FeatureCollection',
+        features: [{
+            type: 'Feature', geometry: { type: 'Point', coordinates: [127, 37] },
+            properties: { id: 1609459200000, memo: '옛 기록명', description: '기존 메모' }
+        }]
+    };
+    assert.equal(upgradeFeatureCollectionRecordProperties(collection), true);
+    const props = collection.features[0].properties;
+    assert.equal(Object.hasOwn(props, 'memo'), false);
+    assert.equal(Object.hasOwn(props, 'name'), false);
+    assert.equal(props.createdAt, '2021-01-01T00:00:00.000Z');
+    assert.equal(props.updatedAt, props.createdAt);
+    assert.equal(props.description, '기존 메모');
+    assert.equal(upgradeFeatureCollectionRecordProperties(collection), false);
 });

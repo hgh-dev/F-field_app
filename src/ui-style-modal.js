@@ -284,7 +284,7 @@ function collectLatLngSegments(latlngs, segments = []) {
 function addSolidDotOverlayForLayer(layer) {
     if (!layer || layer instanceof L.Marker || typeof layer.getLatLngs !== 'function') return;
     const props = layer.feature?.properties || {};
-    if (props.customLineStyle !== 'solid-dot' || props.isHidden === true) return;
+    if (props.customLineStyle !== 'solid-dot' || props.isHidden === true || map.getZoom() < AppState.recordMinZoom) return;
 
     const weight = Math.min(5, Math.max(1, parseFloat(props.customWeight || layer.options?.weight || 3)));
     const color = props.customStrokeColor || props.customColor || layer.options?.color || '#333333';
@@ -337,7 +337,7 @@ export function syncSolidDotOverlays() {
 function clearLayerFillPattern(layer) {
     if (!(layer instanceof L.Polygon) || !layer._path) return;
     const props = layer.feature?.properties || {};
-    const isHidden = props.isHidden === true;
+    const isHidden = props.isHidden === true || map.getZoom() < AppState.recordMinZoom;
     const fillColor = props.customFillColor || props.customColor || layer.options?.fillColor || layer.options?.color || '#3388ff';
     const fillOpacity = isHidden ? 0 : getLayerFillOpacity(layer);
     layer._path.setAttribute('fill', fillColor);
@@ -351,7 +351,7 @@ function applyFillPatternToLayer(layer) {
     if (!(layer instanceof L.Polygon)) return;
     const props = layer.feature?.properties || {};
     const pattern = normalizeFillPattern(props.customFillPattern);
-    if (pattern === 'solid' || pattern === 'none' || props.isHidden === true) {
+    if (pattern === 'solid' || pattern === 'none' || props.isHidden === true || map.getZoom() < AppState.recordMinZoom) {
         clearLayerFillPattern(layer);
         return;
     }

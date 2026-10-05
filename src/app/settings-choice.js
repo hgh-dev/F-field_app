@@ -21,11 +21,26 @@ const TRACK_INTERVAL_OPTIONS = [
     { value: 20, label: '20m' }
 ];
 
+const DISPLAY_ZOOM_OPTIONS = Array.from({ length: 22 }, (_, index) => ({
+    value: index + 1,
+    label: `${index + 1}레벨`
+}));
+
+const RECORD_ZOOM_OPTIONS = DISPLAY_ZOOM_OPTIONS.map(option => ({
+    ...option,
+    label: option.value === 10 ? `${option.label} (기본값)` : option.label
+}));
+
+const LABEL_ZOOM_OPTIONS = [
+    { value: 'same', label: '기록과 동일한 범위에서 표시 (기본값)' },
+    ...DISPLAY_ZOOM_OPTIONS
+];
+
 const REOPEN_SETTINGS_ON_RETURN_KEY = 'f-field-reopen-settings-on-return';
 const REOPEN_SETTINGS_MAX_AGE_MS = 10 * 60 * 1000;
 
 function getSettingsOptionLabel(options, value) {
-    return options.find(option => option.value === Number(value))?.label || options[0].label;
+    return options.find(option => String(option.value) === String(value))?.label || options[0].label;
 }
 
 export function syncSettingsChoiceValues() {
@@ -34,6 +49,16 @@ export function syncSettingsChoiceValues() {
 
     const trackValue = document.getElementById('settings-track-interval-value');
     if (trackValue) trackValue.textContent = getSettingsOptionLabel(TRACK_INTERVAL_OPTIONS, AppState.trackInterval);
+
+    const recordRangeValue = document.getElementById('settings-record-range-value');
+    if (recordRangeValue) recordRangeValue.textContent = getSettingsOptionLabel(RECORD_ZOOM_OPTIONS, AppState.recordMinZoom);
+
+    const labelRangeValue = document.getElementById('settings-label-range-value');
+    if (labelRangeValue) {
+        labelRangeValue.textContent = AppState.labelMinZoom === 'same'
+            ? '기록과 동일 (기본값)'
+            : getSettingsOptionLabel(DISPLAY_ZOOM_OPTIONS, AppState.labelMinZoom);
+    }
 
 }
 
@@ -69,11 +94,16 @@ function renderSettingsChoiceModal(type) {
     const list = document.getElementById('settings-choice-list');
     if (!title || !list) return false;
 
-    const isCoord = type === 'coord';
-    const isTrack = type === 'track';
-    const options = isCoord ? COORD_MODE_OPTIONS : TRACK_INTERVAL_OPTIONS;
-    const currentValue = isCoord ? AppState.coordMode : AppState.trackInterval;
-    title.textContent = isCoord ? '좌표 표시 방식' : '트랙 기록 간격';
+    const configurations = {
+        coord: { title: '좌표 표시 방식', options: COORD_MODE_OPTIONS, value: AppState.coordMode, name: 'coord', setter: 'setCoordMode' },
+        track: { title: '트랙 기록 간격', options: TRACK_INTERVAL_OPTIONS, value: AppState.trackInterval, name: 'track', setter: 'setTrackInterval' },
+        'record-range': { title: '기록 표시 범위', options: RECORD_ZOOM_OPTIONS, value: AppState.recordMinZoom, name: 'record-range', setter: 'setRecordMinZoom' },
+        'label-range': { title: '라벨 표시 범위', options: LABEL_ZOOM_OPTIONS, value: AppState.labelMinZoom, name: 'label-range', setter: 'setLabelMinZoom' }
+    };
+    const configuration = configurations[type];
+    if (!configuration) return false;
+    const { options, value: currentValue } = configuration;
+    title.textContent = configuration.title;
     list.innerHTML = '';
 
     options.forEach(option => {
@@ -82,15 +112,11 @@ function renderSettingsChoiceModal(type) {
 
         const input = document.createElement('input');
         input.type = 'radio';
-        input.name = isCoord ? 'settings-choice-coord' : 'settings-choice-track';
+        input.name = `settings-choice-${configuration.name}`;
         input.value = String(option.value);
-        input.checked = Number(currentValue) === option.value;
+        input.checked = String(currentValue) === String(option.value);
         input.addEventListener('change', () => {
-            if (isCoord) {
-                window.setCoordMode(option.value);
-            } else {
-                window.setTrackInterval(option.value);
-            }
+            window[configuration.setter](option.value);
             window.closeSettingsChoiceModal();
         });
 
@@ -118,7 +144,12 @@ export function openSettingsChoiceModal(type) {
     const overlay = document.getElementById('settings-choice-modal-overlay');
     if (!overlay) return;
     overlay.style.display = 'flex';
-    setTimeout(() => overlay.classList.add('visible'), 10);
+    setTimeout(() => {
+        overlay.classList.add('visible');
+        const list = document.getElementById('settings-choice-list');
+        const selected = list?.querySelector('input:checked')?.closest('.settings-choice-option');
+        if (list && selected) list.scrollTop = Math.max(0, selected.offsetTop - (list.clientHeight - selected.offsetHeight) / 2);
+    }, 10);
 }
 
 export function closeSettingsChoiceModal() {
@@ -139,4 +170,22 @@ export function setTrackInterval(value) {
     AppState.trackInterval = parseInt(value);
     localStorage.setItem('setting_track_interval', value);
     syncSettingsChoiceValues();
+}
+
+export function setRecordMinZoom(value) {
+    const zoom = Number(value);
+    if (!Number.isInteger(zoom) || zoom < 1 || zoom > 22) return;
+    AppState.recordMinZoom = zoom;
+    localStorage.setItem('setting_record_min_zoom', String(zoom));
+    syncSettingsChoiceValues();
+    document.dispatchEvent(new CustomEvent('record-display-range-changed'));
+}
+
+export function setLabelMinZoom(value) {
+    const normalized = value === 'same' ? 'same' : Number(value);
+    if (normalized !== 'same' && (!Number.isInteger(normalized) || normalized < 1 || normalized > 22)) return;
+    AppState.labelMinZoom = normalized;
+    localStorage.setItem('setting_label_min_zoom', String(normalized));
+    syncSettingsChoiceValues();
+    document.dispatchEvent(new CustomEvent('label-display-range-changed'));
 }

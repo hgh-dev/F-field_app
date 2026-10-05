@@ -16,6 +16,7 @@ import distance from '@turf/distance';
 import flatten from '@turf/flatten';
 import { point } from '@turf/helpers';
 import length from '@turf/length';
+import pointOnFeature from '@turf/point-on-feature';
 import { proj4 } from './shp-crs.js';
 
 // 핀치 중에는 기존 타일을 확대하고, 제스처가 끝난 배율에서 타일을 요청합니다.
@@ -39,6 +40,7 @@ const turf = {
     distance,
     flatten,
     length,
+    pointOnFeature,
     point
 };
 

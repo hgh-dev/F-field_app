@@ -6,10 +6,12 @@
    [참고]
    - 앱 데이터가 저장/복원되지 않거나 프로젝트 전환이 이상할 때 확인합니다.
    ========================================================================== */
+import { getRecordAddress } from './record-address.js';
+import { rememberRecordTimestamps, updateRecordTimestamps } from './record-timestamps.js';
 import { L, turf } from './vendor-globals.js';
 import { STORAGE_KEY } from './config.js';
 import { AppState } from './state.js';
-import { getRandomColor, createColoredMarkerIcon, getRecordName, getShortAddress, getLineStyleDashArray, normalizeFillPattern, setRecordName, ensureRecordNameAlias } from './utils.js';
+import { getRandomColor, createColoredMarkerIcon, getRecordName, getShortAddress, getLineStyleDashArray, normalizeFillPattern, setRecordName, normalizeRecordName } from './utils.js';
 import { VWORLD_API_KEY } from './config.js';
 import { map } from './map.js';
 import localforage from 'localforage';
@@ -17,7 +19,8 @@ import { showAppConfirm } from './app-dialog.js';
 import { enqueueStorageWrite } from './storage-write-queue.js';
 import {
     cloneRecordGroups,
-    normalizeImportedFeatureProperties
+    normalizeImportedFeatureProperties,
+    upgradeFeatureCollectionRecordProperties
 } from './project-data-contract.js';
 import { validateRuntimeDependencies } from './runtime-dependencies.js';
 
@@ -72,6 +75,7 @@ function getDataTransferModule() {
  * 저장 시점의 화면 상태와 저장소 상태가 일치하도록 만듭니다.
  */
 export async function saveToStorage() {
+    document.dispatchEvent(new Event('records-changed'));
     // 프로젝트가 아직 선택되지 않은 초기 상태라면 저장하지 않습니다.
     if (!AppState.currentProjectId) return;
 
@@ -79,11 +83,13 @@ export async function saveToStorage() {
     const projectIndex = AppState.projects.findIndex(p => p.id === parseInt(AppState.currentProjectId));
     if (projectIndex !== -1) {
         const orderedLayers = getLayersForStorageOrder();
+        const savedAt = new Date().toISOString();
         orderedLayers.forEach((layer, index) => {
             if (!layer.feature) layer.feature = { type: "Feature", properties: {} };
             if (!layer.feature.properties) layer.feature.properties = {};
-            ensureRecordNameAlias(layer.feature.properties);
+            normalizeRecordName(layer.feature.properties);
             layer.feature.properties.displayOrder = index;
+            updateRecordTimestamps(layer, savedAt);
         });
 
         // Leaflet 레이어는 직렬화가 어려우므로 표준 포맷(GeoJSON)으로 변환해 저장 가능한 형태로 바꿉니다.
@@ -167,6 +173,9 @@ export async function loadFromStorage() {
             console.log("Legacy data detected. Migrating...");
             await migrateLegacyData(parsed);
         } else if (parsed.version === "2.0") {
+            const upgraded = (parsed.projects || []).reduce((changed, project) =>
+                upgradeFeatureCollectionRecordProperties(project?.features) || changed, false);
+            if (upgraded) await enqueueStorageWrite(STORAGE_KEY, parsed);
             AppState.projects = parsed.projects || [];
             AppState.currentProjectId = parsed.currentProjectId;
 
@@ -363,6 +372,7 @@ export function restoreFeatures(geoJsonData, options = {}) {
                 updateLayerInfo(layer);
             }
             drawnItems.addLayer(layer);
+            rememberRecordTimestamps(layer);
         }
     });
 
@@ -456,9 +466,11 @@ export async function clearAllData() {
  * 동작 원리: 좌표 -> Leaflet 마커 -> feature 메타 부여 -> 저장/렌더링 순서로 처리합니다.
  */
 export function saveCurrentPoint(lat, lng, addressName) {
-    const shortName = getShortAddress(addressName);
+    const address = getRecordAddress(addressName);
+    if (!address) return;
+    const shortName = getShortAddress(address);
     const marker = L.marker([lat, lng], { icon: createColoredMarkerIcon('#FF0000') });
-    marker.feature = { type: "Feature", properties: setRecordName({ id: Date.now(), customColor: '#FF0000', isHidden: false }, getUniqueRecordName(shortName || "지점 기록")) };
+    marker.feature = { type: "Feature", properties: setRecordName({ id: Date.now(), address, customColor: '#FF0000', isHidden: false }, getUniqueRecordName(shortName || "지점 기록")) };
     updateLayerInfo(marker);
     drawnItems.addLayer(marker);
     saveToStorage();
@@ -475,7 +487,9 @@ export function saveCurrentPoint(lat, lng, addressName) {
  */
 export function saveCurrentBoundary(addressName) {
     if (!AppState.currentBoundaryLayer) { alert("영역이 선택되지 않았습니다."); return; }
-    let shortName = getShortAddress(addressName);
+    const address = getRecordAddress(addressName);
+    if (!address) return;
+    const shortName = getShortAddress(address);
     let addedCount = 0;
 
     AppState.currentBoundaryLayer.eachLayer(function (layer) {
@@ -496,7 +510,7 @@ export function saveCurrentBoundary(addressName) {
                 innerLayer.feature.properties = {
                     id: uniqueId,
                     name: recordName,
-                    memo: recordName,
+                    address,
                     customColor: '#FF0000',
                     customWeight: 3,
                     customFillPattern: 'none',

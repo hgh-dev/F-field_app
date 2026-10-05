@@ -28,6 +28,18 @@ function isLineOrPolygonLayer(layer) {
  *        필요한 UI 갱신·저장·후속 호출을 순차 실행해 상태 일관성을 유지한다.
  */
 function optimizeVectorLayerForViewport(layer, viewBounds, zoom) {
+    const isHidden = layer.feature?.properties?.isHidden === true;
+    const isInZoomRange = zoom >= AppState.recordMinZoom;
+    if (layer instanceof L.Marker) {
+        const element = layer.getElement?.() || layer._icon;
+        if (!element) return;
+        const shouldShow = !isHidden && isInZoomRange;
+        element.style.display = shouldShow ? '' : 'none';
+        element.style.pointerEvents = shouldShow ? '' : 'none';
+        if (layer._shadow) layer._shadow.style.display = shouldShow ? '' : 'none';
+        if (!shouldShow && typeof layer.closePopup === 'function') layer.closePopup();
+        return;
+    }
     if (!isLineOrPolygonLayer(layer)) return;
 
     const smoothFactor = 1;
@@ -36,14 +48,13 @@ function optimizeVectorLayerForViewport(layer, viewBounds, zoom) {
         if (typeof layer.redraw === 'function') layer.redraw();
     }
 
-    const isHidden = layer.feature?.properties?.isHidden === true;
     const layerBounds = typeof layer.getBounds === 'function' ? layer.getBounds() : null;
     const isInView = !!(layerBounds && layerBounds.isValid() && viewBounds.intersects(layerBounds));
     const path = layer._path;
     if (!path) return;
 
     // 화면 밖/숨김 상태 도형은 path 자체를 숨겨서 렌더링 비용을 낮춤
-    if (isHidden || !isInView) {
+    if (isHidden || !isInZoomRange || !isInView) {
         path.style.display = 'none';
         path.style.pointerEvents = 'none';
     } else {

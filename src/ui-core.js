@@ -143,6 +143,7 @@ import {
 import {
     applyLayerVisibilityState,
     refreshRecordLayerDisplayMode,
+    refreshLayerAddress,
     toggleLayerVisibility,
     updateLayerInfo
 } from './ui-layer-detail.js';
@@ -164,6 +165,7 @@ import {
 export {
     applyLayerVisibilityState,
     refreshRecordLayerDisplayMode,
+    refreshLayerAddress,
     toggleLayerVisibility,
     updateLayerInfo
 } from './ui-layer-detail.js';
@@ -347,6 +349,11 @@ export function initUiEventListeners() {
     drawnItems.on('layeradd layerremove', scheduleViewportVectorOptimization);
     drawnItems.on('layeradd layerremove', syncSolidDotOverlays);
     drawnItems.on('layeradd layerremove', syncFillPatternOverlays);
+    document.addEventListener('record-display-range-changed', () => {
+        scheduleViewportVectorOptimization();
+        syncSolidDotOverlays();
+        syncFillPatternOverlays();
+    });
 
     setTimeout(updateOfflineButton, 100);
     setTimeout(scheduleViewportVectorOptimization, 120);

@@ -36,6 +36,7 @@ let closeBottomSheet;
 let syncFillPatternOverlays;
 let syncSolidDotOverlays;
 let saveToStorage;
+let refreshLayerAddress;
 
 /**
  * 그리기 엔진이 데이터/UI 통합 모듈을 직접 import하지 않도록 콜백을 연결합니다.
@@ -51,7 +52,8 @@ export function configureDrawRuntime(dependencies) {
         closeBottomSheet: 'function',
         syncFillPatternOverlays: 'function',
         syncSolidDotOverlays: 'function',
-        saveToStorage: 'function'
+        saveToStorage: 'function',
+        refreshLayerAddress: 'function'
     });
     ({
         updateLayerInfo,
@@ -62,7 +64,8 @@ export function configureDrawRuntime(dependencies) {
         closeBottomSheet,
         syncFillPatternOverlays,
         syncSolidDotOverlays,
-        saveToStorage
+        saveToStorage,
+        refreshLayerAddress
     } = validatedDependencies);
 }
 
@@ -897,8 +900,9 @@ export function completeSingleEdit() {
         layer.dragging.disable();
     } else if (layer.editing) layer.editing.disable();
 
-    // 좌표 변경분을 feature 정보로 재계산하고 즉시 저장합니다.
+    // 좌표 변경분을 feature 정보로 재계산하고, 새 위치를 기준으로 주소를 다시 조회합니다.
     updateLayerInfo(layer);
+    void refreshLayerAddress(layer);
     saveToStorage();
     renderSurveyList();
 
@@ -1073,7 +1077,10 @@ map.on(L.Draw.Event.CREATED, async function (event) {
  * 동작 원리: 다중 편집 결과 레이어 집합(e.layers)을 순회해 정보 재계산 후 저장합니다.
  */
 map.on('draw:edited', function (e) {
-    e.layers.eachLayer(updateLayerInfo);
+    e.layers.eachLayer(layer => {
+        updateLayerInfo(layer);
+        void refreshLayerAddress(layer);
+    });
     saveToStorage();
     renderSurveyList();
     syncSolidDotOverlays();

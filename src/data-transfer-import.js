@@ -60,7 +60,7 @@ function showLargeShpImportChoice(featureCount) {
                 <div style="font-size:18px; font-weight:800; color:#111827;">SHP 파일 추가 방식</div>
                 <div style="padding:12px; border-radius:8px; background:#f8f9fa; color:#4b5563; font-size:13px; line-height:1.55;">
                     이 SHP 파일에는 도형이 ${featureCount.toLocaleString()}개 있습니다.<br>
-                    도형이 많고 수정할 일이 없는 읽기 전용의 SHP파일은 기록관리보다 지도관리 &gt; 사용자지도에서 배경지도로 불러오는 것이 적합합니다.
+                    도형이 많고 수정할 일이 없는 읽기 전용의 SHP파일은 기록관리보다 지도관리 &gt; 사용자지도에서 배경지도로 가저오는 것이 적합합니다.
                 </div>
                 <div style="display:flex; flex-direction:column; gap:8px;">
                     <button id="large-shp-user-map-btn" type="button" style="width:100%; min-height:44px; border:0; border-radius:8px; background:#2563eb; color:#fff; font-size:14px; font-weight:800;">사용자 지도에 추가</button>
@@ -108,7 +108,7 @@ function showShpCrsSelectModal(fileName) {
                 <div style="font-size:18px; font-weight:800; color:#111827;">SHP 좌표계 선택</div>
                 <div style="padding:12px; border-radius:8px; background:#f8f9fa; color:#4b5563; font-size:13px; line-height:1.55;">
                     ${escapeModalHtml(fileName)} 파일의 원본 좌표계를 선택하세요.<br>
-                    .prj 파일을 기준으로 불러오려면 자동 선택을 사용하세요.
+                    .prj 파일을 기준으로 가저오려면 자동 선택을 사용하세요.
                 </div>
                 <label style="display:block;">
                     <span style="display:block; font-size:12px; font-weight:800; color:#4b5563; margin-bottom:6px;">좌표계</span>
@@ -117,7 +117,7 @@ function showShpCrsSelectModal(fileName) {
                     </select>
                 </label>
                 <div style="display:flex; flex-direction:column; gap:8px;">
-                    <button id="shp-import-crs-confirm-btn" type="button" style="width:100%; min-height:44px; border:0; border-radius:8px; background:#2563eb; color:#fff; font-size:14px; font-weight:800;">불러오기</button>
+                    <button id="shp-import-crs-confirm-btn" type="button" style="width:100%; min-height:44px; border:0; border-radius:8px; background:#2563eb; color:#fff; font-size:14px; font-weight:800;">가저오기</button>
                     <button id="shp-import-crs-cancel-btn" type="button" style="width:100%; min-height:40px; border:0; background:transparent; color:#6b7280; font-size:13px; font-weight:700;">취소</button>
                 </div>
             </div>
@@ -197,7 +197,6 @@ function gpxToGeoJson(gpxText) {
             properties: {
                 id: Date.now() + i,
                 name: name,
-                memo: name,
                 // 과거/외부 GPX는 색상이 없는 경우가 많아 앱 기본색으로 보정합니다.
                 customColor: getColor(wpts[i]) || '#FF0000',
                 isHidden: false
@@ -222,7 +221,7 @@ function gpxToGeoJson(gpxText) {
             features.push({
                 type: "Feature",
                 geometry: { type: "LineString", coordinates: coords },
-                properties: { id: Date.now() + 1000 + i, name: name, memo: name, customColor: getColor(trks[i]) || '#0040ff', customWeight: 3, isHidden: false }
+                properties: { id: Date.now() + 1000 + i, name: name, customColor: getColor(trks[i]) || '#0040ff', customWeight: 3, isHidden: false }
             });
         }
     }
@@ -244,7 +243,7 @@ function gpxToGeoJson(gpxText) {
             features.push({
                 type: "Feature",
                 geometry: { type: "LineString", coordinates: coords },
-                properties: { id: Date.now() + 2000 + i, name: name, memo: name, customColor: getColor(rtes[i]) || '#0040ff', customWeight: 3, isHidden: false }
+                properties: { id: Date.now() + 2000 + i, name: name, customColor: getColor(rtes[i]) || '#0040ff', customWeight: 3, isHidden: false }
             });
         }
     }
@@ -348,7 +347,7 @@ export async function handleFileSelect(input) {
                     if (importChoice !== 'record') continue;
                 }
 
-                // DBF 인코딩 차이로 속성 문자열이 깨질 수 있어, memo를 파일명으로 보정합니다.
+                // DBF 인코딩 차이로 속성 문자열이 깨질 수 있어, 기록명을 파일명으로 보정합니다.
                 if (json && json.features) {
                     json.features.forEach(feature => {
                         if (!feature.properties) feature.properties = {};
@@ -360,7 +359,7 @@ export async function handleFileSelect(input) {
                 const MAX_VERTICES = 50000;
                 const vertexCount = countVertices(json);
                 if (vertexCount > MAX_VERTICES) {
-                    alert(`"${file.name}" 파일의 버텍스 개수가 너무 많습니다.\n모바일 환경에서는 ${MAX_VERTICES.toLocaleString()}개 이하만 불러올 수 있습니다.\n(현재: ${vertexCount.toLocaleString()}개)`);
+                    alert(`"${file.name}" 파일의 버텍스 개수가 너무 많습니다.\n모바일 환경에서는 ${MAX_VERTICES.toLocaleString()}개 이하만 가저올 수 있습니다.\n(현재: ${vertexCount.toLocaleString()}개)`);
                     errorCount++;
                     continue;
                 }

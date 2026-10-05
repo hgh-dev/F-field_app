@@ -377,7 +377,9 @@
 
         .badge-road,
         .badge-parcel,
-        .badge-coord {
+        .badge-coord,
+        .badge-length,
+        .badge-area {
             padding: 2px 4px;
             border-radius: 3px;
             font-size: 10px;
@@ -399,6 +401,16 @@
         .badge-coord {
             background: #f3e8ff;
             color: #7e22ce;
+        }
+
+        .badge-length {
+            background: #e6f7ff;
+            color: #0369a1;
+        }
+
+        .badge-area {
+            background: #eaf8ee;
+            color: #15803d;
         }
 
         /* Leaflet.draw 가상 버텍스(중간점) 스타일: 반투명한 + 모양 */

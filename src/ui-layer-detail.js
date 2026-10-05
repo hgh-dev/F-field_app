@@ -6,19 +6,66 @@
    [참고]
    - 기록 상세 정보 값이나 표시 형식이 이상할 때 확인합니다.
    ========================================================================== */
-import { L } from './vendor-globals.js';
+import { L, turf } from './vendor-globals.js';
 import { SVG_ICONS } from './config.js';
 import { AppState } from './state.js';
 import { map } from './map.js';
 import { drawnItems, currentEditLayerId } from './draw.js';
-import { ensureRecordNameAlias, formatCoordinate, getRecordName, calculateProjectedLengthMeters, calculateProjectedAreaM2 } from './utils.js';
+import { normalizeRecordName, formatCoordinate, getRecordName, calculateProjectedLengthMeters, calculateProjectedAreaM2 } from './utils.js';
 import { saveToStorage } from './data.js';
 import { scheduleViewportVectorOptimization } from './ui-viewport.js';
 import { getLayerFillOpacity, syncFillPatternOverlays, syncSolidDotOverlays } from './ui-style-modal.js';
 import { createLayerPhotoSection } from './ui-photo.js';
 import { currentBottomSheetLayerId, flyToWithBottomSheet, getBottomSheetAwareFitOptions, setCurrentBottomSheetLayerId, openBottomSheet, closeBottomSheet, suppressBottomSheetCloseOnMapMove, syncBottomSheetHoleMenuForLayer } from './ui-bottomsheet.js';
 import { renderSurveyList } from './ui-project.js';
-import { escapeHtml } from './user-maps/utils.js';
+import { escapeHtml, escapeJsString } from './user-maps/utils.js';
+import { lookupRecordAddress } from './record-address-lookup.js';
+
+const addressLookupState = new WeakMap();
+
+function getAddressLookupStatus(layer) {
+    const state = addressLookupState.get(layer);
+    return typeof state === 'string' ? state : state?.status;
+}
+
+function getLayerAddressCoordinate(layer) {
+    try {
+        const point = turf.pointOnFeature(layer.toGeoJSON());
+        const [lng, lat] = point?.geometry?.coordinates || [];
+        return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+    } catch {
+        return null;
+    }
+}
+
+async function ensureLayerAddress(layer, options = {}) {
+    const force = options.force === true;
+    if (!force && (layer.feature?.properties?.address || getAddressLookupStatus(layer) === 'loading')) return;
+    const coordinate = getLayerAddressCoordinate(layer);
+    if (!coordinate) return;
+    if (force) delete layer.feature.properties.address;
+    const requestState = { status: 'loading' };
+    addressLookupState.set(layer, requestState);
+    updateLayerInfo(layer);
+    const address = await lookupRecordAddress(coordinate.lat, coordinate.lng);
+    if (addressLookupState.get(layer) !== requestState) return;
+    if (address) {
+        layer.feature.properties.address = address;
+        addressLookupState.delete(layer);
+        await saveToStorage();
+    } else {
+        addressLookupState.set(layer, 'failed');
+    }
+    updateLayerInfo(layer);
+    if (currentBottomSheetLayerId === layer.feature.properties.id) {
+        layer.refreshBottomSheetContent({ lookupAddress: false });
+    }
+}
+
+/** 도형 편집 후 기존 주소를 지우고 변경된 위치의 주소를 다시 조회합니다. */
+export function refreshLayerAddress(layer) {
+    return ensureLayerAddress(layer, { force: true });
+}
 
 /* --------------------------------------------------------------------------
    7. 레이어 상세 및 관리 (Layer Detail & Management)
@@ -97,12 +144,14 @@ export function applyLayerVisibilityState(layer, isHidden = layer?.feature?.prop
  *        팝업 이벤트와 바텀시트 동작을 재바인딩해 선택/편집 흐름을 일관되게 유지한다.
  */
 export function updateLayerInfo(layer) {
-    ensureRecordNameAlias(layer.feature.properties);
+    normalizeRecordName(layer.feature.properties);
     const memo = getRecordName(layer.feature.properties, "");
     const typeIcon = (layer instanceof L.Marker)
         ? SVG_ICONS.marker
         : (layer instanceof L.Polygon ? SVG_ICONS.polygon : (layer.feature.properties?.isTrack ? SVG_ICONS.track : SVG_ICONS.ruler));
     let infoText = "";
+    let infoLabel = "";
+    let infoBadgeClass = "";
     if (layer instanceof L.Marker) {
         const pos = layer.getLatLng();
         infoText = formatCoordinate(pos.lat, pos.lng, AppState.coordMode, {
@@ -110,11 +159,15 @@ export function updateLayerInfo(layer) {
             tmSeparator: ', '
         });
     } else if (layer instanceof L.Polyline && !(layer instanceof L.Polygon)) {
-        infoText = "<b>거리:</b> " + calculateProjectedLengthMeters(layer.toGeoJSON()).toFixed(2) + " m";
+        infoLabel = "길이";
+        infoBadgeClass = "badge-length";
+        infoText = calculateProjectedLengthMeters(layer.toGeoJSON()).toFixed(2) + " m";
     } else if (layer instanceof L.Polygon) {
         const areaM2 = calculateProjectedAreaM2(layer.toGeoJSON());
         const areaPyeong = areaM2 * 0.3025;
-        infoText = "<b>면적:</b> " + areaM2.toFixed(2) + " ㎡ (" + areaPyeong.toFixed(2) + "평)";
+        infoLabel = "면적";
+        infoBadgeClass = "badge-area";
+        infoText = areaM2.toFixed(2) + " ㎡ (" + areaPyeong.toFixed(2) + "평)";
     }
 
     let popupContent = `<div style="display:flex; align-items:center; gap:6px; margin-bottom:5px;">
@@ -125,11 +178,20 @@ export function updateLayerInfo(layer) {
         </button>
     </div><hr style="margin: 12px 0; border: none; border-top: 1px solid #f0f0f0;">`;
 
+    const address = layer.feature.properties.address;
+    if (address) {
+        const safeAddressArg = escapeHtml(escapeJsString(address));
+        popupContent += `<div onclick="copyText('${safeAddressArg}', false, '지번 주소')" title="주소 복사" style="display:flex; align-items:baseline; font-size:14px; color:#555; line-height:1.5; margin-bottom:10px; overflow-wrap:anywhere; cursor:pointer;"><span class="badge-parcel" style="flex-shrink:0; width:36px; text-align:center;">지번</span><span style="margin-left:5px;">${escapeHtml(address)}</span></div>`;
+    } else {
+        const addressStatus = getAddressLookupStatus(layer) === 'failed' ? '주소 정보 없음' : '조회 중...';
+        popupContent += `<div style="display:flex; align-items:baseline; font-size:14px; color:#999; line-height:1.5; margin-bottom:10px;"><span class="badge-parcel" style="flex-shrink:0; width:36px; text-align:center;">지번</span><span style="margin-left:5px;">${addressStatus}</span></div>`;
+    }
+
     if (infoText) {
         if (layer instanceof L.Marker) {
             popupContent += `<div style="display:flex; align-items:baseline; font-size: 14px; color: #555; margin-bottom: 15px;"><span class="badge-coord" style="flex-shrink:0; width:36px; display:inline-block; text-align:center;">좌표</span><div style="margin-left: 5px; line-height: 1.5;">${infoText}</div></div>`;
         } else {
-            popupContent += `<div style="font-size:14px; color:#666; line-height:1.5; margin-bottom:15px;">${infoText}</div>`;
+            popupContent += `<div style="display:flex; align-items:baseline; font-size:14px; color:#555; line-height:1.5; margin-bottom:15px;"><span class="${infoBadgeClass}" style="flex-shrink:0; width:36px; text-align:center;">${infoLabel}</span><span style="margin-left:5px;">${infoText}</span></div>`;
         }
     }
 
@@ -160,6 +222,7 @@ export function updateLayerInfo(layer) {
         syncBottomSheetHoleMenuForLayer(layer);
         openBottomSheet(memo || '측량 기록', popupContent);
         document.getElementById('bottom-sheet')?.classList.add('full-open');
+        if (options.lookupAddress !== false && !layer.feature.properties.address) ensureLayerAddress(layer);
 
         if (options.move === false) return;
         if (layer instanceof L.Marker) flyToWithBottomSheet(layer.getLatLng(), Math.max(map.getZoom(), 17), { duration: 0.5 });
@@ -169,8 +232,8 @@ export function updateLayerInfo(layer) {
         }
     };
 
-    layer.refreshBottomSheetContent = function () {
-        openLayerBottomSheet({ move: false });
+    layer.refreshBottomSheetContent = function (options = {}) {
+        openLayerBottomSheet({ move: false, ...options });
         return this;
     };
 

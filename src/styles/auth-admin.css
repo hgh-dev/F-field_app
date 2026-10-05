@@ -1322,7 +1322,11 @@
 
         .settings-choice-modal-content {
             width: min(340px, calc(100vw - 36px));
+            max-height: min(560px, calc(100vh - 36px - env(safe-area-inset-top) - env(safe-area-inset-bottom)));
             padding: 18px 18px 12px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
         }
 
         .settings-choice-modal-title {
@@ -1335,6 +1339,10 @@
         .settings-choice-list {
             display: flex;
             flex-direction: column;
+            min-height: 0;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            -webkit-overflow-scrolling: touch;
         }
 
         .settings-choice-option {

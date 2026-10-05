@@ -212,6 +212,10 @@
                 </svg>
                 스타일 설정
             </div>
+            <div id="bottom-sheet-label-item" class="more-menu-item" onclick="openRecordLabelSettings('current')">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><text x="12" y="15.5" text-anchor="middle" font-size="10" font-weight="800" font-family="Arial, sans-serif" fill="currentColor">abc</text></svg>
+                라벨 표시
+            </div>
             <div id="bottom-sheet-hole-item" class="more-menu-item" onclick="handleBottomSheetHole()">
                 <svg viewBox="0 0 24 24">
                     <path fill-rule="evenodd" clip-rule="evenodd"
@@ -918,12 +922,12 @@
                                     style="width:14px;height:14px;fill:currentColor;margin-right:4px;">
                                     <path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z" />
                                 </svg>
-                                <span>불러오기</span>
+                                <span>가저오기</span>
                             </button>
                             <div id="user-map-status"
                                 style="font-size: 11px; color: #888; margin-top: 6px; text-align: left;">
                                 <ul style="padding-left: 18px; margin: 6px 0 0 0; line-height: 1.4;">
-                                    <li>로컬에서 Shp파일을 불러오거나 타일 지도의 URL을 입력하여 지도 위에 표시할 수 있습니다.</li>
+                                    <li>로컬에서 Shp파일을 가저오거나 타일 지도의 URL을 입력하여 지도 위에 표시할 수 있습니다.</li>
                                     <li style="margin-top: 2px;">외부 지도 주소는 CORS가 허용되어야 표시됩니다.</li>
                                 </ul>
                             </div>
@@ -989,7 +993,7 @@
                             <svg viewBox="0 0 24 24">
                                 <path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z" />
                             </svg>
-                            불러오기
+                            가저오기
                         </button>
                         <button onclick="backupAllProjects()" class="mono-btn"
                             style="justify-content:center; padding: var(--space-3); font-size: 13px; color: #000000;">
@@ -1010,7 +1014,7 @@
                     </div>
                     <div class="sidebar-warning" style="flex-shrink:0; margin-top:8px;">
                         <ul>
-                            <li>많은 기록이나 용량이 큰 파일을 불러오면 앱이 느려지거나 오류가 발생할 수 있습니다.</li>
+                            <li>많은 기록이나 용량이 큰 파일을 가저오면 앱이 느려지거나 오류가 발생할 수 있습니다.</li>
                             <li>브라우저 사이트 데이터 삭제, 앱 삭제 또는 앱 데이터 삭제 시 기록이 없어질 수 있으니, 중요한 기록은 미리 저장하거나 데이터 백업 버튼을 눌러 보관하시기 바랍니다.</li>
                         </ul>
                     </div>
@@ -1049,6 +1053,7 @@
                                 </svg>
                             </button>
                             <div id="more-menu" class="dropdown-menu">
+                                <div class="dropdown-menu-title" data-record-bulk-action hidden>선택 작업</div>
                                 <div class="dropdown-item" data-record-normal-action onclick="openSortModal()">
                                     <svg viewBox="0 0 24 24">
                                         <path d="M3 18h6v-2H3v2zM3 6v2h18V6H3zm0 7h12v-2H3v2z" />
@@ -1062,7 +1067,7 @@
                                             d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h11v-2H4V8h16v4h2V8c0-1.1-.9-2-2-2z" />
                                         <path d="M14 13v-3l7 4.5-7 4.5v-3H9v-3h5z" />
                                     </svg>
-                                    선택 이동
+                                    프로젝트 이동
                                 </div>
                                 <div class="dropdown-item" data-record-normal-action onclick="groupSelectedLayers()">
                                     <svg viewBox="0 0 24 24">
@@ -1078,22 +1083,30 @@
                 </svg>
                                     스타일 일괄 설정
                                 </div>
+                                <div class="dropdown-item" data-record-bulk-action hidden onclick="openRecordLabelSettings('selected')">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true"><text x="12" y="15.5" text-anchor="middle" font-size="10" font-weight="800" font-family="Arial, sans-serif" fill="currentColor">abc</text></svg>
+                                    라벨 표시
+                                </div>
                                 <div id="add-selected-records-to-group" class="dropdown-item" data-record-bulk-action hidden>
-                                    선택 그룹에 추가
+                                    그룹에 추가
+                                </div>
+                                <div class="dropdown-item" data-record-bulk-action hidden onclick="exportSelectedRecordsExcel()">
+                                    <svg viewBox="0 0 24 24"><path d="M3 3h18v18H3V3zm2 2v4h4V5H5zm6 0v4h8V5h-8zM5 11v3h4v-3H5zm6 0v3h8v-3h-8zM5 16v3h4v-3H5zm6 0v3h8v-3h-8z" /></svg>
+                                    엑셀로 내보내기
                                 </div>
                                 <div class="dropdown-item" data-record-bulk-action hidden onclick="exportSelectedLayers()">
                                     <svg viewBox="0 0 24 24">
                                         <path
                                             d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" />
                                     </svg>
-                                    선택 저장
+                                    파일로 내보내기
                                 </div>
                                 <div class="dropdown-item danger" data-record-bulk-action hidden onclick="deleteSelectedLayers()">
                                     <svg viewBox="0 0 24 24">
                                         <path
                                             d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
                                     </svg>
-                                    선택 삭제
+                                    삭제
                                 </div>
                             </div>
                         </div>
@@ -1113,7 +1126,7 @@
                                 <svg viewBox="0 0 24 24">
                                     <path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z" />
                                 </svg>
-                                불러오기
+                                가저오기
                             </button>
                             <button onclick="exportCurrentProject()" class="mono-btn"
                                 style="flex:1; justify-content:center; padding: var(--space-3); font-size: 13px;">
@@ -1121,13 +1134,13 @@
                                     <path
                                         d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h16c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" />
                                 </svg>
-                                프로젝트 저장
+                                파일로 내보내기
                             </button>
                         </div>
                     </div>
                     <div class="sidebar-warning" style="margin-top:4px;">
                         <ul>
-                            <li>많은 기록이나 용량이 큰 파일을 불러오면 앱이 느려지거나 오류가 발생할 수 있습니다.</li>
+                            <li>많은 기록이나 용량이 큰 파일을 가저오면 앱이 느려지거나 오류가 발생할 수 있습니다.</li>
                             <li>브라우저 사이트 데이터 삭제, 앱 삭제 또는 앱 데이터 삭제 시 기록이 없어질 수 있으니, 중요한 기록은 미리 저장하거나 데이터 백업 버튼을 눌러 보관하시기 바랍니다.</li>
                         </ul>
                     </div>
@@ -1812,6 +1825,26 @@
             </section>
 
             <section class="settings-section">
+                <div class="settings-row settings-link-row" onclick="openSettingsChoiceModal('record-range')">
+                    <div>
+                        <div class="settings-label">기록 표시 범위</div>
+                        <div class="settings-help">선택한 지도 확대 레벨 이상에서 기록을 표시합니다.</div>
+                    </div>
+                    <div class="settings-row-action">
+                        <span id="settings-record-range-value" class="settings-value">10레벨 (기본값)</span>
+                        <span class="settings-chevron"></span>
+                    </div>
+                </div>
+                <div class="settings-row settings-link-row" onclick="openSettingsChoiceModal('label-range')">
+                    <div>
+                        <div class="settings-label">라벨 표시 범위</div>
+                        <div class="settings-help">선택한 지도 확대 레벨 이상에서 라벨을 표시합니다.</div>
+                    </div>
+                    <div class="settings-row-action">
+                        <span id="settings-label-range-value" class="settings-value">기록과 동일 (기본값)</span>
+                        <span class="settings-chevron"></span>
+                    </div>
+                </div>
                 <div class="settings-row">
                     <div>
                         <div class="settings-label">지도 설정 저장</div>

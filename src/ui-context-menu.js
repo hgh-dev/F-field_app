@@ -33,6 +33,9 @@ export function initContextMenu() {
         <div class="more-menu-item" onclick="handleMenuAction('edit')">
             ${SVG_ICONS.edit} 기록명 수정
         </div>
+        <div id="record-menu-label" class="more-menu-item" onclick="handleMenuAction('label')">
+            ${SVG_ICONS.label} 라벨 표시
+        </div>
         <div class="more-menu-item" onclick="handleMenuAction('move')">
             ${SVG_ICONS.folder_move}
             프로젝트 이동
@@ -115,6 +118,7 @@ export function openContextMenu(e, id) {
     const menu = document.getElementById('global-context-menu');
     menu.classList.remove('visible');
     const isGrouped = contextMenuActions.isLayerInRecordGroup?.(id);
+    window.syncRecordLabelMenuItem?.(document.getElementById('record-menu-label'), id);
     const addGroupItem = document.getElementById('record-menu-add-group');
     const removeGroupItem = document.getElementById('record-menu-remove-group');
     if (addGroupItem) addGroupItem.style.display = (!isGrouped && contextMenuActions.hasRecordGroups?.()) ? 'flex' : 'none';
@@ -175,7 +179,9 @@ export function handleMenuAction(action) {
     if (!id) return;
     closeContextMenu();
     setTimeout(() => {
-        if (action === 'save') {
+        if (action === 'label') {
+            window.openRecordLabelSettings(id);
+        } else if (action === 'save') {
             contextMenuActions.exportSingleLayer?.(id);
         } else if (action === 'edit') {
             contextMenuActions.editLayerMemo?.(id);

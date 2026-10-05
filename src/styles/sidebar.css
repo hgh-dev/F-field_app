@@ -728,6 +728,15 @@
             animation: fadeIn 0.2s ease;
         }
 
+        .dropdown-menu-title {
+            padding: 10px 12px 6px;
+            color: #9ca3af;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            cursor: default;
+        }
+
         .dropdown-item {
             padding: 10px 12px;
             font-size: 13px;
@@ -966,6 +975,37 @@
             text-overflow: ellipsis;
             /* block 레이아웃이어야 text-overflow: ellipsis가 동작함 */
             display: block;
+        }
+
+        .survey-actions {
+            display: flex;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .record-label-indicator {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 22px;
+            height: 22px;
+            color: #2563eb;
+            flex-shrink: 0;
+            padding: 0;
+            border: 0;
+            border-radius: 4px;
+            background: transparent;
+            cursor: pointer;
+        }
+
+        .record-label-indicator:hover,
+        .record-label-indicator:focus-visible {
+            background: #DBEAFE;
+        }
+
+        .record-label-indicator svg {
+            width: 22px;
+            height: 22px;
         }
 
         .survey-group-items .survey-name {

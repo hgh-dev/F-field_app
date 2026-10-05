@@ -21,19 +21,69 @@ export function cloneRecordGroups(recordGroups) {
 export const cloneRecordGroupsForExport = cloneRecordGroups;
 
 function getRecordName(props, fallback = '') {
-    const value = props?.name ?? props?.memo;
+    const value = props?.name;
     if (value === undefined || value === null || value === '') return fallback;
     return String(value);
 }
 
-function ensureRecordNameAlias(props, fallback = '') {
+function normalizeRecordName(props, fallback = '') {
     if (!props) return props;
+    delete props.memo;
+    delete props.MEMO;
     const name = getRecordName(props, fallback);
     if (name !== '') {
         props.name = name;
-        props.memo = name;
     }
     return props;
+}
+
+function normalizeTimestamp(value) {
+    if (typeof value !== 'string' || !value.trim()) return '';
+    const time = Date.parse(value);
+    return Number.isFinite(time) ? new Date(time).toISOString() : '';
+}
+
+function timestampFromRecordId(id) {
+    const value = Number(id);
+    const earliest = Date.UTC(2000, 0, 1);
+    const latest = Date.now() + 86400000;
+    if (!Number.isSafeInteger(value) || value < earliest || value > latest) return '';
+    return new Date(value).toISOString();
+}
+
+/**
+ * 앱의 이전 저장 구조를 현재 기록 속성 구조로 보정합니다.
+ * 주소처럼 원본에 없던 정보는 추측하지 않습니다.
+ */
+export function upgradeRecordProperties(feature) {
+    if (!feature || typeof feature !== 'object') return false;
+    const props = feature.properties || (feature.properties = {});
+    const before = {
+        hasMemo: Object.hasOwn(props, 'memo'),
+        hasUpperMemo: Object.hasOwn(props, 'MEMO'),
+        createdAt: props.createdAt,
+        updatedAt: props.updatedAt
+    };
+
+    delete props.memo;
+    delete props.MEMO;
+
+    const createdAt = normalizeTimestamp(props.createdAt) || timestampFromRecordId(props.id);
+    const updatedAt = normalizeTimestamp(props.updatedAt) || createdAt;
+    if (createdAt) props.createdAt = createdAt;
+    else delete props.createdAt;
+    if (updatedAt) props.updatedAt = updatedAt;
+    else delete props.updatedAt;
+
+    return before.hasMemo
+        || before.hasUpperMemo
+        || before.createdAt !== props.createdAt
+        || before.updatedAt !== props.updatedAt;
+}
+
+export function upgradeFeatureCollectionRecordProperties(featureCollection) {
+    if (!featureCollection || !Array.isArray(featureCollection.features)) return false;
+    return featureCollection.features.reduce((changed, feature) => upgradeRecordProperties(feature) || changed, false);
 }
 
 /**
@@ -43,6 +93,7 @@ function ensureRecordNameAlias(props, fallback = '') {
 export function normalizeImportedFeatureProperties(feature, { normalizeId = true } = {}) {
     if (!feature || typeof feature !== 'object') return feature;
     const props = feature.properties || (feature.properties = {});
+    upgradeRecordProperties(feature);
 
     const pickFirstDefined = (keys) => {
         for (const key of keys) {
@@ -69,9 +120,8 @@ export function normalizeImportedFeatureProperties(feature, { normalizeId = true
     assignIfMissing('customWeight', ['customweig', 'CUSTOMWEIG', 'weight', 'WEIGHT']);
     assignIfMissing('customFillOpacity', ['customfill', 'CUSTOMFILL', 'fillopacit', 'FILLOPACIT']);
     assignIfMissing('description', ['descriptio', 'DESCRIPTIO']);
-    assignIfMissing('name', ['name', 'NAME', 'memo', 'MEMO']);
-    assignIfMissing('memo', ['memo', 'MEMO', 'name', 'NAME']);
-    ensureRecordNameAlias(props);
+    assignIfMissing('name', ['name', 'NAME']);
+    normalizeRecordName(props);
 
     if (normalizeId) {
         const parsedId = Number(props.id);

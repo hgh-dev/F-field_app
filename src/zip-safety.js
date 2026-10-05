@@ -8,7 +8,7 @@ export const MAX_IMPORT_ZIP_UNCOMPRESSED_BYTES = 300 * MB;
 export function assertImportFileSize(file, isZip = false) {
     const limit = isZip ? MAX_IMPORT_ZIP_FILE_BYTES : MAX_IMPORT_TEXT_FILE_BYTES;
     if (Number(file?.size || 0) > limit) {
-        throw new Error(`파일이 너무 큽니다. ${isZip ? 'ZIP은 150MB' : 'GeoJSON/GPX는 100MB'} 이하만 불러올 수 있습니다.`);
+        throw new Error(`파일이 너무 큽니다. ${isZip ? 'ZIP은 150MB' : 'GeoJSON/GPX는 100MB'} 이하만 가저올 수 있습니다.`);
     }
 }
 
@@ -18,7 +18,7 @@ export async function assertSafeZipArchive(arrayBuffer) {
     const entries = Object.values(zip.files).filter(entry => !entry.dir);
 
     if (entries.length > MAX_IMPORT_ZIP_ENTRY_COUNT) {
-        throw new Error(`ZIP 안의 파일이 너무 많습니다. 최대 ${MAX_IMPORT_ZIP_ENTRY_COUNT}개까지 불러올 수 있습니다.`);
+        throw new Error(`ZIP 안의 파일이 너무 많습니다. 최대 ${MAX_IMPORT_ZIP_ENTRY_COUNT}개까지 가저올 수 있습니다.`);
     }
 
     const totalUncompressedBytes = entries.reduce((total, entry) => {

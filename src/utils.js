@@ -6,6 +6,7 @@
    [참고]
    - 특정 기능 전용 로직보다는 앱 전체에서 재사용되는 보조 기능만 둡니다.
    ========================================================================== */
+import { getShortRecordAddress } from './record-address.js';
 import { SVG_ICONS } from './config.js';
 import { showAppPrompt } from './app-dialog.js';
 import { proj4, registerShpCrsDefinitions } from './shp-crs.js';
@@ -31,31 +32,32 @@ export function getTimestampString() {
 
 /**
  * 기록명 속성을 읽습니다.
- * 현재 표준은 name이고, 기존 저장 데이터 호환을 위해 memo를 fallback으로 사용합니다.
+ * 기록명은 name 속성만 사용합니다.
  */
 export function getRecordName(props = {}, fallback = "") {
-    const value = props.name ?? props.memo;
+    const value = props.name;
     if (value === undefined || value === null || value === "") return fallback;
     return String(value);
 }
 
 /**
- * 기록명을 현재 표준(name)과 구버전 호환(memo)에 동시에 저장합니다.
+ * 기록명을 name에 저장하고 사용하지 않는 memo 속성을 제거합니다.
  */
 export function setRecordName(props, name) {
     if (!props) return props;
     const value = name ?? "";
     props.name = value;
-    props.memo = value;
+    delete props.memo;
     return props;
 }
 
 /**
- * 기존 데이터처럼 name 또는 memo 중 하나만 있는 경우 두 속성을 맞춥니다.
+ * 기록명 형식을 정리하고 사용하지 않는 memo 속성을 제거합니다.
  */
-export function ensureRecordNameAlias(props, fallback = "") {
+export function normalizeRecordName(props, fallback = "") {
     if (!props) return props;
     const name = getRecordName(props, fallback);
+    delete props.memo;
     if (name !== "") setRecordName(props, name);
     return props;
 }
@@ -317,12 +319,7 @@ export function copyText(text, silent = false, itemLabel = "주소") {
  * 주소 문자열에서 뒤쪽 핵심 구간(동/리/가)을 우선 추출해 짧은 주소를 만듭니다.
  */
 export function getShortAddress(addressName) {
-    if (!addressName) return "";
-    const parts = addressName.split(' ');
-    for (let i = parts.length - 1; i >= 0; i--) {
-        if (parts[i].match(/(동|리|가)$/)) return parts.slice(i).join(' ');
-    }
-    return parts.length >= 2 ? parts.slice(parts.length - 2).join(' ') : addressName;
+    return getShortRecordAddress(addressName);
 }
 
 /* ==========================================================================

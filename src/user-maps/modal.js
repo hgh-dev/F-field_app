@@ -86,7 +86,7 @@ function ensureUserMapModal() {
     overlay.innerHTML = `
         <div onclick="event.stopPropagation()" style="width:min(420px, calc(100vw - 32px)); max-height:calc(100vh - 48px); overflow:auto; background:#fff; border-radius:12px; padding:18px; box-sizing:border-box; -webkit-user-select:text; user-select:text; -webkit-touch-callout:default;">
             <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px;">
-                <div id="user-map-modal-title" style="font-size:17px; font-weight:800; color:#111827;">사용자 지도 불러오기</div>
+                <div id="user-map-modal-title" style="font-size:17px; font-weight:800; color:#111827;">사용자 지도 가저오기</div>
                 <button type="button" id="user-map-modal-close" style="width:34px; height:34px; border:0; background:#f3f4f6; border-radius:50%; color:#6b7280; font-size:20px; line-height:1;">&times;</button>
             </div>
             <form id="user-map-form">
@@ -112,7 +112,7 @@ function ensureUserMapModal() {
                 <label id="user-map-file-row" style="display:none; margin-bottom:12px;">
                     <span style="display:block; font-size:12px; font-weight:700; color:#4b5563; margin-bottom:6px;">SHP 파일</span>
                     <input id="user-map-file-input" type="file" accept=".zip" style="width:100%; min-height:44px; border:1px solid #d1d5db; border-radius:8px; padding:9px 10px; font-size:14px; box-sizing:border-box; background:#fff;">
-                    <span style="display:block; margin-top:6px; font-size:11px; line-height:1.45; color:#6b7280;">shp, .shx, .dbf, .prj 파일을 함께 압축한 .zip 파일을 선택하세요. <br> 그 외의 파일이 포함되면 불러오기가 실패할 수 있습니다. <br> 도형이 너무 많은 파일을 불러오면 오류가 발생할 수 있습니다.</span>
+                    <span style="display:block; margin-top:6px; font-size:11px; line-height:1.45; color:#6b7280;">shp, .shx, .dbf, .prj 파일을 함께 압축한 .zip 파일을 선택하세요. <br> 그 외의 파일이 포함되면 가저오기가 실패할 수 있습니다. <br> 도형이 너무 많은 파일을 가저오면 오류가 발생할 수 있습니다.</span>
                 </label>
                 <label id="user-map-shp-crs-row" style="display:none; margin-bottom:12px;">
                     <span style="display:block; font-size:12px; font-weight:700; color:#4b5563; margin-bottom:6px;">좌표계 설정</span>
@@ -212,7 +212,7 @@ export function showUserMapModal(existing = null, deps = {}) {
     if (activeUserMapModal) closeUserMapModal(null);
     const modalSessionId = ++activeUserMapModalSessionId;
 
-    title.textContent = existing ? '사용자 지도 수정' : '사용자 지도 불러오기';
+    title.textContent = existing ? '사용자 지도 수정' : '사용자 지도 가저오기';
     nameInput.value = existing?.name || '';
     urlInput.value = existing?.url || '';
     typeInput.value = existing?.type || 'shp';
@@ -377,7 +377,7 @@ export function showUserMapModal(existing = null, deps = {}) {
                 xyz: '타일 주소는 {z}, {x}, {y}가 포함된 URL을 입력하세요. 예: https://example.com/{z}/{x}/{y}.png',
                 wms: 'WMS 서비스 주소를 입력하세요. layers 값은 주소에 포함되어 있거나 아래 WMS layers 칸에 따로 입력하면 됩니다.',
                 pmtiles: '웹에서 직접 접근 가능한 .pmtiles 파일 주소를 입력하세요. 서버가 CORS와 Range 요청을 허용해야 합니다.',
-                mbtiles: '웹에서 직접 접근 가능한 .mbtiles 파일 주소를 입력하세요. 파일이 크면 불러오는 데 시간이 걸릴 수 있습니다.'
+                mbtiles: '웹에서 직접 접근 가능한 .mbtiles 파일 주소를 입력하세요. 파일이 크면 가저오는 데 시간이 걸릴 수 있습니다.'
             };
             urlHelp.textContent = helpText[typeInput.value] || '';
         }
@@ -495,7 +495,7 @@ export function showUserMapModal(existing = null, deps = {}) {
                     delete item.categoryVisibleValues;
                 } catch (error) {
                     console.error(error);
-                    alert(`SHP 파일을 불러오지 못했습니다.\n${error.message || error}`);
+                    alert(`SHP 파일을 가저오지 못했습니다.\n${error.message || error}`);
                     return;
                 }
             }

@@ -6,8 +6,8 @@
    [참고]
    - 기능 로직은 넣지 않고, 설정값과 상수만 둡니다.
    ========================================================================== */
-export const APP_VERSION = "1.3.0"; // 현재 앱 버전
-export const APP_VERSION_CODE = 10300; // Android versionCode
+export const APP_VERSION = "1.3.1"; // 현재 앱 버전
+export const APP_VERSION_CODE = 10301; // Android versionCode
 export const SHARE_BASE_URL = "https://f-field.app/";
 export const APP_PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=app.ffield.mobile";
 
@@ -102,6 +102,10 @@ export const SVG_ICONS = {
    unlock: `<svg viewBox="0 0 24 24"><path d="M12 17c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm6-9h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6h1.9c.55 0 1 .45 1 1s-.45 1-1 1H7c-1.66 0-3 1.34-3 3v2H3c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm0 12H6V10h12v10z"/></svg>`,
    // 더보기(점 3개) 아이콘
    more: `<svg viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>`,
+   // 기록 라벨(abc) 아이콘
+   label: `<svg viewBox="0 0 24 24" aria-hidden="true"><text x="12" y="15.5" text-anchor="middle" font-size="10" font-weight="800" font-family="Arial, sans-serif" fill="currentColor">abc</text></svg>`,
+   // 기록 라벨 끄기(abc + 취소선) 아이콘
+   label_off: `<svg viewBox="0 0 24 24" aria-hidden="true"><text x="12" y="15.5" text-anchor="middle" font-size="10" font-weight="800" font-family="Arial, sans-serif" fill="currentColor">abc</text><line x1="4" y1="19" x2="20" y2="5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`,
    // 트랙(달리기) 아이콘
    track: `<svg class="svg-inline" viewBox="0 0 24 24"><path d="M13.49 5.48c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm-3.6 13.9l1-4.4 2.1 2v6h2v-7.5l-2.1-2 .6-3c1.3 1.5 3.3 2.5 5.5 2.5v-2c-1.9 0-3.5-1-4.3-2.4l-1-1.6c-.4-.6-1-1-1.7-1-.3 0-.5.1-.8.1l-5.2 2.2v4.7h2v-3.4l1.8-.7-1.6 8.1-4.9-1-.4 2 7 1.4z"/></svg>`,
    // 폴더 이동 아이콘 (커스텀: 큰 화살표)

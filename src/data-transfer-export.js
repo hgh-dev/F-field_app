@@ -251,7 +251,7 @@ export function closeExportFormatModal() {
 }
 
 export async function exportCurrentProject() {
-    if (!await showAppConfirm('현재 프로젝트를 기기에 저장합니다.\n프로젝트의 모든 기록이 한 개의 GeoJSON 파일로 저장됩니다.\nGeoJSON 파일은 QGIS에서 불러올 수 있습니다.', { title: '프로젝트 저장' })) return;
+    if (!await showAppConfirm('현재 프로젝트를 파일로 내보냅니다.\n프로젝트의 모든 기록이 한 개의 GeoJSON 파일로 저장됩니다.\nGeoJSON 파일은 QGIS에서 가저올 수 있습니다.', { title: '파일로 내보내기' })) return;
 
     const project = AppState.projects.find(p => p.id === parseInt(AppState.currentProjectId));
     if (!project) return;
@@ -278,7 +278,7 @@ export async function exportCurrentProject() {
 };
 
 export async function backupAllProjects() {
-    if (!await showAppConfirm('모든 프로젝트 파일(.GeoJSON)이 하나의 압축파일(.ZIP)로 저장됩니다. 다시 불러올 때에는 압축을 해제한 후 GeoJSON 파일을 선택하세요.', { title: '데이터 백업' })) return;
+    if (!await showAppConfirm('모든 프로젝트 파일(.GeoJSON)이 하나의 압축파일(.ZIP)로 저장됩니다. 다시 가저올 때에는 압축을 해제한 후 GeoJSON 파일을 선택하세요.', { title: '데이터 백업' })) return;
 
     await saveToStorageCallback();
 
@@ -382,7 +382,7 @@ function geoJsonToGpx(geoJson, projectName) {
     return gpx;
 }
 
-async function saveOrShareFile(content, fileName, mimeType = "application/json") {
+export async function saveOrShareFile(content, fileName, mimeType = "application/json") {
     const blob = content instanceof Blob ? content : new Blob([content], { type: mimeType });
 
     if (isNativeApp()) {

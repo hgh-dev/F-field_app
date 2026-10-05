@@ -6,7 +6,7 @@
    [참고]
    - 새 기능 로직을 여기에 길게 넣지 말고, 실제 구현은 기능 파일에 둔 뒤 연결만 합니다.
    ========================================================================== */
-import { closeSettingsChoiceModal, openSettingsChoiceModal, openSettingsDocument, setCoordMode, setTrackInterval } from './settings-choice.js';
+import { closeSettingsChoiceModal, openSettingsChoiceModal, openSettingsDocument, setCoordMode, setLabelMinZoom, setRecordMinZoom, setTrackInterval } from './settings-choice.js';
 import { checkAppVersion, forceAppUpdate } from './version-update.js';
 import { ensureFeatureAccess } from '../auth-access.js';
 import {
@@ -29,6 +29,8 @@ import {
     copyCurrentCoords,
     deleteSelectedLayers,
     exportSelectedLayers,
+    exportSelectedRecordsExcel,
+    exportProjectRecordsExcel,
     openMapTileOpacitySettings,
     openUserMapTileOpacitySettings,
     proceedWithImport,
@@ -138,6 +140,12 @@ export function registerGlobals() {
     window.setTrackInterval = (value) => {
         setTrackInterval(value);
     };
+    window.setRecordMinZoom = (value) => {
+        setRecordMinZoom(value);
+    };
+    window.setLabelMinZoom = (value) => {
+        setLabelMinZoom(value);
+    };
     window.setSnapEnabled = (value) => {
         setSnapEnabled(value);
     };
@@ -147,6 +155,8 @@ export function registerGlobals() {
     window.toggleAllLayers = toggleAllLayers;
     window.deleteSelectedLayers = deleteSelectedLayers;
     window.exportSelectedLayers = exportSelectedLayers;
+    window.exportSelectedRecordsExcel = exportSelectedRecordsExcel;
+    window.exportProjectRecordsExcel = exportProjectRecordsExcel;
     window.exportCurrentProject = exportCurrentProject;
     window.backupAllProjects = backupAllProjects;
     window.toggleOverlay = toggleOverlay;

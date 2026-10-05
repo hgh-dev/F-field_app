@@ -18,6 +18,18 @@ export const AppState = {
     isSnapEnabled: localStorage.getItem('setting_snap_enabled') !== 'false',
     // 기본 지도와 주제도 스타일 설정을 앱 재접속 후에도 저장할지 여부
     isMapSettingsSaveEnabled: localStorage.getItem('setting_map_settings_save_enabled') === 'true',
+    // 기록을 표시하기 시작하는 최소 지도 확대 레벨
+    recordMinZoom: (() => {
+        const value = Number(localStorage.getItem('setting_record_min_zoom'));
+        return Number.isInteger(value) && value >= 1 && value <= 22 ? value : 10;
+    })(),
+    // 라벨 최소 확대 레벨 ('same'이면 기록 표시 범위를 따름)
+    labelMinZoom: (() => {
+        const raw = localStorage.getItem('setting_label_min_zoom');
+        if (!raw || raw === 'same') return 'same';
+        const value = Number(raw);
+        return Number.isInteger(value) && value >= 1 && value <= 22 ? value : 'same';
+    })(),
     // 빠른 지도 이동 후 도형 렌더링을 마지막 이동 이후로 지연할지 여부
     isVectorRenderDelayEnabled: true,
 

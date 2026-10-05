@@ -15,7 +15,7 @@ import { saveToStorage } from './data.js';
 import { closeAllDropdowns } from './ui-dropdown.js';
 import { showAppConfirm, showTextPrompt } from './app-dialog.js';
 import { validateRuntimeDependencies } from './runtime-dependencies.js';
-import { createMarkerShapeSvg, getLineStyleDashArray, getLineStyleFromDashArray, getRecordName, ensureRecordNameAlias, normalizeFillPattern, normalizeMarkerStyle, parseDashArray } from './utils.js';
+import { createMarkerShapeSvg, getLineStyleDashArray, getLineStyleFromDashArray, getRecordName, normalizeRecordName, normalizeFillPattern, normalizeMarkerStyle, parseDashArray } from './utils.js';
 import {
     openAddSelectedRecordsToGroupModal,
     closeAddRecordToGroupModal,
@@ -208,9 +208,19 @@ function createProjectSectionHeader() {
  * [원리] 프로젝트 상태에 따라 저장/이름 변경/삭제 액션을 조건부로 생성해 메뉴에 붙인다.
  */
 function createProjectDropdownMenu(p, dropdownMenu) {
+    const excelItem = document.createElement('div');
+    excelItem.className = 'dropdown-item';
+    excelItem.innerHTML = `<svg viewBox="0 0 24 24"><path d="M3 3h18v18H3V3zm2 2v4h4V5H5zm6 0v4h8V5h-8zM5 11v3h4v-3H5zm6 0v3h8v-3h-8zM5 16v3h4v-3H5zm6 0v3h8v-3h-8z" /></svg> 엑셀로 내보내기`;
+    excelItem.onclick = (e) => {
+        e.stopPropagation();
+        dropdownMenu.classList.remove('visible');
+        window.exportProjectRecordsExcel?.(p.id);
+    };
+    dropdownMenu.appendChild(excelItem);
+
     const saveItem = document.createElement('div');
     saveItem.className = 'dropdown-item';
-    saveItem.innerHTML = `<svg viewBox="0 0 24 24"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" /></svg> 프로젝트 저장`;
+    saveItem.innerHTML = `<svg viewBox="0 0 24 24"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" /></svg> 파일로 내보내기`;
     saveItem.onclick = (e) => {
         e.stopPropagation();
         dropdownMenu.classList.remove('visible');
@@ -695,7 +705,7 @@ function recordEyeIcon(hidden) {
 
 function createSurveyItem(layer) {
     const props = layer.feature.properties || {};
-    ensureRecordNameAlias(props);
+    normalizeRecordName(props);
     const isHidden = props.isHidden === true;
     let dateStr = "";
     if (props.id) {
@@ -710,6 +720,9 @@ function createSurveyItem(layer) {
     const displayColor = props.customColor || (layer instanceof L.Marker ? '#FF0000' : '#3388ff');
     const customEmoji = props.customEmoji || null;
     const styleBtnHTML = createSurveyStyleButton(layer, props, displayColor, customEmoji);
+    const labelIndicatorHTML = props.label?.enabled
+        ? `<button type="button" class="record-label-indicator" title="라벨 수정" aria-label="라벨 수정" onclick="event.stopPropagation(); editRecordLabelSettings(${props.id})">${SVG_ICONS.label}</button>`
+        : '';
 
     div.innerHTML = `
     <button type="button" class="survey-row-toggle-spacer" aria-hidden="true" tabindex="-1">${RECORD_GROUP_TOGGLE_ICON}</button>
@@ -722,6 +735,7 @@ function createSurveyItem(layer) {
         ${dateStr ? `<div style="font-size:11px; color:#aaa; margin-top:1px;">${dateStr}</div>` : ''}
     </div>
     <div class="survey-actions">
+        ${labelIndicatorHTML}
         <button class="btn-more" onclick="openContextMenu(event, ${props.id})">${SVG_ICONS.more}</button>
     </div>`;
     const control = div.querySelector('.record-control');
@@ -848,7 +862,7 @@ export function renderSurveyList() {
     document.querySelectorAll('[data-record-normal-action]').forEach(item => { item.hidden = selecting; });
     const addToGroup = document.getElementById('add-selected-records-to-group');
     if (addToGroup) {
-        addToGroup.innerHTML = `${SVG_ICONS.file_group_add} 선택 그룹에 추가`;
+        addToGroup.innerHTML = `${SVG_ICONS.file_group_add} 그룹에 추가`;
         addToGroup.onclick = openAddSelectedRecordsToGroupModal;
     }
 

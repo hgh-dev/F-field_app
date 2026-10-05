@@ -663,7 +663,7 @@ async function openUserMapCategoryModal(id) {
 
     const geojson = await getUserMapDataStore().getItem(item.geojsonKey);
     if (!geojson) {
-        alert('저장된 SHP 데이터를 찾을 수 없습니다. 지도를 다시 불러오세요.');
+        alert('저장된 SHP 데이터를 찾을 수 없습니다. 지도를 다시 가저오세요.');
         return;
     }
 
@@ -858,7 +858,7 @@ export async function toggleUserMapLayer(id, isChecked) {
         renderUserMapList();
     } catch (error) {
         console.error(error);
-        alert(`사용자 지도를 불러오지 못했습니다.\n${error.message || error}`);
+        alert(`사용자 지도를 가저오지 못했습니다.\n${error.message || error}`);
         setAllCategoryValuesVisible(item, false);
         item.enabled = false;
         saveUserMapsToStorage();
@@ -938,7 +938,7 @@ export async function toggleUserMapCategoryValue(id, value, isChecked, event = n
             await activateUserMapLayer(item);
         } catch (error) {
             console.error(error);
-            alert(`사용자 지도를 불러오지 못했습니다.\n${error.message || error}`);
+            alert(`사용자 지도를 가저오지 못했습니다.\n${error.message || error}`);
             item.enabled = false;
             saveUserMapsToStorage();
         }

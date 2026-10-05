@@ -6,6 +6,7 @@
    [참고]
    - 기록 상세 화면이나 바텀시트 표시 문제가 생기면 확인합니다.
    ========================================================================== */
+import { getRecordAddress } from './record-address.js';
 import { L, turf } from './vendor-globals.js';
 import { VWORLD_API_KEY, SVG_ICONS } from './config.js';
 import { AppState } from './state.js';
@@ -185,6 +186,11 @@ export function toggleBottomSheetMoreMenu(event) {
     const menu = document.getElementById('bottom-sheet-more-menu');
     const moreBtn = document.getElementById('bottom-sheet-more-btn');
     if (!menu) return;
+
+    window.syncRecordLabelMenuItem?.(
+        document.getElementById('bottom-sheet-label-item'),
+        currentBottomSheetLayerId
+    );
 
     if (menu.parentElement !== document.body) {
         document.body.appendChild(menu);
@@ -842,11 +848,12 @@ function createZipcodeInfoSection(zipcode) {
  */
 function createPrimaryActionButtonsSection(parcelAddr, lat, lng) {
     const safeAddressArg = escapeHtml(escapeJsString(parcelAddr));
+    const disabled = getRecordAddress(parcelAddr) ? '' : ' disabled aria-disabled="true"';
     return `<div style="display:flex; gap:5px; justify-content:center;">
-                <button class="popup-btn" style="flex:1; background:#fff; color:#555; border:1px solid #ddd; display:flex; align-items:center; justify-content:center; gap:4px;" onclick="saveCurrentPoint(${lat}, ${lng}, '${safeAddressArg}')">
+                <button class="popup-btn" style="flex:1; background:#fff; color:#555; border:1px solid #ddd; display:flex; align-items:center; justify-content:center; gap:4px;" onclick="saveCurrentPoint(${lat}, ${lng}, '${safeAddressArg}')"${disabled}>
                     <div style="width:16px; height:16px;">${SVG_ICONS.marker}</div>
                 </button>
-                <button class="popup-btn" style="flex:1; background:#fff; color:#555; border:1px solid #ddd; display:flex; align-items:center; justify-content:center; gap:4px;" onclick="saveCurrentBoundary('${safeAddressArg}')">
+                <button class="popup-btn" style="flex:1; background:#fff; color:#555; border:1px solid #ddd; display:flex; align-items:center; justify-content:center; gap:4px;" onclick="saveCurrentBoundary('${safeAddressArg}')"${disabled}>
                     <div style="width:16px; height:16px;">${SVG_ICONS.polygon}</div>
                 </button>
                 <button class="popup-btn" style="flex:1; background:#fff; color:#555; border:1px solid #ddd; display:flex; align-items:center; justify-content:center; gap:4px;" onclick="shareLocationText('${safeAddressArg}', '${lat}', '${lng}')">

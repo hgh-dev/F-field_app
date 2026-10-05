@@ -76,7 +76,7 @@ export function createUserMapLayerRuntime({
             let db = mbtilesDbCache.get(item.url);
             if (!db) {
                 const response = await fetch(item.url);
-                if (!response.ok) throw new Error(`MBTiles 파일을 불러오지 못했습니다. (${response.status})`);
+                if (!response.ok) throw new Error(`MBTiles 파일을 가저오지 못했습니다. (${response.status})`);
                 const SQL = await getSqlJs();
                 db = new SQL.Database(new Uint8Array(await response.arrayBuffer()));
                 mbtilesDbCache.set(item.url, db);
@@ -89,7 +89,7 @@ export function createUserMapLayerRuntime({
 
         if (item.type === 'shp') {
             const geojson = await getUserMapDataStore().getItem(item.geojsonKey);
-            if (!geojson) throw new Error('저장된 SHP 지도 데이터를 찾을 수 없습니다. 다시 불러오세요.');
+            if (!geojson) throw new Error('저장된 SHP 지도 데이터를 찾을 수 없습니다. 다시 가저오세요.');
             const spatialMetadataChanged = ensureGeojsonSpatialMetadata(geojson);
             if (spatialMetadataChanged) {
                 await getUserMapDataStore().setItem(item.geojsonKey, geojson);
