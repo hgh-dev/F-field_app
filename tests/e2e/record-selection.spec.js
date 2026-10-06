@@ -2,14 +2,14 @@ import { test, expect } from '@playwright/test';
 
 test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
 
-async function prepare(page, type = '점') {
+async function prepare(page, type = '점', styles = false) {
     await page.goto('/');
     await expect(page.locator('#map-active-project-badge')).toContainText('기본 프로젝트');
     await page.locator('#geoJsonInput').setInputFiles({
         name: 'selection.geojson', mimeType: 'application/geo+json',
         buffer: Buffer.from(JSON.stringify({ type: 'FeatureCollection', features: [1, 2, 3].map(n => ({
             type: 'Feature', geometry: type === '면' ? { type: 'Polygon', coordinates: [[[127, 37], [127.01, 37], [127.01, 37.01], [127, 37]]] } : type === '선' || (type === '혼합' && n === 2) ? { type: 'LineString', coordinates: [[127, 37], [127.01, 37.01]] } : { type: 'Point', coordinates: [127 + n / 100, 37] },
-            properties: { id: 1000 + n, name: `기록 ${n}`, memo: `기록 ${n}` }
+            properties: { id: 1000 + n, name: `기록 ${n}`, memo: `기록 ${n}`, ...(styles ? {customColor: ["#ff0000", "#00ff00", "#0000ff"][n-1], customWeight:n, customFillOpacity:n/10, customFillPattern:"solid", customLineStyle:"dash"} : {}) }
         })) }))
     });
     await expect(page.locator('#app-dialog-overlay')).toContainText('현재 프로젝트에 추가되었습니다');
@@ -127,4 +127,43 @@ test('서로 다른 형태의 스타일 일괄 설정은 안내만 표시한다'
     await expect(page.locator('#app-dialog-overlay')).toContainText('같은 형식의 기록을 선택해야 합니다.');
     await page.locator('#app-dialog-overlay .primary').click();
     await expect(page.locator('#style-modal-overlay')).toBeHidden();
+});
+
+async function savedProperties(page) {
+    return page.evaluate(() => new Promise(resolve => {
+        const request = indexedDB.open('localforage');
+        request.onsuccess = () => {
+            const db = request.result;
+            const read = db.transaction('keyvaluepairs').objectStore('keyvaluepairs').get('my_survey_data_v4');
+            read.onsuccess = () => {
+                const data = read.result;
+                resolve(data.projects.find(p => p.id === data.currentProjectId).features.features.map(f => f.properties));
+                db.close();
+            };
+        };
+    }));
+}
+
+test('윤곽 위치만 일괄 변경하면 개별 색상 두께 채움과 투명도를 유지한다', async ({page}) => {
+    await prepare(page, '면', true);
+    const before = await savedProperties(page);
+    await page.locator('#record-selection-toggle').click();
+    await page.locator('#chk-select-all').check();
+    await page.evaluate(() => { window.openBulkStyleModal(); });
+    await page.locator('#app-dialog-overlay .primary').click();
+    await page.locator('#style-line-tab-btn').click();
+    await page.locator('#style-stroke-position-dropdown summary').click();
+    await page.locator('[data-stroke-position="inside"]').click();
+    await page.locator('.style-modal-apply-btn').click();
+    await expect.poll(async () => (await savedProperties(page)).every(p => p.customStrokePosition === 'inside')).toBe(true);
+    const after = await savedProperties(page);
+    for (let i=0; i<before.length; i++) {
+        for (const key of ['customColor','customWeight','customFillOpacity','customFillPattern','customLineStyle','customStrokeColor','customFillColor']) {
+            expect(after[i][key], key).toEqual(before[i][key]);
+        }
+    }
+    await page.evaluate(() => { window.openBulkStyleModal(); });
+    await page.locator('#app-dialog-overlay .primary').click();
+    await page.locator('.style-modal-apply-btn').click();
+    expect(await savedProperties(page)).toEqual(after);
 });

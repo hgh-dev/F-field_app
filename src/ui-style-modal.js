@@ -25,6 +25,10 @@ import { scheduleViewportVectorOptimization } from './ui-viewport.js';
 let currentStyleLayerId = null;
 let bulkStyleLayers = null;
 let bulkStyleProjectId = null;
+const changedStyleFields = new Set();
+function markStyleChanged(field) {
+    if (bulkStyleLayers) changedStyleFields.add(field);
+}
 let currentStyleType = null;
 let tempStyleColor = '#3B82F6';
 let tempLineStyle = 'solid';
@@ -414,9 +418,13 @@ export async function openBulkStyleModal() {
     openStyleModal(layers[0].feature.properties.id);
     bulkStyleLayers = layers;
     bulkStyleProjectId = projectId;
+    changedStyleFields.clear();
+    document.getElementById("style-bulk-help").hidden = false;
 }
 
 export function openStyleModal(id) {
+    changedStyleFields.clear();
+    document.getElementById("style-bulk-help").hidden = true;
     bulkStyleLayers = null;
     const layer = drawnItems.getLayers().find(l => l.feature.properties.id === id);
     if (!layer) return;
@@ -588,6 +596,8 @@ export function closeStyleModal() {
     if (dropdown) dropdown.open = false;
     bulkStyleLayers = null;
     bulkStyleProjectId = null;
+    changedStyleFields.clear();
+    document.getElementById("style-bulk-help").hidden = true;
     const overlay = document.getElementById('style-modal-overlay');
     if (overlay) {
         overlay.classList.remove('visible');
@@ -649,6 +659,7 @@ function updateStyleModalUI() {
         dropdown.querySelectorAll('[data-stroke-position]').forEach(button => {
             button.setAttribute('aria-pressed', String(button.dataset.strokePosition === tempStrokePosition));
             button.onclick = () => {
+                markStyleChanged("strokePosition");
                 tempStrokePosition = button.dataset.strokePosition;
                 dropdown.open = false;
                 updateStyleModalUI();
@@ -788,6 +799,7 @@ function updateStyleModalUI() {
  *        선택 UI를 다시 칠해 현재 선택 항목이 시각적으로 즉시 반영되게 한다.
  */
 export function selectStyleColor(color) {
+    markStyleChanged("color");
     if (currentStyleType === 'polygon') {
         tempFillColor = color;
         if (tempLineColorMode === 'same') tempLineColor = color;
@@ -807,12 +819,14 @@ export function selectStyleTab(tab) {
 }
 
 export function selectLineColorMode(mode) {
+    markStyleChanged("strokeColor");
     tempLineColorMode = mode === 'custom' ? 'custom' : 'same';
     if (tempLineColorMode === 'same') tempLineColor = tempFillColor;
     updateStyleModalUI();
 }
 
 export function selectLineStyleColor(color) {
+    markStyleChanged("strokeColor");
     tempLineColorMode = 'custom';
     tempLineColor = color;
     updateStyleModalUI();
@@ -837,6 +851,7 @@ export function openStyleColorPicker(pickerId) {
  *        선택 UI를 다시 칠해 현재 선택 항목이 시각적으로 즉시 반영되게 한다.
  */
 export function selectLineStyle(style) {
+    markStyleChanged("lineStyle");
     tempLineStyle = style;
     updateStyleModalUI();
 }
@@ -855,6 +870,7 @@ export function toggleLineStyleOptions() {
  * [원리] 임시 선택값을 1~5 범위 숫자로 정규화한 뒤 표시값과 상태를 함께 갱신한다.
  */
 export function updateLineWeightLabel(val) {
+    markStyleChanged("weight");
     tempLineWeight = normalizeLineWeight(val);
     const weightLabel = document.getElementById('style-line-weight-label');
     if (weightLabel) weightLabel.innerText = formatSliderValue(tempLineWeight);
@@ -866,6 +882,7 @@ export function updateLineWeightLabel(val) {
  * [원리] 슬라이더 입력값을 1~5 범위로 제한해 적용 시 레이어 스타일에 사용한다.
  */
 export function selectLineWeight(val) {
+    markStyleChanged("weight");
     tempLineWeight = normalizeLineWeight(val);
     updateStyleModalUI();
 }
@@ -876,6 +893,7 @@ export function selectLineWeight(val) {
  * [원리] 입력값을 0~1 범위의 0.1 단위 값으로 정규화해 임시 상태와 라벨을 함께 갱신한다.
  */
 export function updateFillOpacityLabel(val) {
+    markStyleChanged("fillOpacity");
     tempFillOpacity = normalizeOpacityValue(val, 0);
     const fillOpacityLabel = document.getElementById('style-fill-opacity-label');
     if (fillOpacityLabel) fillOpacityLabel.innerText = formatSliderValue(tempFillOpacity);
@@ -887,6 +905,7 @@ export function updateFillOpacityLabel(val) {
  * [원리] 슬라이더 입력값을 정규화한 뒤 스타일 모달 UI와 적용 대기 상태를 동기화한다.
  */
 export function selectFillOpacity(val) {
+    markStyleChanged("fillOpacity");
     tempFillOpacity = normalizeOpacityValue(val, 0);
     updateStyleModalUI();
 }
@@ -924,6 +943,7 @@ export function resetTileStyleSettings() {
 }
 
 export function selectFillPattern(pattern) {
+    markStyleChanged("fillPattern");
     tempFillPattern = normalizeFillPattern(pattern);
     if (tempFillPattern === 'none') tempFillOpacity = 0;
     else if (tempFillOpacity === 0) tempFillOpacity = 0.2;
@@ -945,6 +965,7 @@ export function toggleFillPatternOptions() {
  *        선택 UI를 다시 칠해 현재 선택 항목이 시각적으로 즉시 반영되게 한다.
  */
 export function selectMarkerStyle(markerStyle) {
+    markStyleChanged("markerStyle");
     tempMarkerStyle = normalizeMarkerStyle(markerStyle);
     updateStyleModalUI();
 }
@@ -975,6 +996,7 @@ export function updateMarkerSizeLabel(val) {
  *        선택 UI를 다시 칠해 현재 선택 항목이 시각적으로 즉시 반영되게 한다.
  */
 export function selectMarkerSize(val) {
+    markStyleChanged("markerSize");
     tempMarkerSize = parseInt(val, 10);
 }
 
@@ -1049,8 +1071,54 @@ export function applyStyleSettings() {
         : drawnItems.getLayers().filter(layer => layer.feature.properties.id === currentStyleLayerId);
     if (!targets.length) return;
 
+    if (bulkStyleLayers && changedStyleFields.size === 0) {
+        closeStyleModal();
+        return;
+    }
     for (const layer of targets) {
         const props = layer.feature.properties;
+        if (bulkStyleLayers) {
+            const changed = field => changedStyleFields.has(field);
+            if (changed('color')) {
+                props.customColor = appliedFillColor;
+                if (currentStyleType === 'polygon') props.customFillColor = appliedFillColor;
+            }
+            if (currentStyleType === 'marker') {
+                if (changed('markerStyle')) props.customEmoji = tempMarkerStyle;
+                if (changed('markerSize')) props.customMarkerSize = tempMarkerSize;
+                layer.setIcon(createColoredMarkerIcon(props.customColor || '#FF0000', props.customEmoji || '', props.customMarkerSize || 3));
+                layer.setOpacity(props.isHidden ? 0 : 1);
+            } else {
+                if (changed('weight')) props.customWeight = tempLineWeight;
+                if (changed('lineStyle')) props.customLineStyle = tempLineStyle;
+                const weight = Number(props.customWeight ?? layer.options.weight ?? 3);
+                const lineStyle = props.customLineStyle || getLineStyleFromDashArray(props.customDashArray);
+                if (changed('weight') || changed('lineStyle')) props.customDashArray = getLineStyleDashArray(lineStyle, weight);
+                if (currentStyleType === 'polygon') {
+                    if (changed('strokePosition')) {
+                        props.customStrokePosition = tempStrokePosition;
+                        props.customStrokeInside = tempStrokePosition === 'inside';
+                    }
+                    if (changed('strokeColor')) {
+                        if (tempLineColorMode === 'custom') props.customStrokeColor = tempLineColor;
+                        else delete props.customStrokeColor;
+                    }
+                    if (changed('fillPattern')) props.customFillPattern = tempFillPattern;
+                    if (changed('fillOpacity')) props.customFillOpacity = tempFillOpacity;
+                }
+                const fillColor = props.customFillColor || props.customColor || '#3388ff';
+                const color = currentStyleType === 'polygon' ? props.customStrokeColor || fillColor : props.customColor || '#3388ff';
+                const dashArray = props.customDashArray ?? getLineStyleDashArray(lineStyle, weight);
+                layer.setStyle({
+                    color, fillColor, weight,
+                    dashArray: dashArray === 'none' ? null : dashArray,
+                    stroke: !props.isHidden && dashArray !== 'none',
+                    fillOpacity: props.isHidden || currentStyleType !== 'polygon' ? 0 : getLayerFillOpacity(layer),
+                    opacity: props.isHidden ? 0 : 0.8
+                });
+            }
+            continue;
+        }
         props.customColor = appliedFillColor;
 
         if (currentStyleType === 'marker') {

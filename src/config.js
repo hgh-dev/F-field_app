@@ -6,8 +6,8 @@
    [참고]
    - 기능 로직은 넣지 않고, 설정값과 상수만 둡니다.
    ========================================================================== */
-export const APP_VERSION = "1.3.1"; // 현재 앱 버전
-export const APP_VERSION_CODE = 10301; // Android versionCode
+export const APP_VERSION = "1.3.2"; // 현재 앱 버전
+export const APP_VERSION_CODE = 10302; // Android versionCode
 export const SHARE_BASE_URL = "https://f-field.app/";
 export const APP_PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=app.ffield.mobile";
 
