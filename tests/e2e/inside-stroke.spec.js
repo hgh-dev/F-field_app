@@ -24,6 +24,8 @@ test('면 안쪽 윤곽선은 취소·적용·새로고침·두께 변경·해�
         buffer: Buffer.from(JSON.stringify({ type: 'FeatureCollection', features: [feature] }))
     });
     await page.locator('#app-dialog-overlay .app-dialog-btn.primary').click();
+    await page.evaluate(() => window.zoomToLayer(991001));
+    await page.waitForTimeout(500);
     const path = page.locator('path.leaflet-interactive[stroke="#a12345"]').first();
     await expect(path).toHaveAttribute('stroke-width', '3');
     await openLineSettings(page);
@@ -40,43 +42,70 @@ test('면 안쪽 윤곽선은 취소·적용·새로고침·두께 변경·해�
     await expect(checkbox).toContainText('중앙');
     await choose('inside');
     await page.locator('.style-modal-apply-btn').click();
-    await expect(path).toHaveAttribute('stroke-width', '6');
-    await expect(path).toHaveAttribute('clip-path', /url\(#record-inside-/);
-    const clipPath = page.locator('clipPath[id^="record-inside-"] path').first();
-    await expect(clipPath).toHaveAttribute('clip-rule', 'evenodd');
-    expect(await clipPath.getAttribute('d')).toBe(await path.getAttribute('d'));
+    await expect(path).toHaveAttribute('stroke-width', '3');
+    await expect(path).not.toHaveAttribute('clip-path', /.+/);
+    const insideStroke = page.locator('.record-positioned-stroke[data-stroke-position="inside"]').first();
+    await expect(insideStroke).toHaveAttribute('stroke-width', '3');
+    await expect(insideStroke).toHaveAttribute('fill', 'none');
+    expect(await insideStroke.getAttribute('d')).not.toBe(await path.getAttribute('d'));
     expect((await path.getAttribute('d')).match(/z/gi).length).toBe(2);
+
+    const insideBounds = await page.evaluate(() => {
+        const boundary = document.querySelector('path.leaflet-interactive[stroke="#a12345"]');
+        const stroke = document.querySelector('.record-positioned-stroke[data-stroke-position="inside"]');
+        const boundaryBox = boundary.getBBox();
+        const strokeBox = stroke.getBBox();
+        return {
+            boundary: { width: boundaryBox.width, height: boundaryBox.height },
+            stroke: { width: strokeBox.width, height: strokeBox.height }
+        };
+    });
+    expect(insideBounds.stroke.width).toBeLessThan(insideBounds.boundary.width);
+    expect(insideBounds.stroke.height).toBeLessThan(insideBounds.boundary.height);
 
     // Wait for the existing asynchronous storage queue before navigating away.
     await page.waitForTimeout(500);
     await page.reload();
-    await expect(path).toHaveAttribute('stroke-width', '6');
+    await expect(path).toHaveAttribute('stroke-width', '3');
+    await expect(insideStroke).toHaveAttribute('stroke-width', '3');
     await openLineSettings(page);
     await expect(checkbox).toContainText('안쪽');
     await page.locator('#style-line-weight').fill('5');
     await page.locator('#style-line-weight').dispatchEvent('change');
     await page.locator('.style-modal-apply-btn').click();
-    await expect(path).toHaveAttribute('stroke-width', '10');
+    await expect(path).toHaveAttribute('stroke-width', '5');
+    await expect(insideStroke).toHaveAttribute('stroke-width', '5');
+    const insideOpacity = await insideStroke.getAttribute('stroke-opacity');
+    expect(Number(insideOpacity)).toBeGreaterThan(0);
     await page.evaluate(() => window.zoomToLayer(991001));
     await page.waitForTimeout(350);
     await page.locator('#map').hover();
     await page.mouse.wheel(0, -250);
     await page.waitForTimeout(350);
-    expect(await clipPath.getAttribute('d')).toBe(await path.getAttribute('d'));
+    expect(await insideStroke.getAttribute('d')).not.toBe(await path.getAttribute('d'));
+    await expect(insideStroke).toHaveAttribute('stroke-opacity', insideOpacity);
+    for (const delta of [250, -250]) {
+        await page.mouse.wheel(0, delta);
+        await page.waitForTimeout(400);
+        await expect(insideStroke).toHaveAttribute('stroke-opacity', insideOpacity);
+        await expect(insideStroke).not.toHaveCSS('display', 'none');
+    }
 
     await openLineSettings(page);
     await page.evaluate(() => window.selectLineStyle('solid-dot'));
     await page.locator('.style-modal-apply-btn').click();
-    await expect(page.locator('.leaflet-solidDotOverlay-pane path[clip-path]')).toHaveCount(1);
-    await expect(page.locator('.leaflet-solidDotOverlay-pane path[clip-path]')).toHaveAttribute('stroke-width', '30');
+    const insideDotStroke = page.locator('.leaflet-solidDotOverlay-pane .record-positioned-stroke[data-stroke-position="inside"]');
+    await expect(insideDotStroke).toHaveCount(1);
+    await expect(insideDotStroke).toHaveAttribute('stroke-width', '15');
     await openLineSettings(page);
     await page.locator('#style-line-dropdown summary').click();
     await page.locator('#style-line-choices [data-style="dashed"]').click();
     await expect(page.locator('#style-line-dropdown')).not.toHaveAttribute('open', '');
     await expect(page.locator('#style-line-dropdown summary')).toContainText('파선');
     await page.locator('.style-modal-apply-btn').click();
-    await expect(page.locator('.leaflet-solidDotOverlay-pane path[clip-path]')).toHaveCount(0);
+    await expect(page.locator('.leaflet-solidDotOverlay-pane .record-positioned-stroke')).toHaveCount(0);
     await expect(path).toHaveAttribute('stroke-dasharray', /.+/);
+    await expect(insideStroke).toHaveAttribute('stroke-dasharray', await path.getAttribute('stroke-dasharray'));
     await page.evaluate(() => window.zoomToLayer(991001));
     await page.waitForTimeout(350);
     await page.screenshot({ path: 'test-results/inside-stroke-map.png' });
@@ -84,22 +113,43 @@ test('면 안쪽 윤곽선은 취소·적용·새로고침·두께 변경·해�
     await page.screenshot({ path: 'test-results/inside-stroke-settings.png' });
     await choose('outside');
     await page.locator('.style-modal-apply-btn').click();
-    const outside = page.locator('path[clip-path^="url(#record-outside-"]').first();
-    await expect(outside).toHaveAttribute('stroke-width', '10');
+    const outside = page.locator('.record-positioned-stroke[data-stroke-position="outside"]').first();
+    await expect(outside).toHaveAttribute('stroke-width', '5');
     await expect(outside).toHaveAttribute('fill', 'none');
+    await expect(outside).toHaveAttribute('stroke-dasharray', await path.getAttribute('stroke-dasharray'));
     await expect(path).toHaveAttribute('stroke-opacity', '0');
     await expect(page.locator('clipPath[id^="record-inside-"]')).toHaveCount(0);
-    const exteriorClip = page.locator('clipPath[id^="record-outside-"] path').first();
-    await expect(exteriorClip).toHaveAttribute('clip-rule', 'evenodd');
-    expect(await exteriorClip.getAttribute('d')).toContain(await path.getAttribute('d'));
+    await expect(page.locator('clipPath[id^="record-outside-"]')).toHaveCount(0);
+    expect(await outside.getAttribute('d')).not.toBe(await path.getAttribute('d'));
+    const outsideBounds = await page.evaluate(() => {
+        const boundary = document.querySelector('path.leaflet-interactive[stroke="#a12345"]');
+        const stroke = document.querySelector('.record-positioned-stroke[data-stroke-position="outside"]');
+        const boundaryBox = boundary.getBBox();
+        const strokeBox = stroke.getBBox();
+        return {
+            boundary: { width: boundaryBox.width, height: boundaryBox.height },
+            stroke: { width: strokeBox.width, height: strokeBox.height }
+        };
+    });
+    expect(outsideBounds.stroke.width).toBeGreaterThan(outsideBounds.boundary.width);
+    expect(outsideBounds.stroke.height).toBeGreaterThan(outsideBounds.boundary.height);
+    const outsideOpacity = await outside.getAttribute('stroke-opacity');
+    expect(Number(outsideOpacity)).toBeGreaterThan(0);
+    for (const delta of [-250, 250, -250]) {
+        await page.locator('#map').hover();
+        await page.mouse.wheel(0, delta);
+        await page.waitForTimeout(400);
+        await expect(outside).toHaveAttribute('stroke-opacity', outsideOpacity);
+        await expect(outside).not.toHaveCSS('display', 'none');
+    }
     await page.waitForTimeout(500);
     await page.reload();
-    await expect(outside).toHaveAttribute('stroke-width', '10');
+    await expect(outside).toHaveAttribute('stroke-width', '5');
     await openLineSettings(page);
     await expect(checkbox).toContainText('바깥쪽');
     await page.evaluate(() => window.selectLineStyle('solid-dot'));
     await page.locator('.style-modal-apply-btn').click();
-    await expect(page.locator('.leaflet-solidDotOverlay-pane path[clip-path^="url(#record-outside-"]')).toHaveCount(1);
+    await expect(page.locator('.leaflet-solidDotOverlay-pane .record-positioned-stroke[data-stroke-position="outside"]')).toHaveCount(1);
     await page.evaluate(() => window.zoomToLayer(991001));
     await page.waitForTimeout(350);
     await page.screenshot({ path: 'test-results/outside-stroke-map.png' });
@@ -111,6 +161,7 @@ test('면 안쪽 윤곽선은 취소·적용·새로고침·두께 변경·해�
     await expect(path).not.toHaveAttribute('clip-path', /.+/);
     await expect(page.locator('clipPath[id^="record-inside-"]')).toHaveCount(0);
     await expect(page.locator('clipPath[id^="record-outside-"]')).toHaveCount(0);
+    await expect(page.locator('.record-positioned-stroke')).toHaveCount(0);
     await expect(path).not.toHaveAttribute('stroke-opacity', '0');
     expect(errors).toEqual([]);
 });

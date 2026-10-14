@@ -61,6 +61,11 @@ function optimizeVectorLayerForViewport(layer, viewBounds, zoom) {
         path.style.display = '';
         path.style.pointerEvents = 'visiblePainted';
     }
+    // Auxiliary SVG paths must follow the boundary when it leaves/re-enters
+    // the viewport or the record's display zoom range changes.
+    for (const companion of [layer._positionedStrokePath, layer._recordHitPath]) {
+        if (companion) companion.style.display = path.style.display;
+    }
 }
 
 /**

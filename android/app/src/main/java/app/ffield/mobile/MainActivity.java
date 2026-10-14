@@ -11,6 +11,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(NativeFileSaverPlugin.class);
         registerPlugin(NativePhotoPickerPlugin.class);
         registerPlugin(NativeTrackPlugin.class);
+        registerPlugin(NativeAppUpdatePlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

@@ -1175,3 +1175,60 @@
 #record-list-controls #record-visibility-all { color: #000; }
 #record-more-button.selection-active { color: var(--color-primary); }
 #record-more-button.selection-active svg { fill: var(--color-primary); }
+
+.record-search-controls {
+    display: flex;
+    align-items: stretch;
+    gap: 6px;
+    flex-shrink: 0;
+    margin-bottom: var(--space-3);
+}
+
+.record-search-controls input {
+    flex: 1;
+    min-width: 0;
+    height: 40px;
+    padding: 0 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: #fff;
+    color: #111827;
+    font-size: 14px;
+    box-sizing: border-box;
+    outline: none;
+}
+
+.record-search-controls input:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.14);
+}
+
+.record-search-controls input[readonly] {
+    background: #f8fafc;
+    color: #374151;
+}
+
+.record-search-controls button {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: var(--color-primary);
+    color: #fff;
+    cursor: pointer;
+}
+
+.record-search-controls button:active { transform: scale(0.97); }
+.record-search-controls button svg { width: 20px; height: 20px; fill: currentColor; }
+
+.record-search-empty {
+    padding: 24px 15px;
+    text-align: center;
+    color: #9ca3af;
+    font-size: 12px;
+}

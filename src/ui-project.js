@@ -39,6 +39,9 @@ import {
 
 export let moveTargetLayerIds = [];
 let switchSidebarTab;
+let activeRecordSearchTerm = '';
+
+const RECORD_SEARCH_CLEAR_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.41 4.29 19.71 2.88 18.3 9.17 12 2.88 5.71 4.29 4.29 10.59 10.59 16.89 4.29z"/></svg>';
 
 export function configureProjectRuntime(dependencies) {
     const validatedDependencies = validateRuntimeDependencies('project-ui', dependencies, {
@@ -751,16 +754,17 @@ function createSurveyItem(layer) {
     return div;
 }
 
-function createSurveyGroup(group, layers) {
+function createSurveyGroup(group, layers, options = {}) {
     const wrapper = document.createElement('div');
     wrapper.className = 'survey-group';
     wrapper.dataset.recordGroupId = group.id;
 
-    const isCollapsed = group.collapsed === true;
-    const visibleCount = layers.filter(layer => !layer.feature.properties.isHidden).length;
-    const count = isRecordSelectionMode() ? layers.filter(isRecordSelected).length : visibleCount;
-    const checked = count > 0 && count === layers.length;
-    const indeterminate = count > 0 && count < layers.length;
+    const isCollapsed = options.forceExpanded === true ? false : group.collapsed === true;
+    const controlLayers = options.controlLayers || layers;
+    const visibleCount = controlLayers.filter(layer => !layer.feature.properties.isHidden).length;
+    const count = isRecordSelectionMode() ? controlLayers.filter(isRecordSelected).length : visibleCount;
+    const checked = count > 0 && count === controlLayers.length;
+    const indeterminate = count > 0 && count < controlLayers.length;
     const escapedGroupId = escapeHtml(escapeJsString(group.id));
 
     wrapper.innerHTML = `
@@ -787,11 +791,11 @@ function createSurveyGroup(group, layers) {
     if (isRecordSelectionMode()) {
         control.indeterminate = indeterminate;
         control.onchange = () => {
-            layers.forEach(layer => selectRecord(layer, control.checked));
+            controlLayers.forEach(layer => selectRecord(layer, control.checked));
             renderSurveyList();
         };
-    } else control.onclick = () => toggleRecordGroupVisibility(group.id, visibleCount !== layers.length);
-    control.disabled = layers.length === 0;
+    } else control.onclick = () => toggleRecordGroupVisibility(group.id, visibleCount !== controlLayers.length);
+    control.disabled = controlLayers.length === 0;
     const items = wrapper.querySelector('.survey-group-items');
     layers.forEach(layer => items.appendChild(createSurveyItem(layer)));
     return wrapper;
@@ -820,6 +824,53 @@ function compareSurveyLayers(a, b, fallbackOrderMap) {
     return AppState.sortOrder === 'asc' ? cmp : -cmp;
 }
 
+function normalizeRecordSearchText(value) {
+    return String(value || '').trim().toLocaleLowerCase('ko-KR');
+}
+
+function applyRecordSearch() {
+    const input = document.getElementById('record-search-input');
+    activeRecordSearchTerm = String(input?.value || '');
+    renderSurveyList();
+}
+
+function clearRecordSearch() {
+    activeRecordSearchTerm = '';
+    const input = document.getElementById('record-search-input');
+    if (input) input.value = '';
+    renderSurveyList();
+    input?.focus();
+}
+
+function syncRecordSearchControls() {
+    const input = document.getElementById('record-search-input');
+    const button = document.getElementById('record-search-button');
+    if (!input || !button) return;
+
+    const searching = activeRecordSearchTerm !== '';
+    input.readOnly = false;
+    button.innerHTML = searching ? RECORD_SEARCH_CLEAR_ICON : SVG_ICONS.search;
+    button.setAttribute('aria-label', searching ? '기록 검색 해제' : '기록 검색');
+    button.title = searching ? '검색 해제' : '검색';
+
+    if (button.dataset.searchBound !== 'true') {
+        button.dataset.searchBound = 'true';
+        button.addEventListener('click', () => {
+            if (activeRecordSearchTerm) clearRecordSearch();
+            else applyRecordSearch();
+        });
+    }
+    if (input.dataset.searchBound !== 'true') {
+        input.dataset.searchBound = 'true';
+        input.addEventListener('input', applyRecordSearch);
+        input.addEventListener('keydown', event => {
+            if (event.key !== 'Enter' || event.isComposing) return;
+            event.preventDefault();
+            applyRecordSearch();
+        });
+    }
+}
+
 /**
  * [함수] renderSurveyList
  * [역할] 현재 데이터 상태를 화면 요소로 재구성해 렌더링한다.
@@ -828,6 +879,7 @@ function compareSurveyLayers(a, b, fallbackOrderMap) {
 export function renderSurveyList() {
     const listContainer = document.getElementById('survey-list-area');
     if (!listContainer) return;
+    syncRecordSearchControls();
     listContainer.innerHTML = "";
     const layers = drawnItems.getLayers();
     const groups = getRecordGroups();
@@ -872,9 +924,24 @@ export function renderSurveyList() {
     }
 
     const fallbackOrderMap = new Map(layers.map((layer, index) => [layer, index]));
-    const sortedLayers = [...layers].sort((a, b) => compareSurveyLayers(a, b, fallbackOrderMap));
+    const normalizedSearchTerm = normalizeRecordSearchText(activeRecordSearchTerm);
+    const displayLayers = normalizedSearchTerm
+        ? layers.filter(layer => normalizeRecordSearchText(getRecordName(layer.feature?.properties, '')).includes(normalizedSearchTerm))
+        : layers;
+    if (normalizedSearchTerm && displayLayers.length === 0) {
+        listContainer.innerHTML = '<div class="record-search-empty">검색 결과 없음</div>';
+        return;
+    }
+    const sortedLayers = [...displayLayers].sort((a, b) => compareSurveyLayers(a, b, fallbackOrderMap));
 
     const validGroupIds = new Set(groups.map(group => group.id));
+    const allGroupedLayers = new Map();
+    layers.forEach(layer => {
+        const groupId = layer.feature?.properties?.groupId;
+        if (!groupId || !validGroupIds.has(groupId)) return;
+        if (!allGroupedLayers.has(groupId)) allGroupedLayers.set(groupId, []);
+        allGroupedLayers.get(groupId).push(layer);
+    });
     const groupedLayers = new Map();
     const ungroupedLayers = [];
     const displayOrderItems = [];
@@ -903,7 +970,10 @@ export function renderSurveyList() {
                 const group = groups.find(group => group.id === item.groupId);
                 const layersInGroup = groupedLayers.get(item.groupId) || [];
                 if (group) {
-                    listContainer.appendChild(createSurveyGroup(group, layersInGroup));
+                    listContainer.appendChild(createSurveyGroup(group, layersInGroup, {
+                        forceExpanded: Boolean(normalizedSearchTerm),
+                        controlLayers: allGroupedLayers.get(group.id) || layersInGroup
+                    }));
                     renderedGroupIds.add(group.id);
                 }
                 return;
@@ -911,8 +981,12 @@ export function renderSurveyList() {
             listContainer.appendChild(createSurveyItem(item.layer));
         });
         groups.forEach(group => {
-            if (!renderedGroupIds.has(group.id)) {
-                listContainer.appendChild(createSurveyGroup(group, groupedLayers.get(group.id) || []));
+            const layersInGroup = groupedLayers.get(group.id) || [];
+            if (!renderedGroupIds.has(group.id) && (!normalizedSearchTerm || layersInGroup.length > 0)) {
+                listContainer.appendChild(createSurveyGroup(group, layersInGroup, {
+                    forceExpanded: Boolean(normalizedSearchTerm),
+                    controlLayers: allGroupedLayers.get(group.id) || layersInGroup
+                }));
             }
         });
         return;
@@ -920,7 +994,12 @@ export function renderSurveyList() {
 
     groups.forEach(group => {
         const layersInGroup = groupedLayers.get(group.id) || [];
-        listContainer.appendChild(createSurveyGroup(group, layersInGroup));
+        if (!normalizedSearchTerm || layersInGroup.length > 0) {
+            listContainer.appendChild(createSurveyGroup(group, layersInGroup, {
+                forceExpanded: Boolean(normalizedSearchTerm),
+                controlLayers: allGroupedLayers.get(group.id) || layersInGroup
+            }));
+        }
     });
     ungroupedLayers.forEach(layer => {
         listContainer.appendChild(createSurveyItem(layer));

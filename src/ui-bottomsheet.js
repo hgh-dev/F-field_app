@@ -962,6 +962,7 @@ export function showInfoPopup(lat, lng, options = {}) {
         if (document.getElementById('bottom-sheet-more-btn')) {
             document.getElementById('bottom-sheet-more-btn').style.display = 'none';
         }
+        setCurrentBottomSheetLayerId(null);
         openBottomSheet(parcelAddr, content);
         const targetZoom = Number.isFinite(Number(options.zoom)) ? Number(options.zoom) : map.getZoom();
         flyToWithBottomSheet([lat, lng], targetZoom, { animate: true, duration: 0.3 });

@@ -251,7 +251,12 @@ export function updateLayerInfo(layer) {
         openLayerBottomSheet();
         return this;
     };
-    layer.closePopup = function () { closeBottomSheet(); return this; };
+    layer.closePopup = function () {
+        // Visibility/viewport updates also close hidden records' popups.
+        // A record may only close the bottom sheet that belongs to it.
+        if (currentBottomSheetLayerId === id) closeBottomSheet();
+        return this;
+    };
 }
 
 export function refreshRecordLayerDisplayMode() {
