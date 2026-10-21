@@ -6,6 +6,7 @@
    [참고]
    - 기록 상세 정보 값이나 표시 형식이 이상할 때 확인합니다.
    ========================================================================== */
+import { UI_ICONS } from './ui-icons.js';
 import { L, turf } from './vendor-globals.js';
 import { SVG_ICONS } from './config.js';
 import { AppState } from './state.js';
@@ -152,6 +153,9 @@ export function updateLayerInfo(layer) {
     let infoText = "";
     let infoLabel = "";
     let infoBadgeClass = "";
+    let metricValue = "";
+    let metricUnit = "";
+    let metricSecondary = "";
     if (layer instanceof L.Marker) {
         const pos = layer.getLatLng();
         infoText = formatCoordinate(pos.lat, pos.lng, AppState.coordMode, {
@@ -161,56 +165,63 @@ export function updateLayerInfo(layer) {
     } else if (layer instanceof L.Polyline && !(layer instanceof L.Polygon)) {
         infoLabel = "길이";
         infoBadgeClass = "badge-length";
-        infoText = calculateProjectedLengthMeters(layer.toGeoJSON()).toFixed(2) + " m";
+        metricValue = calculateProjectedLengthMeters(layer.toGeoJSON()).toFixed(2);
+        metricUnit = "m";
+        infoText = metricValue + " m";
     } else if (layer instanceof L.Polygon) {
         const areaM2 = calculateProjectedAreaM2(layer.toGeoJSON());
         const areaPyeong = areaM2 * 0.3025;
         infoLabel = "면적";
         infoBadgeClass = "badge-area";
-        infoText = areaM2.toFixed(2) + " ㎡ (" + areaPyeong.toFixed(2) + "평)";
+        metricValue = areaM2.toFixed(2);
+        metricUnit = "㎡";
+        metricSecondary = areaPyeong.toFixed(2) + "평";
+        infoText = metricValue + " ㎡ (" + metricSecondary + ")";
     }
 
-    let popupContent = `<div style="display:flex; align-items:center; gap:6px; margin-bottom:5px;">
-        <span style="width:20px; height:18px; flex-shrink:0; display:flex; align-items:center; justify-content:center; color:#3B82F6;">${typeIcon}</span>
-        <span style="font-size:16px; color:#3B82F6; font-weight:bold;">${escapeHtml(memo)}</span>
-        <button onclick="editLayerMemo(${layer.feature.properties.id})" title="기록명 수정" style="background:none; border:none; padding:0; cursor:pointer; color:#3B82F6; opacity:0.7; display:flex; align-items:center;">
-            <svg viewBox="0 0 24 24" style="width:16px; height:16px; fill:#3B82F6;"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
-        </button>
-    </div><hr style="margin: 12px 0; border: none; border-top: 1px solid #f0f0f0;">`;
+    const recordKind = layer instanceof L.Marker ? '점 기록'
+        : layer instanceof L.Polygon ? '면 기록'
+            : layer.feature.properties?.isTrack ? '트랙 기록' : '선 기록';
+    let popupContent = `<div class="sheet-record-heading">
+        <span class="sheet-type-icon">${typeIcon}</span>
+        <div class="sheet-title-wrap"><div class="sheet-title-line">
+            <span class="sheet-record-title">${escapeHtml(memo)}</span>
+            <button type="button" class="sheet-rename" onclick="editLayerMemo(${layer.feature.properties.id})" title="기록명 수정" aria-label="기록명 수정">${UI_ICONS.pencil}</button>
+        </div><span class="sheet-record-kind">${recordKind}</span></div>
+    </div>`;
 
     const address = layer.feature.properties.address;
     if (address) {
         const safeAddressArg = escapeHtml(escapeJsString(address));
-        popupContent += `<div onclick="copyText('${safeAddressArg}', false, '지번 주소')" title="주소 복사" style="display:flex; align-items:baseline; font-size:14px; color:#555; line-height:1.5; margin-bottom:10px; overflow-wrap:anywhere; cursor:pointer;"><span class="badge-parcel" style="flex-shrink:0; width:36px; text-align:center;">지번</span><span style="margin-left:5px;">${escapeHtml(address)}</span></div>`;
+        popupContent += `<div class="sheet-info-row" onclick="copyText('${safeAddressArg}', false, '지번 주소')" title="주소 복사" style="cursor:pointer;"><span class="badge-parcel">지번</span><span>${escapeHtml(address)}</span></div>`;
     } else {
         const addressStatus = getAddressLookupStatus(layer) === 'failed' ? '주소 정보 없음' : '조회 중...';
-        popupContent += `<div style="display:flex; align-items:baseline; font-size:14px; color:#999; line-height:1.5; margin-bottom:10px;"><span class="badge-parcel" style="flex-shrink:0; width:36px; text-align:center;">지번</span><span style="margin-left:5px;">${addressStatus}</span></div>`;
+        popupContent += `<div class="sheet-info-row"><span class="badge-parcel">지번</span><span>${addressStatus}</span></div>`;
     }
 
     if (infoText) {
         if (layer instanceof L.Marker) {
-            popupContent += `<div style="display:flex; align-items:baseline; font-size: 14px; color: #555; margin-bottom: 15px;"><span class="badge-coord" style="flex-shrink:0; width:36px; display:inline-block; text-align:center;">좌표</span><div style="margin-left: 5px; line-height: 1.5;">${infoText}</div></div>`;
+            popupContent += `<div class="sheet-info-row"><span class="badge-coord">좌표</span><div>${infoText}</div></div>`;
         } else {
-            popupContent += `<div style="display:flex; align-items:baseline; font-size:14px; color:#555; line-height:1.5; margin-bottom:15px;"><span class="${infoBadgeClass}" style="flex-shrink:0; width:36px; text-align:center;">${infoLabel}</span><span style="margin-left:5px;">${infoText}</span></div>`;
+            popupContent += `<div class="sheet-metric"><span class="${infoBadgeClass}">${infoLabel}</span><div class="sheet-metric-value">${metricValue}<span class="sheet-unit">${metricUnit}</span></div>${metricSecondary ? `<small class="sheet-metric-secondary">${metricSecondary}</small>` : ''}</div>`;
         }
     }
 
     const id = layer.feature.properties.id;
     popupContent += `<div class="bottom-sheet-extra"><div class="extra-inner">`;
     const description = layer.feature.properties.description || "";
-    if (description) popupContent += `<div style="background:#f8f9fa; padding:8px; border-radius:6px; white-space:pre-wrap; font-size:14px; color:#333; line-height:1.5; margin: 15px 0;">${escapeHtml(description)}</div>`;
+    if (description) popupContent += `<div class="sheet-memo">${escapeHtml(description)}</div>`;
 
     const photos = layer.feature.properties.photos || [];
     const photoSection = createLayerPhotoSection(id, photos);
     popupContent += photoSection.thumbnailsHtml;
 
-    popupContent += `<div style="${photoSection.gridStyle}">
+    popupContent += `<div class="sheet-record-actions" style="${photoSection.gridStyle}">
         ${photoSection.inputElementsHtml}
-        <button onclick="editLayerDescription(${id})" class="popup-btn" style="background:#fff; color:#555; border:1px solid #ddd; display:flex; align-items:center; justify-content:center; gap:4px;">
-            <svg viewBox="0 0 24 24" style="width:14px; height:14px; fill:#555;"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>메모
-        </button>
+        <button type="button" onclick="editLayerDescription(${id})" class="popup-btn">${UI_ICONS.memo}메모</button>
         ${photoSection.actionButtonHtml}
-    </div></div></div>`;
+    </div></div></div>
+    <button type="button" class="sheet-expand" onclick="toggleBottomSheetState()"><span class="when-expanded">간략히 보기</span><span class="when-collapsed">메모·사진 펼치기</span>${UI_ICONS.chevron}</button>`;
 
     applyLayerVisibilityState(layer, layer.feature?.properties?.isHidden === true);
 

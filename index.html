@@ -45,6 +45,7 @@
     <link rel="stylesheet" href="%BASE_URL%src/styles/photo.css">
     <link rel="stylesheet" href="%BASE_URL%src/styles/bottom-sheet.css">
     <link rel="stylesheet" href="%BASE_URL%src/styles/style-modal.css">
+    <link rel="stylesheet" href="%BASE_URL%src/styles/refresh.css">
 </head>
 
 <body>
@@ -58,25 +59,17 @@
     <div class="map-top-controls">
         <div class="map-top-left">
             <button class="map-control-btn" onclick="openSidebar()" aria-label="메뉴 열기" title="메뉴">
-                <svg class="svg-icon" viewBox="0 0 24 24">
-                    <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" />
-                </svg>
+                <svg class="ui-icon"  viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
             </button>
         </div>
 
         <div class="map-top-right">
             <button id="btn-search-toggle" class="map-control-btn" onclick="toggleSearchBox()" aria-label="검색창 열기"
                 title="검색">
-                <svg class="svg-icon" viewBox="0 0 24 24">
-                    <path
-                        d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z" />
-                </svg>
+                <svg class="ui-icon"  viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="7.5"/><path d="m16 16 5 5"/></svg>
             </button>
             <button class="map-control-btn" onclick="openLocationActionModal()" aria-label="내 위치 공유" title="내 위치 공유">
-                <svg class="svg-icon" viewBox="0 0 24 24">
-                    <path
-                        d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11A2.99 2.99 0 1 0 15 5c0 .24.04.47.09.7L8.04 9.81A3 3 0 1 0 8.04 14.2l7.12 4.18c-.05.2-.08.41-.08.62a2.92 2.92 0 1 0 2.92-2.92z" />
-                </svg>
+                <svg class="ui-icon"  viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 10.5 6.8-4M8.6 13.5l6.8 4"/></svg>
             </button>
         </div>
     </div>
@@ -146,27 +139,11 @@
     <!-- [우측] GPS 및 위치 추적 버튼 -->
     <div class="gps-btn-group">
         <button class="circle-btn" onclick="findMe()" title="내 위치로 이동">
-            <svg class="svg-icon-lg" viewBox="0 0 100 100"
-                style="fill:none; stroke:#000000; stroke-width:4; stroke-linecap:round;">
-                <circle cx="50" cy="50" r="38" />
-                <line x1="50" y1="12" x2="50" y2="28" />
-                <line x1="50" y1="88" x2="50" y2="72" />
-                <line x1="12" y1="50" x2="28" y2="50" />
-                <line x1="88" y1="50" x2="72" y2="50" />
-                <circle cx="50" cy="50" r="5" style="fill:#000000; stroke:none;" />
-            </svg>
+            <svg class="ui-icon"  viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3"/></svg>
         </button>
 
         <button id="toggle-track-btn" class="circle-btn" onclick="toggleTracking()" title="위치 추적">
-            <svg id="tracking-svg-icon" viewBox="0 0 100 100">
-                <path d="M20 35 L20 20 L35 20 M80 35 L80 20 L65 20 M20 65 L20 80 L35 80 M80 65 L80 80 L65 80"
-                    fill="none" stroke="#F44336" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
-                <circle cx="50" cy="50" r="28" fill="none" stroke="#000000" stroke-width="2" />
-                <path d="M50 16 L50 26 M50 74 L50 84 M16 50 L26 50 M74 50 L84 50" fill="none" stroke="#000000"
-                    stroke-width="2" stroke-linecap="round" />
-                <path d="M50 26 L34 62 L50 52 L66 62 Z" fill="#4285F4" stroke="#1967D2" stroke-width="2"
-                    stroke-linejoin="round" transform="rotate(45 50 50)" />
-            </svg>
+            <svg class="ui-icon" id="tracking-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21 3-7 18-3-8-8-3Z"/></svg>
         </button>
     </div>
 
@@ -187,7 +164,7 @@
     ==========================================================================
     -->
     <div id="bottom-sheet">
-        <div id="bottom-sheet-handle" onclick="toggleBottomSheetState()"></div>
+        <button type="button" id="bottom-sheet-handle" onclick="toggleBottomSheetState()" aria-label="상세 정보 접기 또는 펼치기"></button>
         <!-- 더보기 버튼 (수정, 삭제) -->
         <button id="bottom-sheet-more-btn" onclick="toggleBottomSheetMoreMenu(event)" aria-label="기록 메뉴 열기">
             <svg viewBox="0 0 24 24">
@@ -521,13 +498,14 @@
     -->
     <div id="sidebar-overlay" class="sidebar-overlay" onclick="if(event.target === this) closeSidebar()">
         <div class="sidebar-content">
-            <div class="sidebar-header">
-                <button class="btn-sidebar-action" onclick="closeSidebar()">
-                    <svg class="svg-icon" viewBox="0 0 24 24">
-                        <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
-                    </svg>
-                </button>
-                <div style="display:flex; gap:10px;">
+            <nav class="sidebar-rail" aria-label="관리 메뉴 탐색">
+                <div class="sidebar-rail-back"><button type="button" class="btn-sidebar-action" onclick="closeSidebar()" aria-label="메뉴 닫기"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 5-7 7 7 7M5 12h14"/></svg></button></div>
+                <div class="sidebar-tabs">
+                    <button type="button" class="tab-btn active" onclick="switchSidebarTab('map')" id="tab-btn-map" aria-label="지도 관리" aria-controls="content-map" aria-pressed="true"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 10 5-10 5L2 8Z"/><path d="m2 12 10 5 10-5M2 16l10 5 10-5"/></svg><span>지도</span></button>
+                    <button type="button" class="tab-btn" onclick="switchSidebarTab('project')" id="tab-btn-project" aria-label="프로젝트 관리" aria-controls="content-project" aria-pressed="false"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg><span>프로젝트</span></button>
+                    <button type="button" class="tab-btn" onclick="switchSidebarTab('record')" id="tab-btn-record" aria-label="기록 관리" aria-controls="content-record" aria-pressed="false"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-4"/><path d="m16 3 5 5-9 9-5 1 1-5Z"/></svg><span>기록</span></button>
+                </div>
+                <div class="sidebar-utilities">
                     <button id="btn-notice" class="btn-sidebar-action" type="button" title="공지사항" aria-label="공지사항"
                         onclick="window.open('https://f-field.blogspot.com/', '_blank')">
                         <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25"
@@ -535,20 +513,16 @@
                             <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
                             <path d="M13.73 21a2 2 0 0 1-3.46 0" />
                         </svg>
-                        <span class="notice-badge-dot" aria-hidden="true"></span>
+                        <span class="notice-badge-dot" aria-hidden="true"></span><span class="rail-label">알림</span>
                     </button>
-                    <button id="btn-settings" class="btn-sidebar-action" onclick="openSettingsModal()" title="설정">
-                        <svg class="svg-icon" viewBox="0 0 24 24">
-                            <path
-                                d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z" />
-                        </svg>
+                    <button id="btn-settings" class="btn-sidebar-action" onclick="openSettingsModal()" title="설정" aria-label="설정">
+                        <svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 3-.6 3-2.5 1.5L3 7l-1 3 2.2 2-2.2 2 1 3 2.9-.5L8.4 18l.6 3h6l.6-3 2.5-1.5 2.9.5 1-3-2.2-2L22 10l-1-3-2.9.5L15.6 6 15 3Z"/><circle cx="12" cy="12" r="3"/></svg><span class="rail-label">설정</span>
                     </button>
+
                 </div>
-            </div>
-            <div class="sidebar-tabs">
-                <button class="tab-btn active" onclick="switchSidebarTab('map')" id="tab-btn-map">지도 관리</button>
-                <button class="tab-btn" onclick="switchSidebarTab('project')" id="tab-btn-project">프로젝트 관리</button>
-                <button class="tab-btn" onclick="switchSidebarTab('record')" id="tab-btn-record">기록 관리</button>
+            </nav>
+            <div class="sidebar-header">
+                <h1 id="sidebar-panel-title">지도 관리</h1>
             </div>
             <div class="sidebar-body">
                 <!-- 탭 1: 지도 관리 -->

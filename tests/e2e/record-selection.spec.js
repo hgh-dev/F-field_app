@@ -167,3 +167,47 @@ test('윤곽 위치만 일괄 변경하면 개별 색상 두께 채움과 투명
     await page.locator('.style-modal-apply-btn').click();
     expect(await savedProperties(page)).toEqual(after);
 });
+
+for (const hasExistingGroup of [false, true]) {
+    test(`선택한 기록으로 새 그룹을 만들고 취소·숨김·저장을 유지한다 (기존 그룹 ${hasExistingGroup ? '있음' : '없음'})`, async ({ page }) => {
+        await prepare(page);
+        if (hasExistingGroup) {
+            await page.evaluate(() => window.groupSelectedLayers());
+            await page.locator('#record-group-create-name').fill('기존 그룹');
+            await page.locator('#record-group-create-submit').click();
+            await expect(page.locator('#record-group-create-modal-overlay')).toBeHidden();
+        }
+        await row(page, 2).getByRole('button', { name: '지도에서 숨기기' }).click();
+        await page.locator('#record-selection-toggle').click();
+        for (const n of [1, 2]) await row(page, n).getByRole('checkbox').check();
+        await page.locator('#record-more-button').click();
+        await page.locator('#add-selected-records-to-group').click();
+        const picker = page.locator('#record-group-select-modal-overlay');
+        const create = picker.getByRole('button', { name: '새 그룹 만들기', exact: true });
+        await expect(create).toBeVisible();
+        if (hasExistingGroup) await expect(picker.getByRole('button', { name: '기존 그룹', exact: true })).toBeVisible();
+        await create.click();
+        const prompt = page.locator('#app-dialog-overlay');
+        await prompt.getByRole('button', { name: '취소', exact: true }).click();
+        await expect(prompt).toBeHidden();
+        await expect(picker).toBeVisible();
+        await expect(page.locator('.survey-group')).toHaveCount(hasExistingGroup ? 1 : 0);
+        await expect(page.locator('#record-list-controls')).toContainText('2개 선택');
+        await create.click();
+        await prompt.locator('#app-dialog-input').fill('  새 현장 그룹  ');
+        await prompt.locator('.primary').click();
+        await expect(picker).toBeHidden();
+        const group = page.locator('.survey-group').filter({ has: page.locator('.survey-group-name', { hasText: '새 현장 그룹' }) });
+        await expect(group.locator('.survey-group-name')).toHaveText('새 현장 그룹');
+        await expect(group.locator('.survey-item')).toHaveCount(2);
+        await expect(group.locator('.survey-name')).toHaveText(['기록 1', '기록 2']);
+        await expect(row(page, 2).locator('.survey-name')).toHaveCSS('color', 'rgb(156, 163, 175)');
+        await page.reload();
+        await expect(page.locator('#map-active-project-badge')).toContainText('기본 프로젝트');
+        await page.locator('#map-active-project-badge').click();
+        await page.locator('#tab-btn-record').click();
+        await expect(group.locator('.survey-item')).toHaveCount(2);
+        await expect(row(page, 2).getByRole('button', { name: '지도에 표시', exact: true })).toBeVisible();
+        await expect(row(page, 3).locator('xpath=ancestor::div[contains(@class,"survey-group")][1]')).toHaveCount(0);
+    });
+}

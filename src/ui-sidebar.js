@@ -6,6 +6,7 @@
    [참고]
    - 사이드바 위치, 탭 전환, 지도 리사이즈 문제가 생기면 확인합니다.
    ========================================================================== */
+import { enhanceVisibilityControls } from './ui-visibility.js';
 import { AppState } from './state.js';
 import { currentEditLayerId } from './draw.js';
 import { map, vworldBase, vworldSatellite, vworldHybrid, esriSatelliteLayer, vworldLxLayer, vworldContinuousLayer, toggleOverlay } from './map.js';
@@ -102,6 +103,7 @@ export function syncSidebarUI() {
 
     enhanceMapLayerRows();
     enhanceMapSectionHeaders();
+    enhanceVisibilityControls(document.getElementById('content-map'));
 }
 
 function getMapLayerToggleIconHtml() {
@@ -320,13 +322,21 @@ export function switchSidebarTab(tabName) {
     ['map', 'project', 'record'].forEach(t => {
         const btn = document.getElementById('tab-btn-' + t);
         const content = document.getElementById('content-' + t);
-        if (btn) btn.classList.remove('active');
+        if (btn) {
+            btn.classList.remove('active');
+            btn.setAttribute('aria-pressed', 'false');
+        }
         if (content) content.classList.remove('active');
     });
 
     const activeBtn = document.getElementById('tab-btn-' + tabName);
     const activeContent = document.getElementById('content-' + tabName);
-    if (activeBtn) activeBtn.classList.add('active');
+    if (activeBtn) {
+        activeBtn.classList.add('active');
+        activeBtn.setAttribute('aria-pressed', 'true');
+    }
+    const title = document.getElementById('sidebar-panel-title');
+    if (title) title.textContent = { map: '지도 관리', project: '프로젝트 관리', record: '기록 관리' }[tabName] || 'F-Field';
     if (activeContent) activeContent.classList.add('active');
 
     // 프로젝트 탭 열 때 목록 렌더링

@@ -245,7 +245,7 @@ test('프로젝트와 점 기록을 만든 뒤 새로고침해도 복원된다',
     await acceptAppDialog(page, projectName);
     await expect(page.locator('#map-active-project-badge')).toContainText(projectName);
 
-    await page.locator('.sidebar-header .btn-sidebar-action').first().click();
+    await page.getByRole('button', { name: '메뉴 닫기', exact: true }).click();
     await page.locator('#record-fab-main').click();
     await page.locator('#btn-point').click();
     const mapBox = await page.locator('#map').boundingBox();

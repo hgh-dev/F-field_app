@@ -1,3 +1,4 @@
+import { visibilityIcon } from './ui-icons.js';
 /* ==========================================================================
    [모듈] 프로젝트와 기록 목록 UI (ui-project.js)
    [역할]
@@ -270,6 +271,7 @@ function createProjectCard(p, index, defaultProject) {
     const isDefault = (p.name === "기본 프로젝트" && index === 0);
 
     const card = document.createElement('div');
+    card.className = `project-card${isActive ? ' is-current' : ''}`;
     card.style.cssText = [
         'display:flex', 'align-items:center', 'gap:10px',
         'padding:12px 10px', `margin-bottom:${isDefault ? '20px' : '6px'}`,
@@ -695,15 +697,12 @@ function createSurveyStyleButton(layer, props, displayColor, customEmoji) {
  */
 function recordControlHtml(hidden, selected, mixed = false) {
     if (isRecordSelectionMode()) return `<input type="checkbox" class="survey-checkbox record-control" aria-label="작업 대상으로 선택" ${selected ? 'checked' : ''}>`;
-    const icon = recordEyeIcon(hidden);
+    const icon = visibilityIcon(hidden, mixed);
     return `<button type="button" class="record-visibility record-control" aria-label="${hidden ? '지도에 표시' : mixed ? '일부 표시 중: 전체 표시' : '지도에서 숨기기'}" aria-pressed="${mixed ? 'mixed' : !hidden}">${icon}</button>`;
 }
 
 function recordEyeIcon(hidden) {
-    const paths = hidden
-        ? '<path d="M3 3l18 18M10.5 10.5a2.2 2.2 0 003 3M9 5.5A12 12 0 0112 5c6 0 10 7 10 7a19 19 0 01-4 4M6 6C3.5 8 2 12 2 12s4 7 10 7a12 12 0 005-1"/>'
-        : '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>';
-    return `<svg viewBox="0 0 24 24" aria-hidden="true">${paths}</svg>`;
+    return visibilityIcon(hidden);
 }
 
 function createSurveyItem(layer) {

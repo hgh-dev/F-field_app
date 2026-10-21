@@ -6,9 +6,10 @@
    [참고]
    - 기록 상세 화면이나 바텀시트 표시 문제가 생기면 확인합니다.
    ========================================================================== */
+import { UI_ICONS } from './ui-icons.js';
 import { getRecordAddress } from './record-address.js';
 import { L, turf } from './vendor-globals.js';
-import { VWORLD_API_KEY, SVG_ICONS } from './config.js';
+import { VWORLD_API_KEY } from './config.js';
 import { AppState } from './state.js';
 import { map, updateLayerOrder } from './map.js';
 import { drawnItems, enableSingleLayerEdit, getUniqueRecordName } from './draw.js';
@@ -802,17 +803,9 @@ export function handleBottomSheetSendBackward() {
 function createAddressInfoSection(parcelAddr, roadAddr) {
     const safeParcelAddr = escapeHtml(parcelAddr);
     const safeRoadAddr = escapeHtml(roadAddr);
-    return `<div style="display:flex; justify-content:space-between; align-items:center;">
-                <div style="display:flex; align-items:center; gap:5px;">
-                    <b onclick="copyText(this.innerText, false, '지번 주소')" style="color:#3B82F6; font-size: 16px; line-height: 1.2; word-break: keep-all; cursor: pointer;">${safeParcelAddr}</b>
-                </div>
-            </div>
-            <hr style="margin: 12px 0; border: none; border-top: 1px solid #f0f0f0;">
-            ${roadAddr ? `
-            <div style="display:flex; align-items:baseline; font-size: 14px; color: #555; margin-bottom: 8px;">
-                <span class="badge-road" style="flex-shrink:0; width:33px; display:inline-block; text-align:center;">도로명</span>
-                <span onclick="copyText(this.innerText, false, '도로명 주소')" style="margin-left: 5px; line-height: 1.5; word-break: keep-all; cursor: pointer;">${safeRoadAddr}</span>
-            </div>` : ''}`;
+    return `<div class="sheet-record-heading"><span class="sheet-type-icon">${UI_ICONS.pin}</span><div class="sheet-title-wrap"><span class="sheet-record-title">위치 정보</span><span class="sheet-record-kind">지적 조회</span></div></div>
+            <div class="sheet-location-heading"><button type="button" onclick="copyText(this.innerText, false, '지번 주소')">${safeParcelAddr}</button></div>
+            ${roadAddr ? `<div class="sheet-info-row"><span class="badge-road">도로명</span><span onclick="copyText(this.innerText, false, '도로명 주소')" style="cursor:pointer;">${safeRoadAddr}</span></div>` : ''}`;
 }
 
 /**
@@ -821,10 +814,7 @@ function createAddressInfoSection(parcelAddr, roadAddr) {
  * [원리] 우편번호 존재 여부에 따라 하단 여백을 조정하면서 좌표 블록을 반환한다.
  */
 function createCoordInfoSection(infoText, zipcode) {
-    return `<div style="display:flex; align-items:baseline; font-size: 14px; color: #555; margin-bottom: ${zipcode ? '8px' : '30px'};">
-                <span class="badge-coord" style="flex-shrink:0; width:33px; display:inline-block; text-align:center;">좌표</span>
-                <div onclick="copyText(this.innerText, false, '좌표')" style="margin-left: 5px; line-height: 1.5; cursor: pointer;">${infoText}</div>
-            </div>`;
+    return `<div class="sheet-info-row"><span class="badge-coord">좌표</span><div onclick="copyText(this.innerText, false, '좌표')" style="cursor:pointer;">${infoText}</div></div>`;
 }
 
 /**
@@ -835,10 +825,7 @@ function createCoordInfoSection(infoText, zipcode) {
 function createZipcodeInfoSection(zipcode) {
     if (!zipcode) return '';
 
-    return `<div style="display:flex; align-items:baseline; font-size: 14px; color: #555; margin-bottom: 30px;">
-                <span style="background:#f3f4f6; color:#4b5563; padding:2px 4px; border-radius:3px; font-size:10px; width:33px; display:inline-block; text-align:center; flex-shrink:0;">우편</span>
-                <span onclick="copyText(this.innerText, false, '우편번호')" style="margin-left: 5px; line-height: 1.5; cursor: pointer;">${escapeHtml(zipcode)}</span>
-            </div>`;
+    return `<div class="sheet-info-row"><span class="sheet-badge">우편</span><span onclick="copyText(this.innerText, false, '우편번호')" style="cursor:pointer;">${escapeHtml(zipcode)}</span></div>`;
 }
 
 /**
@@ -849,23 +836,13 @@ function createZipcodeInfoSection(zipcode) {
 function createPrimaryActionButtonsSection(parcelAddr, lat, lng) {
     const safeAddressArg = escapeHtml(escapeJsString(parcelAddr));
     const disabled = getRecordAddress(parcelAddr) ? '' : ' disabled aria-disabled="true"';
-    return `<div style="display:flex; gap:5px; justify-content:center;">
-                <button class="popup-btn" style="flex:1; background:#fff; color:#555; border:1px solid #ddd; display:flex; align-items:center; justify-content:center; gap:4px;" onclick="saveCurrentPoint(${lat}, ${lng}, '${safeAddressArg}')"${disabled}>
-                    <div style="width:16px; height:16px;">${SVG_ICONS.marker}</div>
-                </button>
-                <button class="popup-btn" style="flex:1; background:#fff; color:#555; border:1px solid #ddd; display:flex; align-items:center; justify-content:center; gap:4px;" onclick="saveCurrentBoundary('${safeAddressArg}')"${disabled}>
-                    <div style="width:16px; height:16px;">${SVG_ICONS.polygon}</div>
-                </button>
-                <button class="popup-btn" style="flex:1; background:#fff; color:#555; border:1px solid #ddd; display:flex; align-items:center; justify-content:center; gap:4px;" onclick="shareLocationText('${safeAddressArg}', '${lat}', '${lng}')">
-                    <svg viewBox="0 0 24 24" style="width:16px; height:16px; fill:currentColor;"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.66 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/></svg>
-                </button>
-                <button class="popup-btn" style="flex:1; background:#fff; color:#555; border:1px solid #ddd; display:flex; align-items:center; justify-content:center; gap:4px;" onclick="openSearchModal('${safeAddressArg}')">
-                    <div style="width:16px; height:16px;">${SVG_ICONS.search}</div>
-                </button>
-                <button class="popup-btn" style="flex:1; background:#fff; color:#555; border:1px solid #ddd; display:flex; align-items:center; justify-content:center; gap:4px;" onclick="openNavModal('${safeAddressArg}', ${lat}, ${lng})">
-                    <div style="width:16px; height:16px;">${SVG_ICONS.car}</div>
-                </button>
-            </div>`;
+    return `<div class="sheet-location-primary">
+        <button type="button" class="popup-btn" onclick="saveCurrentPoint(${lat}, ${lng}, '${safeAddressArg}')"${disabled}>${UI_ICONS.pin}<span>점 저장</span></button>
+        <button type="button" class="popup-btn" onclick="saveCurrentBoundary('${safeAddressArg}')"${disabled}>${UI_ICONS.polygon}<span>면 저장</span></button>
+        <button type="button" class="popup-btn" onclick="shareLocationText('${safeAddressArg}', '${lat}', '${lng}')">${UI_ICONS.share}<span>공유</span></button>
+        <button type="button" class="popup-btn" onclick="openSearchModal('${safeAddressArg}')">${UI_ICONS.search}<span>검색</span></button>
+        <button type="button" class="popup-btn" onclick="openNavModal('${safeAddressArg}', ${lat}, ${lng})">${UI_ICONS.car}<span>길찾기</span></button>
+    </div>`;
 }
 
 /**
@@ -875,9 +852,9 @@ function createPrimaryActionButtonsSection(parcelAddr, lat, lng) {
  */
 function createSecondaryActionButtonsSection(parcelAddr, lat, lng) {
     const safeAddressArg = escapeHtml(escapeJsString(parcelAddr));
-    return `<div style="display:flex; gap:5px; justify-content:center;">
-                <button id="btn-landeum-popup" class="popup-btn disabled" style="flex:1;" onclick="fetchAndHighlightBoundary(${lng}, ${lat})">토지e음 조회</button>
-                <button class="popup-btn" style="flex:1; background:#007bff; color:#fff; border:1px solid #007bff;" onclick="
+    return `<div class="sheet-location-secondary">
+                <button id="btn-landeum-popup" class="popup-btn disabled" onclick="fetchAndHighlightBoundary(${lng}, ${lat})">토지e음 조회</button>
+                <button class="popup-btn" onclick="
                     copyText('${safeAddressArg}', true);
                     setTimeout(() => {
                         alert('주소가 복사되었습니다.\\nK-GeoP 검색창에 붙여넣기 하세요.');
@@ -893,7 +870,7 @@ function createSecondaryActionButtonsSection(parcelAddr, lat, lng) {
  * [원리] 상단/하단 버튼 그룹을 세로로 묶어 바텀시트 액션 영역 전체를 반환한다.
  */
 function createActionButtonsSection(parcelAddr, lat, lng) {
-    return `<div style="margin-top: 10px; display:flex; flex-direction:column; gap:5px;">
+    return `<div class="sheet-location-actions">
                 ${createPrimaryActionButtonsSection(parcelAddr, lat, lng)}
                 ${createSecondaryActionButtonsSection(parcelAddr, lat, lng)}
             </div>`;
@@ -905,7 +882,7 @@ function createActionButtonsSection(parcelAddr, lat, lng) {
  * [원리] 주소/좌표/버튼 영역 생성 함수를 조합해 기존 본문 구조를 유지한 채 반환한다.
  */
 function createInfoPopupContent(parcelAddr, roadAddr, zipcode, infoText, lat, lng) {
-    return `<div style="min-width: 210px;">
+    return `<div class="sheet-location-info">
                 ${createAddressInfoSection(parcelAddr, roadAddr)}
                 ${createCoordInfoSection(infoText, zipcode)}
                 ${createZipcodeInfoSection(zipcode)}

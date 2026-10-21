@@ -119,7 +119,7 @@ function initScaleZoomMenu() {
 
     container.addEventListener('click', toggleMenu);
     container.addEventListener('keydown', (event) => {
-        if (event.key !== 'Enter' && event.key !== ' ') return;
+        if (event.target !== container || (event.key !== 'Enter' && event.key !== ' ')) return;
         event.preventDefault();
         toggleMenu(event);
     });

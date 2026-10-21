@@ -6,6 +6,7 @@
    [참고]
    - 기록 사진 표시나 사진 추가/삭제가 이상할 때 확인합니다.
    ========================================================================== */
+import { UI_ICONS } from './ui-icons.js';
 import { AppState } from './state.js';
 import { drawnItems } from './draw.js';
 import { getRecordName, resizeImage } from './utils.js';
@@ -397,9 +398,7 @@ function createPhotoActionButton(layerId) {
     button.className = 'popup-btn';
     button.style.cssText = 'background:#fff; color:#555; border:1px solid #ddd; display:flex; align-items:center; justify-content:center; gap:4px;';
     button.setAttribute('onclick', `openPhotoSelectMenu(event, ${layerId})`);
-    button.innerHTML = `
-        <svg viewBox="0 0 24 24" style="width:14px; height:14px; fill:#555;"><path d="M19 7v2.99s-1.99.01-2 0V7h-3s.01-1.99 0-2h3V2h2v3h3v2h-3zm-3 4V8h-3V5H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-8h-3zM5 19l3-4 2 3 3-4 4 5H5z"/></svg>사진
-    `;
+    button.innerHTML = `${UI_ICONS.camera}사진`;
     return button;
 }
 

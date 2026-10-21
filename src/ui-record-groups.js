@@ -443,26 +443,52 @@ export function openAddSelectedRecordsToGroupModal() {
     const projectId = AppState.currentProjectId;
     const groups = getRecordGroups();
     list.innerHTML = '';
-    empty.textContent = '그룹이 없습니다. 선택 모드를 완료한 뒤 그룹을 만들어 주세요.';
-    empty.style.display = groups.length ? 'none' : 'block';
+    empty.style.display = 'none';
+    const addToGroup = group => {
+        if (AppState.currentProjectId !== projectId || !getRecordGroup(group.id)) {
+            closeAddRecordToGroupModal();
+            return;
+        }
+        layers.filter(layer => drawnItems.hasLayer(layer)).forEach(layer => {
+            layer.feature.properties.groupId = group.id;
+        });
+        group.collapsed = false;
+        closeAddRecordToGroupModal();
+        saveToStorage();
+        renderSurveyListCallback();
+    };
+    const createButton = document.createElement('button');
+    createButton.type = 'button';
+    createButton.className = 'record-group-select-item';
+    createButton.innerHTML = `<span class="record-group-select-icon">${SVG_ICONS.file_group_add}</span><span class="record-group-select-name">새 그룹 만들기</span>`;
+    createButton.onclick = async () => {
+        const name = await showTextPrompt('그룹명을 입력하세요:', getDefaultRecordGroupName());
+        if (name === null) return;
+        const trimmedName = name.trim();
+        if (!trimmedName) {
+            alert('그룹명을 입력하세요.');
+            return;
+        }
+        if (AppState.currentProjectId !== projectId || !layers.some(layer => drawnItems.hasLayer(layer))) {
+            closeAddRecordToGroupModal();
+            return;
+        }
+        const group = {
+            id: makeRecordGroupId(),
+            name: trimmedName,
+            collapsed: false,
+            createdAt: new Date().toISOString()
+        };
+        getRecordGroups().push(group);
+        addToGroup(group);
+    };
+    list.appendChild(createButton);
     groups.forEach(group => {
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'record-group-select-item';
         button.innerHTML = `<span class="record-group-select-icon">${RECORD_GROUP_ICON}</span><span class="record-group-select-name">${escapeHtml(group.name || '그룹')}</span>`;
-        button.onclick = () => {
-            if (AppState.currentProjectId !== projectId || !getRecordGroup(group.id)) {
-                closeAddRecordToGroupModal();
-                return;
-            }
-            layers.filter(layer => drawnItems.hasLayer(layer)).forEach(layer => {
-                layer.feature.properties.groupId = group.id;
-            });
-            group.collapsed = false;
-            closeAddRecordToGroupModal();
-            saveToStorage();
-            renderSurveyListCallback();
-        };
+        button.onclick = () => addToGroup(group);
         list.appendChild(button);
     });
     overlay.style.display = 'flex';

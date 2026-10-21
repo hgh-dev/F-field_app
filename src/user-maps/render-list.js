@@ -6,6 +6,7 @@
    [참고]
    - 사용자지도 목록 표시나 항목 UI가 이상할 때 확인합니다.
    ========================================================================== */
+import { enhanceVisibilityControls } from '../ui-visibility.js';
 import { SVG_ICONS } from '../config.js';
 import { escapeHtml, escapeJsString } from './utils.js';
 
@@ -84,6 +85,7 @@ export function renderUserMapListView(userMaps, helpers = {}) {
     list.querySelectorAll('.user-map-parent-checkbox, .user-map-group-checkbox').forEach(checkbox => {
         checkbox.indeterminate = checkbox.dataset.indeterminate === 'true';
     });
+    enhanceVisibilityControls(list);
 }
 
 function createUserMapItemHtml(item, helpers) {
