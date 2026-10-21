@@ -7,6 +7,7 @@
     --ui-background: #f5f7fb;
     --ui-ink: #16243a;
     --ui-navy: #182c4b;
+    --ui-action: #182c4b;
     --ui-secondary: #728098;
     --ui-border: #e8edf4;
     --ui-selected: #eef4ff;
@@ -33,7 +34,7 @@ button:focus-visible, [role="button"]:focus-visible { outline: 3px solid #93b4fa
     border: 0; border-radius: 12px; background: transparent; padding: 10px 0;
     color: var(--ui-secondary); font-size: 11px; font-weight: 500; line-height: 1.25;
 }
-.sidebar-tabs .tab-btn.active { background: var(--ui-navy); color: #fff; box-shadow: 0 3px 8px #142c3c1a; font-weight: 600; }
+.sidebar-tabs .tab-btn.active { background: var(--ui-action); color: #fff; box-shadow: 0 3px 8px #142c3c1a; font-weight: 600; }
 .sidebar-tabs .tab-btn.active::after { display: none; }
 .sidebar-tabs .ui-icon, .sidebar-utilities .ui-icon, .sidebar-utilities .svg-icon { width: 22px; height: 22px; }
 .sidebar-utilities .svg-icon { fill: none; stroke: currentColor; }
@@ -61,7 +62,7 @@ button:focus-visible, [role="button"]:focus-visible { outline: 3px solid #93b4fa
 #content-map .topic-map-groups > .map-layer-row { min-height: 49px; border-radius: 0; border-bottom: 1px solid var(--ui-border); padding-top: 9px; padding-bottom: 9px; }
 #content-map .topic-map-groups .map-layer-name { font-weight: 600; font-size: 14px; }
 #content-record.active, #content-project.active { padding: 16px 16px max(16px, env(safe-area-inset-bottom)); background: var(--ui-surface); }
-#current-project-banner { background: var(--ui-navy) !important; border: 0 !important; border-radius: 12px !important; padding: 13px 12px !important; box-shadow: 0 3px 9px #152b4c18; }
+#current-project-banner { background: var(--ui-action) !important; border: 0 !important; border-radius: 12px !important; padding: 13px 12px !important; box-shadow: 0 3px 9px #152b4c18; }
 #current-project-banner svg { fill: #fff !important; }
 #current-project-name { color: #fff !important; font-size: 14px !important; }
 #survey-list-area { border: 1px solid var(--ui-border); border-radius: 14px; box-shadow: none; }
@@ -69,7 +70,7 @@ button:focus-visible, [role="button"]:focus-visible { outline: 3px solid #93b4fa
 /* Preserve the hidden-record colors used by the visibility controls. */
 .record-search-controls { margin-top: 12px; gap: 8px; }
 .record-search-controls input { border-color: transparent; background: var(--ui-background); border-radius: 10px; }
-.record-search-controls button { border-radius: 10px; background: var(--ui-navy); }
+.record-search-controls button { border-radius: 10px; background: var(--ui-action); }
 #record-search-button svg { display: block; margin: 0; flex-shrink: 0; }
 .mono-btn { border-color: var(--ui-border); border-radius: 10px; box-shadow: 0 2px 3px #142c3c05; }
 .sidebar-warning { color: var(--ui-secondary); line-height: 1.65; }
@@ -118,7 +119,7 @@ button:focus-visible, [role="button"]:focus-visible { outline: 3px solid #93b4fa
 .sheet-location-primary .ui-icon { width: 18px; height: 18px; color: var(--ui-secondary); }
 .sheet-location-secondary { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 9px; }
 #bottom-sheet .sheet-location-secondary .popup-btn { border: 1px solid var(--ui-border); background: var(--ui-surface); color: var(--ui-ink); padding: 11px 5px; }
-#bottom-sheet .sheet-location-secondary .popup-btn:last-child { background: var(--ui-navy); color: #fff; border-color: var(--ui-navy); }
+#bottom-sheet .sheet-location-secondary .popup-btn:last-child { background: var(--ui-action); color: #fff; border-color: var(--ui-navy); }
 #bottom-sheet .popup-btn:disabled, #bottom-sheet .popup-btn.disabled { opacity: .45; }
 @media (max-width: 380px) {
     #content-record.active, #content-project.active { padding-left: 12px; padding-right: 12px; }
@@ -138,7 +139,7 @@ button:focus-visible, [role="button"]:focus-visible { outline: 3px solid #93b4fa
 #project-list-area .project-card > div:first-child { border-radius: 10px !important; }
 #section-user-map > .mono-btn { background: var(--ui-background) !important; color: var(--ui-ink) !important; border: 1px dashed var(--ui-border) !important; border-radius: 10px !important; }
 .settings-page-overlay { background: var(--ui-background); }
-.settings-page-header { background: var(--ui-navy); color: #fff; border-bottom: 0; }
+.settings-page-header { background: var(--ui-action); color: #fff; border-bottom: 0; }
 .settings-page-title, .settings-back-btn { color: #fff; }
 .settings-section { margin: 12px; border: 1px solid var(--ui-border); border-radius: 14px; background: var(--ui-surface); overflow: hidden; }
 .settings-section:last-child { border-bottom: 1px solid var(--ui-border); margin-bottom: max(14px, env(safe-area-inset-bottom)); }
@@ -174,14 +175,14 @@ button:focus-visible, [role="button"]:focus-visible { outline: 3px solid #93b4fa
 .search-tab-btn.active::after { display: none; }
 #search-container input:not([type=checkbox]) { min-height: 44px; min-width: 0; box-sizing: border-box; border: 1px solid var(--ui-border); border-radius: 10px; background: var(--ui-background); color: var(--ui-ink); font-size: 16px; padding: 10px; }
 #search-container input:not([type=checkbox]):focus { outline: 2px solid #b6cdf7; outline-offset: 0; border-color: var(--color-primary); }
-#search-go-btn, #search-go-btn-national, #search-go-btn-coord { min-width: 52px; min-height: 44px; border: 0; border-radius: 10px; background: var(--ui-navy); color: #fff; font-weight: 600; }
+#search-go-btn, #search-go-btn-national, #search-go-btn-coord { min-width: 52px; min-height: 44px; border: 0; border-radius: 10px; background: var(--ui-action); color: #fff; font-weight: 600; }
 .coord-search-help { color: var(--ui-secondary); line-height: 1.6; }
 #history-panel { border-color: var(--ui-border); border-radius: 12px; box-shadow: 0 8px 24px #182c4b1a; overflow: hidden; }
 .history-header { background: var(--ui-background); color: var(--ui-secondary); }
 
 /* A clear recording entry point over both satellite and street tiles. */
 .record-fab-main, .record-fab-main.is-recording { width: 56px; height: 56px; border-radius: 18px; border: 0; background: #2563eb; box-shadow: 0 5px 18px #10254f55; font-size: 32px; }
-.record-fab.expanded .record-fab-main { background: var(--ui-navy); color: #fff; }
+.record-fab.expanded .record-fab-main { background: var(--ui-action); color: #fff; }
 .record-fab-main:focus-visible { outline: 3px solid #93b4ff; outline-offset: 3px; }
 .record-fab-group { width: 190px; padding: 6px; box-sizing: border-box; border: 1px solid var(--ui-border); border-radius: 16px; background: #fff; box-shadow: 0 6px 24px #182c4b29; }
 .record-fab-group .bottom-btn { min-height: 48px; border-radius: 10px; padding: 0 10px; gap: 12px; font-size: 14px; color: var(--ui-ink); }
@@ -195,7 +196,7 @@ button:focus-visible, [role="button"]:focus-visible { outline: 3px solid #93b4fa
 #location-action-modal-overlay #address-display { color: var(--ui-ink); font-size: 15px; font-weight: 600; line-height: 1.6; }
 #location-action-modal-overlay #coord-display { color: var(--ui-secondary); font-size: 13px; font-variant-numeric: tabular-nums; line-height: 1.6; }
 #location-action-modal-overlay .mono-btn { min-height: 46px; border: 1px solid var(--ui-border); border-radius: 10px; background: #fff; color: var(--ui-ink); font-size: 12px !important; padding: 10px 5px !important; }
-#location-action-modal-overlay .mono-btn:last-child { background: var(--ui-navy); color: #fff; border-color: var(--ui-navy); }
+#location-action-modal-overlay .mono-btn:last-child { background: var(--ui-action); color: #fff; border-color: var(--ui-navy); }
 #location-action-modal-overlay .nav-modal-content > button:last-child { background: var(--ui-background) !important; color: var(--ui-secondary) !important; border-radius: 10px !important; }
 #user-map-modal-overlay > div, #user-map-representative-field-modal-overlay > div { border: 1px solid var(--ui-border); border-radius: 20px !important; padding: 22px !important; box-shadow: 0 16px 60px #182c4b33; box-sizing: border-box; color: var(--ui-ink); }
 #user-map-modal-title { color: var(--ui-navy); font-size: 18px !important; letter-spacing: -.4px; }
@@ -203,10 +204,10 @@ button:focus-visible, [role="button"]:focus-visible { outline: 3px solid #93b4fa
 #user-map-form label > span { color: var(--ui-secondary); font-size: 12px !important; }
 #user-map-form input:not([type=checkbox]), #user-map-form textarea, #user-map-form select, #user-map-representative-field-btn { border: 1px solid var(--ui-border) !important; border-radius: 10px !important; background: var(--ui-background) !important; color: var(--ui-ink); font-size: 16px !important; min-height: 44px; box-sizing: border-box; }
 #user-map-form input:focus, #user-map-form textarea:focus, #user-map-form select:focus { outline: 2px solid #b6cdf7; outline-offset: 0; }
-#user-map-save-btn { background: var(--ui-navy) !important; border-radius: 10px !important; }
+#user-map-save-btn { background: var(--ui-action) !important; border-radius: 10px !important; }
 #user-map-cancel-btn { background: var(--ui-background) !important; color: var(--ui-secondary) !important; border-radius: 10px !important; }
 #user-map-action-panel { border: 1px solid var(--ui-border); border-radius: 14px !important; padding: 6px !important; box-shadow: 0 10px 32px #182c4b29 !important; }
-#user-map-action-panel .more-menu-item { min-height: 44px; border-radius: 8px; }
+#user-map-action-panel .more-menu-item { box-sizing: border-box; min-height: 44px; border-radius: 8px; }
 
 /* The same controls frame map and record styles without altering previews or colors. */
 #style-modal .style-modal-tabs { background: var(--ui-background); border: 0; border-radius: 11px; padding: 4px; gap: 4px; }
@@ -229,7 +230,7 @@ button:focus-visible, [role="button"]:focus-visible { outline: 3px solid #93b4fa
 #style-modal .style-modal-actions { position: sticky; bottom: 0; padding: 12px 0 0; border-top: 1px solid var(--ui-border); background: #fff; z-index: 2; }
 #style-modal .style-modal-actions button { min-height: 46px; font-weight: 600; }
 #style-modal .style-modal-cancel-btn, #style-modal .style-tile-reset-btn { background: var(--ui-background); color: var(--ui-secondary); }
-#style-modal .style-modal-apply-btn { background: var(--ui-navy); }
+#style-modal .style-modal-apply-btn { background: var(--ui-action); }
 
 #content-map .layer-visibility > input[type]:disabled { opacity: 0; cursor: default; }
 #record-list-controls #record-visibility-all { color: var(--color-primary); }

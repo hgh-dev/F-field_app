@@ -15,6 +15,15 @@
         content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta charset="utf-8" />
 
+    <script>
+        // Apply the saved appearance before the first paint.
+        (() => {
+            let mode = 'system';
+            try { mode = localStorage.getItem('setting_appearance_mode') || 'system'; } catch {}
+            document.documentElement.dataset.theme = mode === 'dark' || (mode !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+        })();
+    </script>
+
     <!-- PWA (웹앱) 설정: 홈 화면에 추가할 때 앱처럼 보이게 합니다. -->
     <link rel="manifest" href="%BASE_URL%manifest.webmanifest">
     <meta name="theme-color" content="transparent">
@@ -46,6 +55,7 @@
     <link rel="stylesheet" href="%BASE_URL%src/styles/bottom-sheet.css">
     <link rel="stylesheet" href="%BASE_URL%src/styles/style-modal.css">
     <link rel="stylesheet" href="%BASE_URL%src/styles/refresh.css">
+    <link rel="stylesheet" href="%BASE_URL%src/styles/appearance.css">
 </head>
 
 <body>
@@ -1785,6 +1795,16 @@
                     </div>
                     <span class="settings-chevron"></span>
                 </div>
+            </section>
+
+            <section class="settings-section">
+                <button id="settings-appearance-row" type="button" class="settings-row settings-link-row" onclick="openSettingsChoiceModal('appearance')">
+                    <span class="settings-label">화면 모드</span>
+                    <span class="settings-row-action">
+                        <span id="settings-appearance-value" class="settings-value">기기 설정에 따름</span>
+                        <span class="settings-chevron" aria-hidden="true"></span>
+                    </span>
+                </button>
             </section>
 
             <section class="settings-section">

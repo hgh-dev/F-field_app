@@ -7,6 +7,13 @@
    - 설정 메뉴 안의 선택지나 설정 버튼 동작을 바꿀 때 확인합니다.
    ========================================================================== */
 import { AppState } from '../state.js';
+import { getAppearanceMode, setAppearanceMode } from './appearance.js';
+
+const APPEARANCE_OPTIONS = [
+    { value: 'light', label: '라이트 모드' },
+    { value: 'dark', label: '다크 모드' },
+    { value: 'system', label: '기기 설정에 따름' }
+];
 
 const COORD_MODE_OPTIONS = [
     { value: 0, label: '도분초' },
@@ -44,6 +51,8 @@ function getSettingsOptionLabel(options, value) {
 }
 
 export function syncSettingsChoiceValues() {
+    const appearance = document.getElementById('settings-appearance-value');
+    if (appearance) appearance.textContent = getSettingsOptionLabel(APPEARANCE_OPTIONS, getAppearanceMode());
     const coordValue = document.getElementById('settings-coord-mode-value');
     if (coordValue) coordValue.textContent = getSettingsOptionLabel(COORD_MODE_OPTIONS, AppState.coordMode);
 
@@ -95,6 +104,7 @@ function renderSettingsChoiceModal(type) {
     if (!title || !list) return false;
 
     const configurations = {
+        appearance: { title: '화면 모드', options: APPEARANCE_OPTIONS, value: getAppearanceMode(), name: 'appearance', setter: setAppearanceMode },
         coord: { title: '좌표 표시 방식', options: COORD_MODE_OPTIONS, value: AppState.coordMode, name: 'coord', setter: 'setCoordMode' },
         track: { title: '트랙 기록 간격', options: TRACK_INTERVAL_OPTIONS, value: AppState.trackInterval, name: 'track', setter: 'setTrackInterval' },
         'record-range': { title: '기록 표시 범위', options: RECORD_ZOOM_OPTIONS, value: AppState.recordMinZoom, name: 'record-range', setter: 'setRecordMinZoom' },
@@ -116,7 +126,8 @@ function renderSettingsChoiceModal(type) {
         input.value = String(option.value);
         input.checked = String(currentValue) === String(option.value);
         input.addEventListener('change', () => {
-            window[configuration.setter](option.value);
+            if (typeof configuration.setter === 'function') configuration.setter(option.value);
+            else window[configuration.setter](option.value);
             window.closeSettingsChoiceModal();
         });
 
@@ -189,3 +200,5 @@ export function setLabelMinZoom(value) {
     syncSettingsChoiceValues();
     document.dispatchEvent(new CustomEvent('label-display-range-changed'));
 }
+
+document.addEventListener('appearance-changed', syncSettingsChoiceValues);

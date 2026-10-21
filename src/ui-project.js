@@ -301,6 +301,7 @@ function createProjectCard(p, index, defaultProject) {
     }
 
     const nameEl = document.createElement('div');
+    nameEl.className = 'project-card-name';
     nameEl.style.cssText = `font-size:14px; font-weight:${isActive ? '700' : '500'}; color:${isActive ? 'var(--color-primary)' : '#374151'}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;`;
     nameEl.textContent = String(p.name || '');
     textEl.appendChild(nameEl);

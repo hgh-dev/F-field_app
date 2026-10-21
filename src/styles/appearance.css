@@ -1,0 +1,128 @@
+:root { color-scheme: light; }
+#settings-appearance-row { width: calc(100% - 36px); background: transparent; border: 0; text-align: left; font: inherit; }
+:root[data-theme="dark"] {
+    color-scheme: dark;
+    --ui-surface: #172235;
+    --ui-background: #101a29;
+    --ui-ink: #e4ebf5;
+    --ui-navy: #edf3ff;
+    --ui-action: #2d64c8;
+    --ui-secondary: #a6b4c9;
+    --ui-border: #2b3b51;
+    --ui-selected: #213754;
+    --color-primary: #8ab8ff;
+    --color-border: #2b3b51;
+    --color-panel: #172235;
+    --color-muted-bg: #101a29;
+}
+html[data-theme="dark"] body { background: var(--ui-background); color: var(--ui-ink); }
+
+/* Theme the UI surfaces; map tiles, photos and saved symbol colors stay intact. */
+html[data-theme="dark"] :is(.nav-modal-content, .settings-page-content, .app-dialog, .dropdown-menu, .more-context-menu, .record-group-select-item, .auth-card, .auth-summary, .auth-hint, .delete-account-info-box, #history-panel, #record-group-context-menu, #user-map-action-panel, #user-map-modal-overlay > div, #user-map-representative-field-modal-overlay > div, #user-map-category-modal-overlay > div) {
+    background: var(--ui-surface) !important; color: var(--ui-ink); border-color: var(--ui-border) !important;
+}
+html[data-theme="dark"] :is(.settings-page-overlay, .settings-page-content) { background: var(--ui-background) !important; }
+html[data-theme="dark"] :is(.settings-page-header, .settings-section, .settings-row, .setting-group, .settings-choice-option, .survey-item, .survey-group-header, .dropdown-item, .more-menu-item, .app-dialog-actions, .auth-card, .auth-summary, .auth-divider, .sort-modal-option) { border-color: var(--ui-border); }
+html[data-theme="dark"] :is(.settings-label, .settings-value, .settings-account-email, .settings-choice-modal-title, .settings-choice-option, .settings-version-title, .sort-modal-title, .sort-modal-group-title, .nav-modal-header, .app-dialog-title, .app-dialog-message, .auth-modal-title, .auth-account-email, .auth-card-title, .auth-card-copy, .auth-status-text, .dropdown-item, .more-menu-item, .survey-group-name, .record-group-select-name) { color: var(--ui-ink) !important; }
+html[data-theme="dark"] :is(.settings-help, .settings-login-help, .settings-account-status, .settings-version-meta, .auth-hint, .auth-legal-copy, .sort-modal-option, .record-search-empty, .survey-group-meta, .history-header, .history-item, .coord-search-help) { color: var(--ui-secondary); }
+html[data-theme="dark"] :is(.settings-back-btn, .settings-page-title) { color: #fff; }
+html[data-theme="dark"] :is(.settings-chevron, .settings-back-btn::before) { border-color: currentColor; }
+html[data-theme="dark"] :is(.dropdown-item:hover, .more-menu-item:hover, .record-group-select-item:hover, .settings-choice-option:hover, .history-item:hover) { background: var(--ui-selected); }
+html[data-theme="dark"] :is(.app-dialog-input, .auth-form input, .delete-account-confirm-input, .nav-modal-content input:not([type=range]):not([type=checkbox]):not([type=radio]):not([type=color]), .nav-modal-content textarea, .nav-modal-content select) {
+    background: var(--ui-background) !important; color: var(--ui-ink) !important; border-color: var(--ui-border) !important;
+}
+html[data-theme="dark"] :is(input, textarea)::placeholder { color: #8f9fb6; }
+html[data-theme="dark"] :is(.app-dialog-btn, .auth-secondary-btn, .auth-google-btn, .auth-modal-close, .settings-update-btn:not(.has-update)) { background: var(--ui-selected); color: var(--ui-ink); border-color: var(--ui-border); }
+html[data-theme="dark"] :is(.app-dialog-btn.primary, .auth-primary-btn, .sort-modal-apply-btn) { background: var(--ui-action); color: #fff; }
+html[data-theme="dark"] :is(#record-list-controls, #survey-list-area .survey-name, #survey-list-area .survey-group-name, .action-icon-btn, .btn-more, .btn-edit-memo-inline) { color: var(--ui-ink); }
+html[data-theme="dark"] :is(#survey-list-area .record-hidden .survey-name, .record-visibility[aria-pressed="false"]) { color: #8f9fb6; }
+html[data-theme="dark"] :is(.survey-item, .survey-group-header, .survey-group-items, #survey-list-area, .record-fab-group, .sidebar-rail-back .btn-sidebar-action) { background: var(--ui-surface); }
+html[data-theme="dark"] :is(#style-modal .style-tab-btn.selected, #style-modal .style-modal-actions, #style-modal .style-choice-options button, #style-modal .palette-expand-btn, .search-tab-btn.active, #location-action-modal-overlay .mono-btn, #history-panel) { background: var(--ui-surface); }
+html[data-theme="dark"] :is(#style-modal .style-choice-options button, #style-modal .palette-expand-btn, .history-item) { color: var(--ui-ink); }
+html[data-theme="dark"] #style-modal .style-choice-options button[aria-pressed=true] { background: var(--ui-selected); color: var(--color-primary); }
+html[data-theme="dark"] #location-action-modal-overlay .mono-btn:last-child { background: var(--ui-action); color: #fff; }
+html[data-theme="dark"] #style-modal .style-modal-actions { border-color: var(--ui-border); }
+html[data-theme="dark"] #style-modal .style-modal-apply-btn { color: #fff; }
+html[data-theme="dark"] #map-active-project-badge { color: var(--ui-ink); }
+html[data-theme="dark"] :is(.action-toolbar, .track-toolbar, .action-toolbar-main, .action-toolbar-sub) { background: var(--ui-surface); color: var(--ui-ink); border-color: var(--ui-border); }
+html[data-theme="dark"] .action-btn { background: var(--ui-surface); color: var(--ui-ink); border-color: var(--ui-border); }
+html[data-theme="dark"] .settings-choice-option input { accent-color: var(--color-primary); }
+
+/* Older modal templates contain inline neutral colors. Override only UI chrome,
+   excluding color swatches and drawing previews so chosen colors remain exact. */
+html[data-theme="dark"] :is(.nav-modal-content, .app-dialog, #user-map-modal-overlay, #user-map-action-panel, #user-map-representative-field-modal-overlay, #user-map-category-modal-overlay) :is(div, p, span, label, button, input, textarea, select):not(.color-circle):not(.color-palette *):not(.style-choice-current *):is([style*="color:#111"], [style*="color: #111"], [style*="color:#333"], [style*="color: #333"], [style*="color:#374151"], [style*="color:#444"], [style*="color:#4b5563"]) { color: var(--ui-ink) !important; }
+html[data-theme="dark"] :is(.nav-modal-content, .app-dialog, #user-map-modal-overlay, #user-map-action-panel, #user-map-representative-field-modal-overlay, #user-map-category-modal-overlay) :is(div, p, span, label, button):not(.color-circle):not(.color-palette *):is([style*="color:#666"], [style*="color: #666"], [style*="color:#6b7280"], [style*="color:#888"], [style*="color:#999"]) { color: var(--ui-secondary) !important; }
+html[data-theme="dark"] :is(.nav-modal-content, #user-map-modal-overlay, #user-map-representative-field-modal-overlay, #user-map-category-modal-overlay) :is(div, p, button):not(.color-circle):not(.color-palette *):not(.style-choice-current *):is([style*="background:#fff"], [style*="background: #fff"], [style*="background:#f5f5f5"], [style*="background:#f3f4f6"], [style*="background:#f8f9fa"], [style*="background:#eff6ff"]) { background: var(--ui-background) !important; border-color: var(--ui-border) !important; }
+html[data-theme="dark"] #project-list-area .project-card { background: var(--ui-surface) !important; color: var(--ui-ink); }
+html[data-theme="dark"] #project-list-area .project-card.is-current { background: var(--ui-selected) !important; border-color: #47658d !important; }
+html[data-theme="dark"] #project-list-area .project-card :is(div, span)[style*="color:#333"] { color: var(--ui-ink) !important; }
+
+html[data-theme="dark"] .mono-btn { background: var(--ui-surface) !important; color: var(--ui-ink) !important; border-color: var(--ui-border) !important; }
+html[data-theme="dark"] .mono-btn svg { fill: currentColor; }
+html[data-theme="dark"] #project-list-area .project-card-name { color: var(--ui-ink) !important; }
+html[data-theme="dark"] #project-list-area .project-card > div:first-child { background: var(--ui-selected) !important; }
+html[data-theme="dark"] .mono-btn.danger { color: #ff969f !important; }
+html[data-theme="dark"] .app-dialog-btn.danger { background: #b73949; color: #fff; }
+html[data-theme="dark"] :is(.auth-info-item, .admin-user-item, .verification-code-result, .admin-users-tier-tab, .admin-users-search, .verification-code-textarea) { background: var(--ui-background); color: var(--ui-ink); border-color: var(--ui-border); }
+html[data-theme="dark"] :is(.auth-info-value, .admin-user-email, .admin-user-tier, .verification-code-value, .verification-code-label) { color: var(--ui-ink); }
+
+/* Lists: include the group shell behind the indented children. */
+html[data-theme="dark"] :is(.survey-group, .survey-list-container) { background: var(--ui-surface); border-color: var(--ui-border); }
+html[data-theme="dark"] #user-map-list :is(.survey-name, .survey-group-name) { color: var(--ui-ink); }
+html[data-theme="dark"] #user-map-list .user-map-item { border-color: var(--ui-border) !important; }
+html[data-theme="dark"] :is(#user-map-list, #survey-list-area) .style-setting-btn { background: var(--ui-background) !important; border-color: var(--ui-border) !important; }
+html[data-theme="dark"] .record-fab-label { color: var(--ui-ink); }
+
+/* Retain the original scale layout; only its menu colors follow appearance. */
+html[data-theme="dark"] .scale-zoom-menu { background: var(--ui-surface); border-color: var(--ui-border); }
+html[data-theme="dark"] .scale-zoom-menu-item { background: transparent; color: var(--ui-ink); }
+html[data-theme="dark"] .scale-zoom-menu-item.active,
+html[data-theme="dark"] .scale-zoom-menu-item:hover { background: var(--ui-selected); color: var(--color-primary); }
+
+/* Style controls and the gaps around their options are all themed. */
+html[data-theme="dark"] #style-modal :is(.style-choice-dropdown, .style-choice-options) { background: var(--ui-background); color: var(--ui-ink); border-color: var(--ui-border); }
+html[data-theme="dark"] #style-modal :is(.style-btn, .emoji-btn, .palette-color-view-btn, .style-tile-invert-row) { background: var(--ui-background); color: var(--ui-ink); border-color: var(--ui-border); }
+html[data-theme="dark"] #style-modal :is(.style-btn.selected, .emoji-btn.selected) { background: var(--ui-selected); color: var(--color-primary); border-color: var(--color-primary); }
+html[data-theme="dark"] #style-modal .palette-color-view-btn { background: var(--ui-selected); color: var(--ui-ink); }
+html[data-theme="dark"] #style-modal :is(.style-choice-current, .style-preview-options) svg { background: transparent; color: var(--ui-ink); }
+/* These are static shape diagrams, not the stored colors of a record. */
+html[data-theme="dark"] #style-modal :is(.style-choice-current, .style-preview-options) svg [stroke="#333"] { stroke: currentColor; }
+html[data-theme="dark"] #style-modal :is(.style-choice-current, .style-preview-options) svg [fill="#333"] { fill: currentColor; }
+html[data-theme="dark"] #style-modal :is(.style-choice-current, .style-preview-options) svg [fill="#e5e5e5"] { fill: var(--ui-secondary); }
+
+/* Secondary dialogs and toolbar actions use the same surfaces and contrast. */
+html[data-theme="dark"] :is(.modal-container, .edit-vertex-action-group .action-btn) { background: var(--ui-surface); color: var(--ui-ink); border-color: var(--ui-border); }
+html[data-theme="dark"] :is(.modal-title, .modal-btn.secondary, .modal-btn.cancel, .app-dialog-btn.secondary) { color: var(--ui-ink); }
+html[data-theme="dark"] :is(.modal-btn.secondary, .modal-btn.cancel, .app-dialog-btn.secondary) { background: var(--ui-background); border-color: var(--ui-border); }
+html[data-theme="dark"] .edit-vertex-action-group .action-btn svg { fill: var(--ui-ink) !important; }
+html[data-theme="dark"] .more-menu-item.danger { color: #ff969f !important; }
+html[data-theme="dark"] .more-menu-item.disabled { color: #8190a6 !important; }
+html[data-theme="dark"] #user-map-form input[type=file]::file-selector-button { background: var(--ui-selected); color: var(--ui-ink); }
+
+/* Search results and history can open separately from the search input. */
+html[data-theme="dark"] .search-result-panel { background: var(--ui-surface); color: var(--ui-ink); border-color: var(--ui-border); }
+html[data-theme="dark"] :is(.history-header, .search-result-header) { background: var(--ui-background); color: var(--ui-secondary); border-color: var(--ui-border); }
+html[data-theme="dark"] :is(.history-item, .search-result-item) { border-color: var(--ui-border); }
+html[data-theme="dark"] :is(.history-item:hover, .search-result-item:hover) { background: var(--ui-selected); }
+html[data-theme="dark"] .search-result-title { color: var(--ui-ink); }
+html[data-theme="dark"] .search-result-addr { color: var(--ui-secondary); }
+html[data-theme="dark"] :is(#memo-input-textarea, #record-label-modal select, #record-label-modal textarea, #record-label-modal input[type=color]) { background: var(--ui-background) !important; color: var(--ui-ink); border-color: var(--ui-border) !important; }
+html[data-theme="dark"] #record-label-modal > [role=dialog] { background: var(--ui-surface) !important; color: var(--ui-ink); }
+html[data-theme="dark"] #record-label-modal :is(#record-label-title, label > span, .record-label-toggle) { color: var(--ui-ink) !important; border-color: var(--ui-border); }
+html[data-theme="dark"] #record-label-modal .label-count { color: var(--ui-secondary) !important; }
+html[data-theme="dark"] #record-label-modal :is(.label-close, .label-cancel, .label-default) { background: var(--ui-selected) !important; color: var(--ui-ink) !important; }
+html[data-theme="dark"] #record-label-modal .label-disable { background: #482538 !important; color: #ffb2c5 !important; }
+html[data-theme="dark"] #record-label-modal .record-label-toggle:has(input:checked) { background: var(--ui-selected); border-color: var(--color-primary); }
+/* Match the map label's outline while preserving the user's preview color. */
+html[data-theme="dark"] #record-label-modal .label-preview { background: var(--ui-background); border-color: var(--ui-border); text-shadow: 0 0 3px white, 1px 1px 2px white, -1px -1px 2px white; }
+
+html[data-theme="dark"] #record-label-modal [style*="color:#6b7280"] { color: var(--ui-secondary) !important; }
+html[data-theme="dark"] .settings-choice span { background: var(--ui-background); color: var(--ui-secondary); border-color: var(--ui-border); }
+html[data-theme="dark"] .settings-choice input:checked + span { background: var(--ui-selected); color: var(--color-primary); border-color: var(--color-primary); }
+html[data-theme="dark"] .modal-btn.primary { background: var(--ui-action); color: #fff; }
+html[data-theme="dark"] :is(.more-menu-item:active, .dropdown-item:active, .record-fab-group .bottom-btn:active, .circle-btn:active, .map-control-btn:active) { background: var(--ui-selected); }
+html[data-theme="dark"] #record-label-modal [style*="color:#4b5563"] { color: var(--ui-ink) !important; }
+
+html[data-theme="dark"] .sort-modal-options { background: var(--ui-background); color: var(--ui-ink); }
+
+html[data-theme="dark"] .user-map-category-field-btn [style*="color:#2563eb"] { color: var(--color-primary) !important; }
