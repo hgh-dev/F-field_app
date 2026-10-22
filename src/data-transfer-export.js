@@ -115,6 +115,8 @@ export async function exportSingleLayer(id) {
         return;
     }
 
+    if (!format || !await showAppConfirm(`기록을 ${format.toUpperCase()} 형식으로 저장합니다.\n계속하시겠습니까?`, { title: '내보내기' })) return;
+
     let safeMemo = getRecordName(layer.feature.properties, "unnamed").replace(/[\\/:*?"<>|]/g, "_");
 
     if (format === 'gpx') {

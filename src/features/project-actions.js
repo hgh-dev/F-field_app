@@ -187,6 +187,7 @@ async function exportRecordsExcel(features, projectName, recordGroups = []) {
     }
     excelExportInProgress = true;
     try {
+        if (!await showAppConfirm(`${features.length}개의 기록을 엑셀 파일로 저장합니다.\n계속하시겠습니까?`, { title: '엑셀로 내보내기' })) return;
         const [{ createRecordExcel, recordExcelFileName, EXCEL_MIME }, { saveOrShareFile }] = await Promise.all([
             import('../record-excel-export.js'),
             import('../data-transfer-export.js')
@@ -215,7 +216,7 @@ export async function exportSelectedRecordsExcel() {
     await exportRecordsExcel(features, project?.name || '프로젝트', project?.recordGroups || []);
 }
 
-export async function exportProjectRecordsExcel(projectId) {
+export async function exportProjectRecordsExcel(projectId = AppState.currentProjectId) {
     const project = AppState.projects.find(item => String(item.id) === String(projectId));
     if (!project) {
         alert('프로젝트를 찾을 수 없습니다.');
@@ -256,8 +257,8 @@ export async function exportSelectedLayers() {
     }
 
     // 선택된 포맷으로 일괄 저장
+    if (!format || !await showAppConfirm(`${layers.length}개의 기록을 ${format.toUpperCase()} 형식으로 저장합니다.\n계속하시겠습니까?`, { title: '파일로 내보내기' })) return;
     await exportLayerWithFormat(layers, format);
-    alert(`${layers.length}개의 기록을 ${format.toUpperCase()} 형식으로 저장합니다.`);
 }
 
 export function bringRecordLayersToFront() {

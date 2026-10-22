@@ -142,7 +142,7 @@
             flex-direction: column;
         }
 
-        @media (min-width: 1024px) and (orientation: landscape) {
+        @media (min-width: 832px) {
             body.sidebar-docked-open #map {
                 left: var(--sidebar-docked-width);
             }
@@ -224,15 +224,6 @@
             padding: var(--space-3) var(--space-3) calc(var(--space-5) + var(--app-floating-bottom));
             overflow: hidden;
             box-sizing: border-box;
-        }
-
-        body.is-native-app #content-project.active,
-        body.is-native-app #content-record.active {
-            padding-bottom: calc(32px + var(--app-floating-bottom));
-        }
-
-        body.is-native-app #content-map.active {
-            padding-bottom: calc(32px + var(--app-floating-bottom));
         }
 
         .project-bottom-actions {

@@ -60,10 +60,10 @@ test('기록 상세의 이름·주소·측정값·메모와 기존 편집 메뉴
     await expect(sheet.locator('.sheet-metric-value')).toContainText('m');
     await expect(sheet.locator('.sheet-memo')).toHaveText('<메모> & 현장 확인');
     await expect(sheet).toContainText('시험리 123-4');
-    await sheet.locator('.sheet-expand').click();
+    await sheet.locator('#bottom-sheet-handle').click();
     await expect(sheet).not.toHaveClass(/full-open/);
     await expect(sheet.locator('.sheet-memo')).not.toBeInViewport();
-    await sheet.locator('.sheet-expand').click();
+    await sheet.locator('#bottom-sheet-handle').click();
     await expect(sheet).toHaveClass(/full-open/);
     await expect(sheet.getByRole('button', { name: '기록명 수정', exact: true })).toBeVisible();
     await page.locator('#bottom-sheet-more-btn').click();
@@ -91,10 +91,10 @@ test('위치 조회의 주소·좌표와 점 저장 동작을 유지한다', asy
     await expect(sheet).toContainText('12345');
     await expect(sheet.locator('.badge-coord')).toHaveText('좌표');
     await expect(page.locator('#bottom-sheet-more-btn')).toBeHidden();
-    for (const name of ['점 저장', '면 저장', '공유', '검색', '길찾기']) {
+    for (const name of ['점 기록', '면 기록', '공유', '검색', '길찾기']) {
         await expect(sheet.getByRole('button', { name, exact: true })).toBeVisible();
     }
-    await sheet.getByRole('button', { name: '점 저장', exact: true }).click();
+    await sheet.getByRole('button', { name: '점 기록', exact: true }).click();
     await expect(page.locator('#app-dialog-overlay')).toBeVisible();
     await page.locator('#app-dialog-overlay .primary').click();
     await expect(page.locator('#survey-list-area .survey-item')).toHaveCount(1);

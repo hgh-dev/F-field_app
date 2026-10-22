@@ -200,6 +200,7 @@ export function toggleBottomSheetMoreMenu(event) {
     if (menu.style.display === 'none' || menu.style.display === '') {
         if (moreBtn) {
             const rect = moreBtn.getBoundingClientRect();
+            menu.style.right = 'auto';
             menu.style.display = 'flex';
             menu.style.visibility = 'hidden';
             menu.classList.remove('visible');
@@ -211,7 +212,8 @@ export function toggleBottomSheetMoreMenu(event) {
                 Math.max(viewportPadding, rect.right - menuWidth),
                 window.innerWidth - menuWidth - viewportPadding
             );
-            const top = Math.min(
+            const above = rect.top - menu.offsetHeight - 6;
+            const top = above >= viewportPadding ? above : Math.min(
                 rect.bottom + 6,
                 window.innerHeight - menu.offsetHeight - bottomGap
             );
@@ -803,8 +805,7 @@ export function handleBottomSheetSendBackward() {
 function createAddressInfoSection(parcelAddr, roadAddr) {
     const safeParcelAddr = escapeHtml(parcelAddr);
     const safeRoadAddr = escapeHtml(roadAddr);
-    return `<div class="sheet-record-heading"><span class="sheet-type-icon">${UI_ICONS.pin}</span><div class="sheet-title-wrap"><span class="sheet-record-title">위치 정보</span><span class="sheet-record-kind">지적 조회</span></div></div>
-            <div class="sheet-location-heading"><button type="button" onclick="copyText(this.innerText, false, '지번 주소')">${safeParcelAddr}</button></div>
+    return `<div class="sheet-record-heading"><span class="sheet-type-icon">${UI_ICONS.pin}</span><div class="sheet-title-wrap"><div class="sheet-location-heading"><button class="sheet-record-title" type="button" onclick="copyText(this.innerText, false, '지번 주소')">${safeParcelAddr}</button></div></div></div>
             ${roadAddr ? `<div class="sheet-info-row"><span class="badge-road">도로명</span><span onclick="copyText(this.innerText, false, '도로명 주소')" style="cursor:pointer;">${safeRoadAddr}</span></div>` : ''}`;
 }
 
@@ -837,8 +838,8 @@ function createPrimaryActionButtonsSection(parcelAddr, lat, lng) {
     const safeAddressArg = escapeHtml(escapeJsString(parcelAddr));
     const disabled = getRecordAddress(parcelAddr) ? '' : ' disabled aria-disabled="true"';
     return `<div class="sheet-location-primary">
-        <button type="button" class="popup-btn" onclick="saveCurrentPoint(${lat}, ${lng}, '${safeAddressArg}')"${disabled}>${UI_ICONS.pin}<span>점 저장</span></button>
-        <button type="button" class="popup-btn" onclick="saveCurrentBoundary('${safeAddressArg}')"${disabled}>${UI_ICONS.polygon}<span>면 저장</span></button>
+        <button type="button" class="popup-btn" onclick="saveCurrentPoint(${lat}, ${lng}, '${safeAddressArg}')"${disabled}>${UI_ICONS.pin}<span>점 기록</span></button>
+        <button type="button" class="popup-btn" onclick="saveCurrentBoundary('${safeAddressArg}')"${disabled}>${UI_ICONS.polygon}<span>면 기록</span></button>
         <button type="button" class="popup-btn" onclick="shareLocationText('${safeAddressArg}', '${lat}', '${lng}')">${UI_ICONS.share}<span>공유</span></button>
         <button type="button" class="popup-btn" onclick="openSearchModal('${safeAddressArg}')">${UI_ICONS.search}<span>검색</span></button>
         <button type="button" class="popup-btn" onclick="openNavModal('${safeAddressArg}', ${lat}, ${lng})">${UI_ICONS.car}<span>길찾기</span></button>

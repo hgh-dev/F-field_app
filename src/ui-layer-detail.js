@@ -165,7 +165,7 @@ export function updateLayerInfo(layer) {
     } else if (layer instanceof L.Polyline && !(layer instanceof L.Polygon)) {
         infoLabel = "길이";
         infoBadgeClass = "badge-length";
-        metricValue = calculateProjectedLengthMeters(layer.toGeoJSON()).toFixed(2);
+        metricValue = calculateProjectedLengthMeters(layer.toGeoJSON()).toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         metricUnit = "m";
         infoText = metricValue + " m";
     } else if (layer instanceof L.Polygon) {
@@ -173,21 +173,18 @@ export function updateLayerInfo(layer) {
         const areaPyeong = areaM2 * 0.3025;
         infoLabel = "면적";
         infoBadgeClass = "badge-area";
-        metricValue = areaM2.toFixed(2);
+        metricValue = areaM2.toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         metricUnit = "㎡";
-        metricSecondary = areaPyeong.toFixed(2) + "평";
+        metricSecondary = areaPyeong.toLocaleString('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + "평";
         infoText = metricValue + " ㎡ (" + metricSecondary + ")";
     }
 
-    const recordKind = layer instanceof L.Marker ? '점 기록'
-        : layer instanceof L.Polygon ? '면 기록'
-            : layer.feature.properties?.isTrack ? '트랙 기록' : '선 기록';
     let popupContent = `<div class="sheet-record-heading">
         <span class="sheet-type-icon">${typeIcon}</span>
         <div class="sheet-title-wrap"><div class="sheet-title-line">
             <span class="sheet-record-title">${escapeHtml(memo)}</span>
             <button type="button" class="sheet-rename" onclick="editLayerMemo(${layer.feature.properties.id})" title="기록명 수정" aria-label="기록명 수정">${UI_ICONS.pencil}</button>
-        </div><span class="sheet-record-kind">${recordKind}</span></div>
+        </div></div>
     </div>`;
 
     const address = layer.feature.properties.address;
@@ -203,7 +200,7 @@ export function updateLayerInfo(layer) {
         if (layer instanceof L.Marker) {
             popupContent += `<div class="sheet-info-row"><span class="badge-coord">좌표</span><div>${infoText}</div></div>`;
         } else {
-            popupContent += `<div class="sheet-metric"><span class="${infoBadgeClass}">${infoLabel}</span><div class="sheet-metric-value">${metricValue}<span class="sheet-unit">${metricUnit}</span></div>${metricSecondary ? `<small class="sheet-metric-secondary">${metricSecondary}</small>` : ''}</div>`;
+            popupContent += `<div class="sheet-metric"><span class="${infoBadgeClass}">${infoLabel}</span><div class="sheet-metric-values"><div class="sheet-metric-value">${metricValue}<span class="sheet-unit">${metricUnit}</span></div>${metricSecondary ? `<small class="sheet-metric-secondary">(${metricSecondary})</small>` : ''}</div></div>`;
         }
     }
 
@@ -220,8 +217,7 @@ export function updateLayerInfo(layer) {
         ${photoSection.inputElementsHtml}
         <button type="button" onclick="editLayerDescription(${id})" class="popup-btn">${UI_ICONS.memo}메모</button>
         ${photoSection.actionButtonHtml}
-    </div></div></div>
-    <button type="button" class="sheet-expand" onclick="toggleBottomSheetState()"><span class="when-expanded">간략히 보기</span><span class="when-collapsed">메모·사진 펼치기</span>${UI_ICONS.chevron}</button>`;
+    </div></div></div>`;
 
     applyLayerVisibilityState(layer, layer.feature?.properties?.isHidden === true);
 

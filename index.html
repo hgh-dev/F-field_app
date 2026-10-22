@@ -184,7 +184,7 @@
         </button>
         <!-- 바텀시트 더보기 메뉴 -->
         <div id="bottom-sheet-more-menu" class="more-context-menu"
-            style="display: none; position: absolute; top: 45px; right: 48px; min-width: 120px; z-index: 10000;">
+            style="display: none; position: fixed; min-width: 120px; z-index: 10000;">
             <div class="more-menu-item" onclick="handleBottomSheetEdit()">
                 <svg viewBox="0 0 24 24">
                     <path
@@ -532,11 +532,12 @@
                 </div>
             </nav>
             <div class="sidebar-header">
-                <h1 id="sidebar-panel-title">지도 관리</h1>
+                <h1 id="sidebar-panel-title"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 10 5-10 5L2 8Z"/><path d="m2 12 10 5 10-5M2 16l10 5 10-5"/></svg>지도 관리</h1>
             </div>
             <div class="sidebar-body">
                 <!-- 탭 1: 지도 관리 -->
                 <div id="content-map" class="tab-content active">
+                    <div class="map-list-scroll">
                     <div class="menu-section">
                         <div class="menu-title accordion-header active"
                             onclick="toggleAccordion('section-base-map', this)"
@@ -949,6 +950,7 @@
                         </div>
                     </div>
 
+                    </div>
                     <div class="sidebar-warning">
                         <ul>
                             <li>모든 정보는 법적 효력이 없으며, 참고용으로만 활용하시기 바랍니다.</li>
@@ -962,33 +964,28 @@
                     <div id="project-list-area"
                         style="flex:1; overflow-y:auto; min-height:0; margin-bottom:var(--space-3);">
                     </div>
-                    <!-- 하단 버튼 (2x2 그리드) -->
-                    <div class="project-bottom-actions"
-                        style="flex-shrink:0; display:grid; grid-template-columns: 1fr 1fr; gap:var(--space-2);">
-                        <button onclick="createNewProject()" class="mono-btn"
-                            style="justify-content:center; padding:var(--space-3); font-size:13px;">
+                    <!-- 하단 버튼 (아이콘과 텍스트 한 줄) -->
+                    <div class="project-bottom-actions sidebar-footer-actions">
+                        <button onclick="createNewProject()" class="mono-btn">
                             <svg viewBox="0 0 24 24">
                                 <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
                             </svg>
                             새 프로젝트
                         </button>
-                        <button onclick="triggerFileInput()" class="mono-btn"
-                            style="justify-content:center; padding: var(--space-3); font-size: 13px;">
+                        <button onclick="triggerFileInput()" class="mono-btn">
                             <svg viewBox="0 0 24 24">
                                 <path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z" />
                             </svg>
-                            가저오기
+                            가져오기
                         </button>
-                        <button onclick="backupAllProjects()" class="mono-btn"
-                            style="justify-content:center; padding: var(--space-3); font-size: 13px; color: #000000;">
-                            <svg viewBox="0 0 24 24" style="fill: #000000;">
+                        <button onclick="backupAllProjects()" class="mono-btn">
+                            <svg viewBox="0 0 24 24">
                                 <path
                                     d="M19 12v7H5v-7H3v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zm-6 .67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 12.67V3h2z" />
                             </svg>
                             데이터 백업
                         </button>
-                        <button onclick="clearAllData()" class="mono-btn danger"
-                            style="justify-content:center; padding: var(--space-3); font-size: 13px;">
+                        <button onclick="clearAllData()" class="mono-btn danger">
                             <svg viewBox="0 0 24 24">
                                 <path
                                     d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" />
@@ -996,12 +993,13 @@
                             초기화
                         </button>
                     </div>
-                    <div class="sidebar-warning" style="flex-shrink:0; margin-top:8px;">
-                        <ul>
+                    <details class="sidebar-info">
+                        <summary><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7v1"/></svg>안내</summary>
+                        <div class="sidebar-info-popover sidebar-warning"><ul>
                             <li>많은 기록이나 용량이 큰 파일을 가저오면 앱이 느려지거나 오류가 발생할 수 있습니다.</li>
                             <li>브라우저 사이트 데이터 삭제, 앱 삭제 또는 앱 데이터 삭제 시 기록이 없어질 수 있으니, 중요한 기록은 미리 저장하거나 데이터 백업 버튼을 눌러 보관하시기 바랍니다.</li>
-                        </ul>
-                    </div>
+                        </ul></div>
+                    </details>
                     <!-- select는 다른 모듈에서 참조하므로 숨김 처리 -->
                     <select id="project-select" onchange="switchProject(this.value)" style="display:none;"></select>
                 </div>
@@ -1110,30 +1108,33 @@
                     <!-- 하단: 버튼 그룹 (고정) -->
                     <!-- 하단: 버튼 그룹 (고정) -->
                     <div style="flex-shrink: 0;">
-                        <div style="display:flex; gap:var(--space-2); margin-bottom:2px;">
-                            <button onclick="triggerFileInput()" class="mono-btn"
-                                style="flex:1; justify-content:center; padding: var(--space-3); font-size: 13px;">
+                        <div class="record-bottom-actions sidebar-footer-actions">
+                            <button onclick="triggerFileInput()" class="mono-btn">
                                 <svg viewBox="0 0 24 24">
                                     <path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z" />
                                 </svg>
-                                가저오기
+                                가져오기
                             </button>
-                            <button onclick="exportCurrentProject()" class="mono-btn"
-                                style="flex:1; justify-content:center; padding: var(--space-3); font-size: 13px;">
+                            <button onclick="exportCurrentProject()" class="mono-btn">
                                 <svg viewBox="0 0 24 24">
                                     <path
                                         d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h16c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z" />
                                 </svg>
                                 파일로 내보내기
                             </button>
+                            <button onclick="exportProjectRecordsExcel()" class="mono-btn">
+                                <svg viewBox="0 0 24 24"><path d="M3 3h18v18H3V3zm2 2v4h4V5H5zm6 0v4h8V5h-8zM5 11v3h4v-3H5zm6 0v3h8v-3h-8zM5 16v3h4v-3H5zm6 0v3h8v-3h-8z" /></svg>
+                                엑셀로 내보내기
+                            </button>
                         </div>
                     </div>
-                    <div class="sidebar-warning" style="margin-top:4px;">
-                        <ul>
+                    <details class="sidebar-info">
+                        <summary><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7v1"/></svg>안내</summary>
+                        <div class="sidebar-info-popover sidebar-warning"><ul>
                             <li>많은 기록이나 용량이 큰 파일을 가저오면 앱이 느려지거나 오류가 발생할 수 있습니다.</li>
                             <li>브라우저 사이트 데이터 삭제, 앱 삭제 또는 앱 데이터 삭제 시 기록이 없어질 수 있으니, 중요한 기록은 미리 저장하거나 데이터 백업 버튼을 눌러 보관하시기 바랍니다.</li>
-                        </ul>
-                    </div>
+                        </ul></div>
+                    </details>
                 </div>
             </div>
         </div>

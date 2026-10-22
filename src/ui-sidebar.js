@@ -14,7 +14,7 @@ import { renderProjectList, renderSurveyList } from './ui-project.js';
 import { SVG_ICONS } from './config.js';
 
 export function isDockedSidebarViewport() {
-    return window.matchMedia('(min-width: 1024px) and (orientation: landscape)').matches;
+    return window.matchMedia('(min-width: 832px)').matches;
 }
 
 export function refreshMapAfterSidebarLayout() {
@@ -55,6 +55,7 @@ export function openSidebar() {
  *        지연 후 display를 none으로 바꿔 클릭 영역과 임시 상태를 정리한다.
  */
 export function closeSidebar() {
+    closeSidebarNotices();
     const overlay = document.getElementById('sidebar-overlay');
     overlay.classList.remove('visible');
     document.body.classList.remove('sidebar-docked-open');
@@ -318,6 +319,7 @@ function enhanceMapSectionHeaders() {
  *        필요한 후속 렌더링 함수를 호출해 화면과 상태가 같은 기준을 보게 만든다.
  */
 export function switchSidebarTab(tabName) {
+    closeSidebarNotices();
     // 모든 탭 버튼과 콘텐츠 비활성화
     ['map', 'project', 'record'].forEach(t => {
         const btn = document.getElementById('tab-btn-' + t);
@@ -336,7 +338,11 @@ export function switchSidebarTab(tabName) {
         activeBtn.setAttribute('aria-pressed', 'true');
     }
     const title = document.getElementById('sidebar-panel-title');
-    if (title) title.textContent = { map: '지도 관리', project: '프로젝트 관리', record: '기록 관리' }[tabName] || 'F-Field';
+    if (title) {
+        title.textContent = { map: '지도 관리', project: '프로젝트 관리', record: '기록 관리' }[tabName] || 'F-Field';
+        const icon = activeBtn?.querySelector('svg');
+        if (icon) title.prepend(icon.cloneNode(true));
+    }
     if (activeContent) activeContent.classList.add('active');
 
     // 프로젝트 탭 열 때 목록 렌더링
@@ -344,3 +350,23 @@ export function switchSidebarTab(tabName) {
         renderProjectList();
     }
 }
+
+
+function closeSidebarNotices(except = null) {
+    document.querySelectorAll('.sidebar-info[open]').forEach(notice => {
+        if (notice !== except) notice.open = false;
+    });
+}
+
+document.addEventListener('click', event => {
+    closeSidebarNotices(event.target.closest('.sidebar-info'));
+}, true);
+document.addEventListener('keydown', event => {
+    if (event.key !== 'Escape') return;
+    const notice = document.querySelector('.sidebar-info[open]');
+    if (notice) {
+        closeSidebarNotices();
+        notice.querySelector('summary')?.focus();
+        event.stopPropagation();
+    }
+}, true);

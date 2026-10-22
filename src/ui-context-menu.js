@@ -28,7 +28,7 @@ export function initContextMenu() {
     menu.className = 'more-context-menu';
     menu.innerHTML = `
         <div class="more-menu-item" onclick="handleMenuAction('save')">
-            ${SVG_ICONS.save} 저장
+            ${SVG_ICONS.save} 내보내기
         </div>
         <div class="more-menu-item" onclick="handleMenuAction('edit')">
             ${SVG_ICONS.edit} 기록명 수정
